@@ -9,6 +9,7 @@
 typedef float mat3[9];
 typedef float mat4[16];
 // typedef __m128 quat;// __attribute__((vector_size(32)));
+typedef __m128 vec2;// __attribute__((vector_size(32)));
 typedef __m128 vec3;// __attribute__((vector_size(32)));
 // typedef __m128 vec4;// __attribute__((vector_size(32)));
 typedef float vec4[4], quat[4];
@@ -53,7 +54,7 @@ vec##n##_sub(scratch, a, b); \
 return vec##n##_len(scratch); \
 }
 
-// LINMATH_H_DEFINE_VEC(2)
+LINMATH_H_DEFINE_VEC(2)
 // LINMATH_H_DEFINE_VEC(3)
 LINMATH_H_DEFINE_VEC(4)
 
@@ -85,6 +86,10 @@ static inline vec3 vec3_min(const vec3 a, const vec3 b) {
 
 static inline vec3 vec3_copy(const vec3 a) {
   return vec3_create(a[0], a[1], a[2]);
+}
+
+static inline vec3 vec3_add(const vec3 a, const vec3 b) {
+  return vec3_create(a[0]+b[0], a[1]+b[1], a[2]+b[2]);
 }
 
 static inline vec3 vec3_sign(const vec3 a) {
@@ -119,6 +124,30 @@ static inline vec3 vec3_transform(const vec3 a, const mat4 m) {
                      (m[2] * x + m[6] * y + m[10] * z + m[14]) / w
                      );
 }
+
+static inline vec3 vec3_transform_quat(vec3 a, quat q) {
+  float x = a[0];
+  float y = a[1];
+  float z = a[2];
+  float qx = q[0];
+  float qy = q[1];
+  float qz = q[2];
+  float qw = q[3];
+
+  // calculate quat * vec
+  float ix = qw * x + qy * z - qz * y;
+  float iy = qw * y + qz * x - qx * z;
+  float iz = qw * z + qx * y - qy * x;
+  float iw = -qx * x - qy * y - qz * z;
+
+  // calculate result * inverse quat
+  return vec3_create(
+    ix * qw + iw * -qx + iy * -qz - iz * -qy,
+    iy * qw + iw * -qy + iz * -qx - ix * -qz,
+    iz * qw + iw * -qz + ix * -qy - iy * -qx
+  );
+};
+
 
 static inline vec3 vec3_reciprocal(vec3 const v) {
   return _mm_rcp_ps(v);

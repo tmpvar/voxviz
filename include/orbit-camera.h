@@ -66,6 +66,18 @@ static vec3 orbit_camera_unproject(const vec3 vec, const vec4 viewport, const ma
   return vec3_transform(r, inv);
 }
 
+static void orbit_camera_pan(vec3 vec) {
+  float d = orbit_camera.distance;
+  vec3 scratch;
+  scratch[0] = -d * vec[0];
+  scratch[1] =  d * vec[1];
+  scratch[2] =  d * vec[2];
+  orbit_camera.center = vec3_add(
+    orbit_camera.center,
+    vec3_transform_quat(scratch, orbit_camera.rotation)
+  );
+}
+
 static void orbit_camera_view(mat4 view) {
   quat q;
   vec3 s = vec3_create(0.0, 0.0, -orbit_camera.distance );
@@ -73,4 +85,11 @@ static void orbit_camera_view(mat4 view) {
   mat4_from_rotation_translation(view, q, s);
   mat4_translate(view, vec3_negate(orbit_camera.center));
 }
+
+static void orbit_camera_eye (vec3 out, mat4 view) {
+  out[0] = view[12];
+  out[1] = view[13];
+  out[2] = view[14];
+}
+
 #endif
