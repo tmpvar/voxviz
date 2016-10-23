@@ -14,8 +14,9 @@ include_directories(include ${OPENGL_INCLUDE_DIR})
 
 add_executable(
   voxviz
+  src/main.cpp
   src/glad.c
-  src/main.c
+  src/mesher.cpp
 )
 
 target_link_libraries(voxviz glfw ${OPENGL_gl_LIBRARY})
