@@ -1,34 +1,11 @@
-#define GLFW_INCLUDE_GLCOREARB
-
-#include <GLFW/glfw3.h>
+#include "gl-wrap.h"
 #include <stdio.h>
 
 #include "vec.h"
 #include "orbit-camera.h"
 #include "mesher.h"
 
-// Shader sources
-const GLchar* vertexSource =
-  "#version 150 core\n"
-  "in vec3 position;"
-  "uniform mat4 MVP;"
-  "uniform ivec3 dims;"
-  "out vec4 color;"
-  "void main()"
-  "{"
-  "  color = vec4(position/dims, 1.0);"
-  "  gl_Position = MVP * vec4(position, 1.0);"
-  "}";
-
-const GLchar* fragmentSource =
-  "#version 150 core\n"
-  "in vec4 color;"
-  "out vec4 outColor;"
-  "void main()"
-  "{"
-  // "  outColor = vec4(1.0);"
-  "  outColor = color;"
-  "}";
+#include <shaders/built.h>
 
 /*
   https://github.com/nothings/stb/blob/master/stb_voxel_render.h
@@ -37,7 +14,7 @@ const GLchar* fragmentSource =
 #include <iostream>
 #include <math.h>
 #include <string.h>
-#include <math.h>
+
 
 #define vol(i, j, k) volume[i + dims[0] * (j + dims[1] * k)]
 
@@ -106,15 +83,17 @@ int main(void) {
     }
   }
 
+  Mesh *voxel_mesh = new Mesh();
   std::vector<float> out_verts;
   std::vector<unsigned int> out_faces;
 
-  vx_mesher(volume, dims, out_verts, out_faces);
+  vx_mesher(volume, dims, voxel_mesh->verts, voxel_mesh->faces);
 
-  GLfloat *vertices = (GLfloat *)out_verts.data();
-  GLuint *elements = (GLuint *)out_faces.data();
-
-  std::cout << "verts: " << out_verts.size() << " elements: " << out_faces.size() << std::endl;
+  std::cout << "verts: "
+            << voxel_mesh->verts.size()
+            << " elements: "
+            << voxel_mesh->faces.size()
+            << std::endl;
 
   GLFWwindow* window;
 
@@ -138,41 +117,21 @@ int main(void) {
   glfwSetKeyCallback(window, key_callback);
   glfwMakeContextCurrent(window);
 
-  GLuint vao;
-  glGenVertexArrays(1, &vao);
-  glBindVertexArray(vao);
+  voxel_mesh->upload();
 
-  GLuint vbo;
-  glGenBuffers(1, &vbo);
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, out_verts.size()*3*sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+  Shaders::init();
 
-  GLuint ebo;
-  glGenBuffers(1, &ebo);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, out_faces.size()*3*sizeof(GLfloat), elements, GL_STATIC_DRAW);
+  Program *prog = new Program();
+  prog->add(Shaders::get("basic.vert"))
+      ->add(Shaders::get("color.frag"))
+      ->output("outColor")
+      ->link()
+      ->use();
 
-  GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource(vertexShader, 1, &vertexSource, NULL);
-  glCompileShader(vertexShader);
+  prog->attribute("position");
 
-  GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource(fragmentShader, 1, &fragmentSource, NULL);
-  glCompileShader(fragmentShader);
-
-  GLuint shaderProgram = glCreateProgram();
-  glAttachShader(shaderProgram, vertexShader);
-  glAttachShader(shaderProgram, fragmentShader);
-  glBindFragDataLocation(shaderProgram, 0, "outColor");
-  glLinkProgram(shaderProgram);
-  glUseProgram(shaderProgram);
-
-  GLint mvpUniform = glGetUniformLocation(shaderProgram, "MVP");
-  GLint dimsUniform = glGetUniformLocation(shaderProgram, "dims");
-
-  GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
-  glEnableVertexAttribArray(posAttrib);
-  glVertexAttribPointer(posAttrib, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), 0);
+  GLint mvpUniform = glGetUniformLocation(prog->handle, "MVP");
+  GLint dimsUniform = glGetUniformLocation(prog->handle, "dims");
 
   // Setup the orbit camera
   vec3 eye = vec3_create(0.0f, 0.0f, camera_z);
@@ -203,20 +162,17 @@ int main(void) {
     orbit_camera_view((float *)&viewMatrix);
     mat4_mul(MVP, perspectiveMatrix, viewMatrix);
     glUniformMatrix4fv(mvpUniform, 1, GL_FALSE, &MVP[0]);
-    glDrawElements(GL_TRIANGLES, out_verts.size() * 3, GL_UNSIGNED_INT, 0);
+
+    voxel_mesh->render(prog);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
-  glDeleteProgram(shaderProgram);
-  glDeleteShader(fragmentShader);
-  glDeleteShader(vertexShader);
+  delete prog;
+  delete voxel_mesh;
 
-  glDeleteBuffers(1, &ebo);
-  glDeleteBuffers(1, &vbo);
-
-  glDeleteVertexArrays(1, &vao);
+  Shaders::destroy();
 
   glfwTerminate();
   return 0;

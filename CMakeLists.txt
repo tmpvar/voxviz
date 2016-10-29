@@ -10,7 +10,9 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 find_package(OpenGL REQUIRED)
 
 add_subdirectory(deps/glfw)
-include_directories(include ${OPENGL_INCLUDE_DIR})
+add_subdirectory(shaders)
+
+include_directories(include ${OPENGL_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(
   voxviz
@@ -18,6 +20,8 @@ add_executable(
   src/glad.c
   src/mesher.cpp
 )
+
+add_dependencies(voxviz shaders_out)
 
 target_link_libraries(voxviz glfw ${OPENGL_gl_LIBRARY})
 target_link_libraries(voxviz )
