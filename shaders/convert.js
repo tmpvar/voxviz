@@ -43,7 +43,6 @@ class Shaders {
     }
 };
 
-// Define bytecount in file scope.
 std::map<const char *, Shader *> Shaders::instances;
 `)
 

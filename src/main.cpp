@@ -143,7 +143,7 @@ int main(void) {
 
   window_resize(window);
 
-  glUniform3i(dimsUniform, dims[0], dims[1], dims[2]);
+  prog->uniformVec3i("dims", dims);
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -156,7 +156,7 @@ int main(void) {
 
     orbit_camera_view((float *)&viewMatrix);
     mat4_mul(MVP, perspectiveMatrix, viewMatrix);
-    glUniformMatrix4fv(mvpUniform, 1, GL_FALSE, &MVP[0]);
+    prog->uniformMat4("MVP", MVP);
 
     voxel_mesh->render(prog);
 

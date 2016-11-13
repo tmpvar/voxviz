@@ -5,6 +5,8 @@
   #include <iostream>
   #include <vector>
 
+  #include "vec.h"
+
   static const char *shader_type(GLuint type) {
     switch (type) {
       // case GL_COMPUTE_SHADER:
@@ -92,7 +94,41 @@
       return this;
     }
 
-    // Program *uniform(const char *name, )
+    // template<class T> Program *uniform(const char *name, const T&) {}
+    //   // TODO: error handling
+    //   GLint loc = glGetUniformLocation(this->handle, name);
+    //   return this;
+    // }
+
+    Program *uniformVec2(const char *name, vec2 v) {
+      GLint loc = glGetUniformLocation(this->handle, name);
+      glUniform2f(loc, v[0], v[1]);
+      return this;
+    }
+
+    Program *uniformVec3(const char *name, vec3 v) {
+      GLint loc = glGetUniformLocation(this->handle, name);
+      glUniform3f(loc, v[0], v[1], v[2]);
+      return this;
+    }
+
+    Program *uniformVec3i(const char *name, int v[3]) {
+      GLint loc = glGetUniformLocation(this->handle, name);
+      glUniform3i(loc, v[0], v[1], v[2]);
+      return this;
+    }
+
+    Program *uniformVec4(const char *name, vec3 v) {
+      GLint loc = glGetUniformLocation(this->handle, name);
+      glUniform4f(loc, v[0], v[1], v[2], v[3]);
+      return this;
+    }
+
+    Program *uniformMat4(const char *name, mat4 v) {
+      GLint loc = glGetUniformLocation(this->handle, name);
+      glUniformMatrix4fv(loc, 1, GL_FALSE, &v[0]);
+      return this;
+    }
   };
 
   class Mesh {
