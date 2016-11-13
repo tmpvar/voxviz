@@ -19,6 +19,10 @@ add_executable(
   src/main.cpp
   src/glad.c
   src/mesher.cpp
+  include/gl-wrap.h
+  include/mesher.h
+  include/orbit-camera.h
+  include/vec.h
 )
 
 add_dependencies(voxviz shaders_out)

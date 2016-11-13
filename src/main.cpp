@@ -35,22 +35,23 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
   }
 }
 
-float window_aspect(GLFWwindow *window) {
-  int width, height;
-  glfwGetWindowSize(window, &width, &height);
+float window_aspect(GLFWwindow *window, int *width, int *height) {
+  glfwGetFramebufferSize(window, width, height);
 
-  float fw = static_cast<float>(width);
-  float fh = static_cast<float>(height);
+  float fw = static_cast<float>(*width);
+  float fh = static_cast<float>(*height);
 
   return fabs(fw / fh);
 }
 
-void window_size_callback(GLFWwindow* window, int width, int height) {
+void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
+  int width, height;
+
   // When reshape is called, update the view and projection matricies since this means the view orientation or size changed
   mat4_perspective(
     perspectiveMatrix,
     65.0f * (M_PI / 180.0f),
-    window_aspect(window),
+    window_aspect(window, &width, &height),
     0.1f,
     1000.0f
   );
@@ -107,7 +108,7 @@ int main(void) {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
   window = glfwCreateWindow(640, 480, "voxviz", NULL, NULL);
-  glfwSetWindowSizeCallback(window, window_size_callback);
+  glfwSetWindowSizeCallback(window, window_resize);
 
   if (!window) {
     glfwTerminate();
@@ -140,13 +141,7 @@ int main(void) {
 
   orbit_camera_init(eye, center, up);
 
-  mat4_perspective(
-    perspectiveMatrix,
-    65.0f * (M_PI / 180.0f),
-    window_aspect(window),
-    0.1f,
-    1000.0f
-  );
+  window_resize(window);
 
   glUniform3i(dimsUniform, dims[0], dims[1], dims[2]);
 

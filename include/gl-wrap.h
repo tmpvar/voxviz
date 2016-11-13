@@ -146,20 +146,4 @@
       );
     }
   };
-
-  // ====
-  /*
-  Program *prog = new Program();
-  prog->add(Shaders::get('basic.vert'))
-      ->add(Shaders::get('color.frag'))
-      ->output("outColor")
-      ->link();
-
-
-  prog->uniform("mvp", MVP)
-  prog->input()
-
-  // render mesh
-  mesh->render(prog); // calls prog->use
-  */
 #endif
