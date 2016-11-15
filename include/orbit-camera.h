@@ -86,10 +86,4 @@ static void orbit_camera_view(mat4 view) {
   mat4_translate(view, vec3_negate(orbit_camera.center));
 }
 
-static void orbit_camera_eye (vec3 out, mat4 view) {
-  out[0] = view[12];
-  out[1] = view[13];
-  out[2] = view[14];
-}
-
 #endif

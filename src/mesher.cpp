@@ -7,10 +7,10 @@
 
 #define add_quad(v00, v01, v02, v10, v11, v12, v20, v21, v22, v30, v31, v32) \
   const std::size_t vertex_count = vertices.size()/3; \
-  vertices.push_back(v00); vertices.push_back(v01); vertices.push_back(v02); \
-  vertices.push_back(v10); vertices.push_back(v11); vertices.push_back(v12); \
-  vertices.push_back(v20); vertices.push_back(v21); vertices.push_back(v22); \
-  vertices.push_back(v30); vertices.push_back(v31); vertices.push_back(v32); \
+  vertices.push_back(hdim[0] + v00); vertices.push_back(hdim[1] + v01); vertices.push_back(hdim[2] + v02); \
+  vertices.push_back(hdim[0] + v10); vertices.push_back(hdim[1] + v11); vertices.push_back(hdim[2] + v12); \
+  vertices.push_back(hdim[0] + v20); vertices.push_back(hdim[1] + v21); vertices.push_back(hdim[2] + v22); \
+  vertices.push_back(hdim[0] + v30); vertices.push_back(hdim[1] + v31); vertices.push_back(hdim[2] + v32); \
   faces.push_back(vertex_count + 0); \
   faces.push_back(vertex_count + 1); \
   faces.push_back(vertex_count + 2); \
@@ -25,7 +25,8 @@ void vx_stupid_mesher(
   std::vector<float> &vertices,
   std::vector<unsigned int> &faces
 ) {
-  int x[3] = {0,0,0}, n = 0;
+  int hdim[3] = {-dims[0]/2,-dims[1]/2,-dims[2]/2};
+  int x[3] = {0, 0, 0}, n = 0;
   for(x[2]=0; x[2]<dims[2]; ++x[2]) {
     for(x[1]=0; x[1]<dims[1]; ++x[1]) {
       for(x[0]=0; x[0]<dims[0]; ++x[0], ++n) {

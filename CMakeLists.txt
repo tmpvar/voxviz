@@ -19,6 +19,7 @@ add_executable(
   src/main.cpp
   src/glad.c
   src/mesher.cpp
+  src/raytrace.h
   include/gl-wrap.h
   include/mesher.h
   include/orbit-camera.h

@@ -4,6 +4,7 @@
 #include "vec.h"
 #include "orbit-camera.h"
 #include "mesher.h"
+#include "raytrace.h"
 
 #include <shaders/built.h>
 
@@ -53,7 +54,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     65.0f * (M_PI / 180.0f),
     window_aspect(window, &width, &height),
     0.1f,
-    1000.0f
+    10000.0f
   );
 
   glViewport(0, 0, width, height);
@@ -62,7 +63,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 int main(void) {
   memset(keys, 0, sizeof(keys));
 
-  int d = 32;
+  int d = 64;
   int hd = d / 2;
   int dims[3] = { d, d, d };
   size_t total_voxels = dims[0] * dims[1] * dims[2];
@@ -79,22 +80,10 @@ int main(void) {
         int dy = y - hd;
         int dz = z - hd;
 
-        vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd+5) > 0;
+        vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 8) > 0 ? 255 : 0;
       }
     }
   }
-
-  Mesh *voxel_mesh = new Mesh();
-  std::vector<float> out_verts;
-  std::vector<unsigned int> out_faces;
-
-  vx_mesher(volume, dims, voxel_mesh->verts, voxel_mesh->faces);
-
-  std::cout << "verts: "
-            << voxel_mesh->verts.size()
-            << " elements: "
-            << voxel_mesh->faces.size()
-            << std::endl;
 
   GLFWwindow* window;
 
@@ -103,7 +92,7 @@ int main(void) {
   }
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -118,7 +107,19 @@ int main(void) {
   glfwSetKeyCallback(window, key_callback);
   glfwMakeContextCurrent(window);
 
-  voxel_mesh->upload();
+  Mesh *voxel_mesh = new Mesh();
+  // std::vector<float> out_verts;
+  // std::vector<unsigned int> out_faces;
+
+  // vx_mesher(volume, dims, voxel_mesh->verts, voxel_mesh->faces);
+
+  // std::cout << "verts: "
+  //           << voxel_mesh->verts.size()
+  //           << " elements: "
+  //           << voxel_mesh->faces.size()
+  //           << std::endl;
+
+  // voxel_mesh->upload();
 
   Shaders::init();
 
@@ -129,21 +130,19 @@ int main(void) {
       ->link()
       ->use();
 
-  prog->attribute("position");
-
   GLint mvpUniform = glGetUniformLocation(prog->handle, "MVP");
   GLint dimsUniform = glGetUniformLocation(prog->handle, "dims");
 
   // Setup the orbit camera
   vec3 eye = vec3_create(0.0f, 0.0f, camera_z);
-  vec3 center = vec3_create(dims[0]/2.0f, dims[1]/2.0f, dims[2]/2.0f);
+  vec3 center = vec3f(0.0);//vec3_create(dims[0]/2.0f, dims[1]/2.0f, dims[2]/2.0f);
   vec3 up = vec3_create(0.0, 1.0, 0.0 );
 
   orbit_camera_init(eye, center, up);
 
   window_resize(window);
 
-  prog->uniformVec3i("dims", dims);
+  Raytracer *raytracer = new Raytracer(dims, volume);
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -153,12 +152,14 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     orbit_camera_rotate(0, 0, -.01, .01);
-
     orbit_camera_view((float *)&viewMatrix);
     mat4_mul(MVP, perspectiveMatrix, viewMatrix);
-    prog->uniformMat4("MVP", MVP);
 
-    voxel_mesh->render(prog);
+
+    // prog->use()->uniformMat4("MVP", MVP)->uniformVec3i("dims", dims);;
+    // voxel_mesh->render(prog, "position");
+
+    raytracer->render(MVP, mat4_get_eye(viewMatrix));
 
     glfwSwapBuffers(window);
     glfwPollEvents();
@@ -166,6 +167,7 @@ int main(void) {
 
   delete prog;
   delete voxel_mesh;
+  delete raytracer;
 
   Shaders::destroy();
 
