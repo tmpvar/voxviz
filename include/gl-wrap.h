@@ -1,11 +1,16 @@
 #ifndef GL_WRAP_H
 #define GL_WRAP_H
-  #define GLFW_INCLUDE_GLCOREARB
+
+#if defined(__APPLE__)
+#define GLFW_INCLUDE_GLCOREARB
+#else
+#define GL_GLEXT_PROTOTYPES
+#endif
+  #include <glad/glad.h>
   #include <GLFW/glfw3.h>
   #include <iostream>
   #include <vector>
-
-  #include "vec.h"
+  #include <glm/glm.hpp>
 
   GLint gl_error() {
     GLint error = glGetError();
@@ -45,9 +50,10 @@
     glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
     if(error || isCompiled == GL_FALSE) {
       glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
-      char s[m];
+      char *s = (char *)malloc(m * sizeof(char));
       glGetShaderInfoLog(shader, m, &l, s);
       printf("shader log:\n%s\n", s);
+      free(s);
     }
   }
 
@@ -142,14 +148,15 @@
       return this;
     }
 
-    Program *uniformVec2(const char *name, vec2 v) {
+    Program *uniformVec2(const char *name, glm::vec2 v) {
       GLint loc = glGetUniformLocation(this->handle, name);
       glUniform2f(loc, v[0], v[1]);
       return this;
     }
 
-    Program *uniformVec3(const char *name, vec3 v) {
+    Program *uniformVec3(const char *name, glm::vec3 v) {
       GLint loc = glGetUniformLocation(this->handle, name);
+		
       glUniform3f(loc, v[0], v[1], v[2]);
       return this;
     }
@@ -160,15 +167,15 @@
       return this;
     }
 
-    Program *uniformVec4(const char *name, vec3 v) {
+    Program *uniformVec4(const char *name, glm::vec3 v) {
       GLint loc = glGetUniformLocation(this->handle, name);
       glUniform4f(loc, v[0], v[1], v[2], v[3]);
       return this;
     }
 
-    Program *uniformMat4(const char *name, mat4 v) {
+    Program *uniformMat4(const char *name, glm::mat4 v) {
       GLint loc = glGetUniformLocation(this->handle, name);
-      glUniformMatrix4fv(loc, 1, GL_FALSE, &v[0]);
+      glUniformMatrix4fv(loc, 1, GL_FALSE, &v[0][0]);
       return this;
     }
 

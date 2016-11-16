@@ -1,7 +1,7 @@
 #include "gl-wrap.h"
 #include <stdio.h>
+#include <glm/glm.hpp>
 
-#include "vec.h"
 #include "orbit-camera.h"
 #include "mesher.h"
 #include "raytrace.h"
@@ -13,6 +13,8 @@
 */
 
 #include <iostream>
+
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <string.h>
 
@@ -20,7 +22,7 @@
 #define vol(i, j, k) volume[i + dims[0] * (j + dims[1] * k)]
 
 bool keys[1024];
-mat4 viewMatrix, perspectiveMatrix, MVP;
+glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -49,9 +51,9 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   int width, height;
 
   // When reshape is called, update the view and projection matricies since this means the view orientation or size changed
-  mat4_perspective(
-    perspectiveMatrix,
-    65.0f * (M_PI / 180.0f),
+  
+  perspectiveMatrix = glm::perspective(
+    45.0f,
     window_aspect(window, &width, &height),
     0.1f,
     10000.0f
@@ -92,7 +94,7 @@ int main(void) {
   }
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -106,6 +108,7 @@ int main(void) {
 
   glfwSetKeyCallback(window, key_callback);
   glfwMakeContextCurrent(window);
+  gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
   Mesh *voxel_mesh = new Mesh();
   // std::vector<float> out_verts;
@@ -134,9 +137,9 @@ int main(void) {
   GLint dimsUniform = glGetUniformLocation(prog->handle, "dims");
 
   // Setup the orbit camera
-  vec3 eye = vec3_create(0.0f, 0.0f, camera_z);
-  vec3 center = vec3f(0.0);//vec3_create(dims[0]/2.0f, dims[1]/2.0f, dims[2]/2.0f);
-  vec3 up = vec3_create(0.0, 1.0, 0.0 );
+  glm::vec3 eye(0.0, 0.0, camera_z);
+  glm::vec3 center(0.0, 0.0, 0.0);//vec3_create(dims[0]/2.0f, dims[1]/2.0f, dims[2]/2.0f);
+  glm::vec3 up(0.0, 1.0, 0.0);
 
   orbit_camera_init(eye, center, up);
 
@@ -152,14 +155,17 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     orbit_camera_rotate(0, 0, -.01, .01);
-    orbit_camera_view((float *)&viewMatrix);
-    mat4_mul(MVP, perspectiveMatrix, viewMatrix);
+    viewMatrix = orbit_camera_view();
+    MVP = perspectiveMatrix * viewMatrix;
 
 
     // prog->use()->uniformMat4("MVP", MVP)->uniformVec3i("dims", dims);;
     // voxel_mesh->render(prog, "position");
 
-    raytracer->render(MVP, mat4_get_eye(viewMatrix));
+    glm::mat4 invertedView = glm::inverse(viewMatrix);
+    // TODO: this might be wrong
+    glm::vec3 currentEye(invertedView[0][3], invertedView[1][3], invertedView[2][3]);
+    raytracer->render(MVP, currentEye);
 
     glfwSwapBuffers(window);
     glfwPollEvents();

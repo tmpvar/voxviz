@@ -1,10 +1,10 @@
 #ifndef __RAYTRACE_H_
 #define __RAYTRACE_H_
   #include "gl-wrap.h"
-  #include "vec.h"
+
   #include "shaders/built.h"
   #include <iostream>
-
+  #include <glm/glm.hpp>
   #include <string.h>
 
   using namespace std;
@@ -21,7 +21,7 @@
     Raytracer(int *dimensions, int *volume) {
       this->dims = dimensions;
 
-      vec3 hd = vec3_create(dims[0]/2, dims[1]/2, dims[2]/2);
+      glm::vec3 hd(dims[0]/2, dims[1]/2, dims[2]/2);
 
       this->program = new Program();
       this->program
@@ -105,8 +105,6 @@
       );
 
       gl_error();
-cout << "down here" << endl;
-
     }
 
     ~Raytracer() {
@@ -114,13 +112,13 @@ cout << "down here" << endl;
       // free(this->volume);
     }
 
-    void render (mat4 mvp, vec3 eye) {
+    void render (glm::mat4 mvp, glm::vec3 eye) {
       this->program->use();
       this->program
           ->uniformMat4("MVP", mvp)
           ->uniformVec3("eye", eye)
           ->uniformVec3i("dims", this->dims);
-gl_error();
+
       glBindTexture(GL_TEXTURE_3D, this->volumeTexture);
       glActiveTexture(GL_TEXTURE0);
       gl_error();

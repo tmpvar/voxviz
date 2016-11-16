@@ -1,49 +1,61 @@
 #ifndef __ORBIT_CAMERA__
 #define __ORBIT_CAMERA__
 
-#include "vec.h"
+#include <glm/glm.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 struct {
-  quat rotation;
-  vec3 center, v3scratch;
+  glm::quat rotation;
+  glm::vec3 center, v3scratch;
   float distance;
-  mat4 scratch0, scratch1;
+  glm::mat4 scratch0, scratch1;
 } orbit_camera;
 
-static void orbit_camera_lookat(const vec3 eye, const vec3 center, const vec3 up) {
-  mat4_look_at(orbit_camera.scratch0, eye, center, up);
-  quat_from_mat4(orbit_camera.rotation, orbit_camera.scratch0);
-  quat_norm(orbit_camera.rotation, orbit_camera.rotation);
+static void orbit_camera_lookat(const glm::vec3 eye, const glm::vec3 center, const glm::vec3 up) {
+  orbit_camera.rotation = glm::normalize(glm::quat_cast(glm::lookAt(eye, center, up)));
   orbit_camera.center = center;
-  orbit_camera.distance = vec3_distance(eye, center);
+  orbit_camera.distance = glm::distance(eye, center);
 }
 
-static void orbit_camera_init(const vec3 eye, const vec3 center, const vec3 up) {
-  quat_identity(orbit_camera.rotation);
+static void orbit_camera_init(const glm::vec3 eye, const glm::vec3 center, const glm::vec3 up) {
   orbit_camera_lookat(eye, center, up);
 }
 
+static glm::quat quat_from_vec3(const glm::vec3 vec) {
+  float x = vec[0];
+  float y = vec[1];
+  float z = vec[2];
+  float s = x*x + y*y;
+  if (s > 1.0) {
+    s = 1.0;
+  }
+
+  if (z == 0.0) {
+    z = sqrtf(1.0 - s);
+  }
+
+  return glm::quat(-x, y, z, 0.0);
+}
+
 static void orbit_camera_rotate(const float sx, const float sy, const float ex, const float ey) {
-  const vec3 vs = vec3_create(sx, sy, 0.0f);
-  const vec3 ve = vec3_create(ex, ey, 0.0f);
-  quat s, e;
+  const glm::vec3 vs = glm::vec3(sx, sy, 0.0f);
+  const glm::vec3 ve = glm::vec3(ex, ey, 0.0f);
+ 
+  glm::quat s = quat_from_vec3(vs);
+  glm::quat e = glm::inverse(quat_from_vec3(ve));
 
-  quat_from_vec3(s, vs);
-  quat_from_vec3(e, ve);
-
-  quat_invert(e, e);
-  quat_mul(s, s, e);
-
-  if(vec4_len(s) < 1e-6) {
-    printf("MISS %f\n", vec4_len(s));
+  s = s * e;
+ 
+  if(glm::length(s) < 1e-6) {
+    printf("MISS %f\n", glm::length(s));
     return;
   }
 
-  quat_mul(orbit_camera.rotation, orbit_camera.rotation, s);
-  quat_norm(orbit_camera.rotation, orbit_camera.rotation);
+  orbit_camera.rotation = glm::normalize(orbit_camera.rotation * s);
 }
-
-static vec3 orbit_camera_unproject(const vec3 vec, const vec4 viewport, const mat4 inv) {
+/*
+static glm::vec3 orbit_camera_unproject(const glm::vec3 vec, const vec4 viewport, const glm::mat4 inv) {
   float viewX = viewport[0];
   float viewY = viewport[1];
   float viewWidth = viewport[2];
@@ -57,33 +69,34 @@ static vec3 orbit_camera_unproject(const vec3 vec, const vec4 viewport, const ma
   y = viewHeight - y - 1;
   y = y - viewY;
 
-  vec3 r = vec3_create(
-                       (2 * x) / viewWidth - 1,
-                       (2 * y) / viewHeight - 1,
-                       2 * z - 1
-                       );
+  glm::vec3 r = glm::vec3(
+    (2 * x) / viewWidth - 1,
+    (2 * y) / viewHeight - 1,
+    2 * z - 1
+  );
 
-  return vec3_transform(r, inv);
+  return glm::transform(r, inv);
 }
 
-static void orbit_camera_pan(vec3 vec) {
+static void orbit_camera_pan(glm::vec3 vec) {
   float d = orbit_camera.distance;
-  vec3 scratch;
+  glm::vec3 scratch;
   scratch[0] = -d * vec[0];
   scratch[1] =  d * vec[1];
   scratch[2] =  d * vec[2];
-  orbit_camera.center = vec3_add(
-    orbit_camera.center,
-    vec3_transform_quat(scratch, orbit_camera.rotation)
-  );
+  // TODO: Busted
+  // orbit_camera.center = orbit_camera.center + glm::vec3_transform_quat(scratch, orbit_camera.rotation);
 }
+*/
 
-static void orbit_camera_view(mat4 view) {
-  quat q;
-  vec3 s = vec3_create(0.0, 0.0, -orbit_camera.distance );
-  quat_conj(q, orbit_camera.rotation);
-  mat4_from_rotation_translation(view, q, s);
-  mat4_translate(view, vec3_negate(orbit_camera.center));
+static glm::mat4 orbit_camera_view() {
+  glm::vec3 s = glm::vec3(0.0, 0.0, -orbit_camera.distance);
+  glm::quat q = glm::conjugate(orbit_camera.rotation);
+
+  glm::mat4 rot = glm::mat4_cast(orbit_camera.rotation);
+  glm::mat4 trans = glm::translate(glm::mat4(1.0f), s);
+  glm::mat4 view = trans * rot;
+  return view;
 }
 
 #endif

@@ -72,7 +72,7 @@ void vx_greedy_mesher(
       , x[3] = {0,0,0}
       , q[3] = {0,0,0};
 
-    int mask[(dims[u] * dims[v])];
+    int *mask = (int *)malloc(sizeof(int) * dims[u] * dims[v]);
 
     q[d] = 1;
     for(x[d]=-1; x[d]<dims[d]; ) {
@@ -175,6 +175,7 @@ void vx_greedy_mesher(
         }
       }
     }
+    free(mask);
   }
 }
 
@@ -193,7 +194,8 @@ void vx2_mesher(
 
     // printf("u: %ld, v: %ld\n", u, v);
 
-    int x[3] = {0}, q[3] = {0}, mask[dims[u] * dims[v]];
+    int x[3] = { 0 }, q[3] = { 0 };
+    int *mask = (int *)malloc(sizeof(int) * dims[u] * dims[v]);
     // printf("dims[u]: %d, dims[v]: %d\n", dims[u], dims[v]);
 
     // printf("x: %d, %d, %d\n", x[0], x[1], x[2]);
@@ -335,6 +337,6 @@ void vx2_mesher(
 
 
     // printf("\n");
-
+    free(mask);
   }
 }

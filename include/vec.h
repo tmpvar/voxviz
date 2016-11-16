@@ -9,12 +9,13 @@
 typedef float mat3[9];
 typedef float mat4[16];
 // typedef __m128 quat;// __attribute__((vector_size(32)));
-typedef __m128 vec2;// __attribute__((vector_size(32)));
-typedef __m128 vec3;// __attribute__((vector_size(32)));
+typedef float vec2[2];// __attribute__((vector_size(32)));
+typedef float vec3[3];// __attribute__((vector_size(32)));
+
 // typedef __m128 vec4;// __attribute__((vector_size(32)));
 typedef float vec4[4], quat[4];
-vec3 _zero = {0.0f, 0.0f, 0.0f, 0.0f};
-vec3 _negative_zero = {-0.0f, -0.0f, -0.0f, -0.0f};
+vec3 _zero = {0.0f, 0.0f, 0.0f};
+vec3 _negative_zero = {-0.0f, -0.0f, -0.0f};
 
 #define LINMATH_H_DEFINE_VEC(n) \
 static inline void vec##n##_add(vec##n r, vec##n const a, vec##n const b) \
@@ -55,52 +56,69 @@ return vec##n##_len(scratch); \
 }
 
 LINMATH_H_DEFINE_VEC(2)
-// LINMATH_H_DEFINE_VEC(3)
+LINMATH_H_DEFINE_VEC(3)
 LINMATH_H_DEFINE_VEC(4)
 
 /* ok then */
 
-static inline vec3 vec3_create(const float x, const float y, const float z) {
-  return _mm_setr_ps(x, y, z, 0.0f);
+static inline float *vec3_create(const float x, const float y, const float z) {
+  vec3 out = { x, y, z };
+  return out;
 }
 
-static inline vec3 vec3f(const float x) {
-  return _mm_set1_ps(x);
+static inline float *vec3f(const float x) {
+  return vec3_create(x, x, x);
 }
 
-static inline float vec3_len(vec3 const v) {
-  return _mm_cvtss_f32(_mm_sqrt_ss(_mm_dp_ps(v, v, 0x71)));
+static inline float *vec3_max(const vec3 a, const vec3 b) {
+  return vec3_create(
+    max(a[0], b[0]),
+    max(a[1], b[1]),
+    max(a[2], b[2])
+  );
+
 }
 
-static inline float vec3_distance(vec3 const a, vec3 const b) {
-  return vec3_len(a - b);
+static inline float *vec3_min(const vec3 a, const vec3 b) {
+  return vec3_create(
+    min(a[0], b[0]),
+    min(a[1], b[1]),
+    min(a[2], b[2])
+  );
 }
 
-static inline vec3 vec3_max(const vec3 a, const vec3 b) {
-  return _mm_max_ps(a, b);
+static inline float *vec3_mul(const vec3 a, const vec3 b) {
+  return vec3_create(
+    a[0] * b[0],
+    a[1] * b[1],
+    a[2] * b[2]
+  );
 }
 
-static inline vec3 vec3_min(const vec3 a, const vec3 b) {
-  return _mm_min_ps(a, b);
-}
-
-static inline vec3 vec3_copy(const vec3 a) {
+static inline float *vec3_copy(const vec3 a) {
   return vec3_create(a[0], a[1], a[2]);
 }
 
-static inline vec3 vec3_add(const vec3 a, const vec3 b) {
+static inline float *vec3_add(const vec3 a, const vec3 b) {
   return vec3_create(a[0]+b[0], a[1]+b[1], a[2]+b[2]);
 }
 
-static inline vec3 vec3_sign(const vec3 a) {
-  return _mm_cvtepi32_ps((a < _zero) - (a > _zero));
+static inline float *vec3_abs(const vec3 a) {
+  return vec3_create(
+    abs(a[0]),
+    abs(a[1]),
+    abs(a[2])
+  );
 }
 
-static inline vec3 vec3_abs(const vec3 a) {
-  return _mm_max_ps(_mm_sub_ps(_mm_setzero_ps(), a), a);
+static inline void vec3_set(vec3 dest, vec3 src) {
+  dest[0] = src[0];
+  dest[1] = src[1];
+  dest[2] = src[2];
 }
 
-static inline vec3 vec3_mul_cross(const vec3 a, const vec3 b) {
+
+static inline float *vec3_mul_cross(const vec3 a, const vec3 b) {
   return vec3_create(
                      a[1]*b[2] - a[2]*b[1],
                      a[2]*b[0] - a[0]*b[2],
@@ -108,7 +126,7 @@ static inline vec3 vec3_mul_cross(const vec3 a, const vec3 b) {
                      );
 }
 
-static inline vec3 vec3_transform(const vec3 a, const mat4 m) {
+static inline float *vec3_transform(const vec3 a, const mat4 m) {
   float x = a[0];
   float y = a[1];
   float z = a[2];
@@ -125,7 +143,7 @@ static inline vec3 vec3_transform(const vec3 a, const mat4 m) {
                      );
 }
 
-static inline vec3 vec3_transform_quat(vec3 a, quat q) {
+static inline float *vec3_transform_quat(vec3 a, quat q) {
   float x = a[0];
   float y = a[1];
   float z = a[2];
@@ -149,21 +167,33 @@ static inline vec3 vec3_transform_quat(vec3 a, quat q) {
 };
 
 
-static inline vec3 vec3_reciprocal(vec3 const v) {
-  return _mm_rcp_ps(v);
+static inline float *vec3_reciprocal(vec3 const v) {
+  return vec3_create(
+    1.0f / v[0],
+    1.0f / v[1],
+    1.0f / v[2]
+  );
 }
 
-static inline vec3 vec3_negate(vec3 const v) {
-  return -v;
+static inline float *vec3_negate(vec3 const v) {
+  return vec3_create(
+    -v[0],
+    -v[1],
+    -v[2]
+  );
 }
 
-static  vec3 vec3_norm(vec3 const v) {
+static float *vec3_norm(vec3 const v) {
   float len = vec3_len(v);
   if (len < 0.000000001) {
     return vec3_create(0, 0, 0);
   }
   float i = 1.0 / len;
-  return v * vec3_create(i, i, i);
+  return vec3_create(
+    v[0] * i,
+    v[1] * i,
+    v[2] * i
+  );
 }
 
 static inline void vec4_norm(vec4 r, vec4 const v) {
@@ -282,7 +312,7 @@ static inline uint8_t mat4_invert(mat4 r, const mat4 a) {
   return 1;
 }
 
-static inline vec3 mat4_get_eye(const mat4 m) {
+static inline float *mat4_get_eye(const mat4 m) {
   mat4 scratch;
   mat4_invert(scratch, m);
   return vec3_create(
@@ -325,13 +355,13 @@ static inline void mat4_mul(mat4 r, mat4 a, mat4 b) {
 
 }
 
-static inline void mat4_perspective(mat4 m, const float fovy, const float aspect, const float near, const float far) {
+static inline void mat4_perspective(mat4 m, const float fovy, const float aspect, const float nearDist, const float farDist) {
   const float f = 1.0 / tanf(fovy / 2);
-  const float nf = 1 / (near - far);
+  const float nf = 1.0 / (nearDist - farDist);
   const float a = f / aspect;
 
-  const float b = (far + near) * nf;
-  const float c = (2.0 * far * near) * nf;
+  const float b = (farDist + nearDist) * nf;
+  const float c = (2.0 * farDist * nearDist) * nf;
 
   mat4_set(m,
            a, 0, 0,  0,
@@ -517,10 +547,11 @@ static inline void quat_conj(quat r, const quat q) {
 static inline void quat_rotate(quat r, const float angle, const vec3 axis) {
   float halfAngle = angle / 2.0f;
   float sinha = sinf(halfAngle);
-  vec3 v = axis * vec3_create(sinha, sinha, sinha);
-  int i;
-  for(i=0; i<3; ++i)
-    r[i] = v[i];
+  vec3 p = (vec3 *)vec3f(sinha);
+  vec3 v = vec3_mul(axis, p);
+  r[0] = v[0];
+  r[1] = v[1];
+  r[2] = v[2];
   r[3] = cosf(halfAngle);
 }
 #define quat_norm vec4_norm
@@ -609,7 +640,7 @@ static inline void mat4_from_quat(mat4 m, quat q)
            );
 }
 
-static inline void quat_from_vec3(quat q, const vec3 vec) {
+static inline void quat_from_vec3_old(quat q, const vec3 vec) {
   float x = vec[0];
   float y = vec[1];
   float z = vec[2];

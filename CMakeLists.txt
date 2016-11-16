@@ -10,6 +10,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 find_package(OpenGL REQUIRED)
 
 add_subdirectory(deps/glfw)
+add_subdirectory(deps/glm)
 add_subdirectory(shaders)
 
 include_directories(include ${OPENGL_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -23,10 +24,10 @@ add_executable(
   include/gl-wrap.h
   include/mesher.h
   include/orbit-camera.h
-  include/vec.h
+  build/shaders/built.h
 )
 
 add_dependencies(voxviz shaders_out)
 
-target_link_libraries(voxviz glfw ${OPENGL_gl_LIBRARY})
+target_link_libraries(voxviz glfw glm ${OPENGL_gl_LIBRARY})
 target_link_libraries(voxviz )
