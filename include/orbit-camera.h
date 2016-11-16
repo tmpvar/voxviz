@@ -89,6 +89,10 @@ static void orbit_camera_pan(glm::vec3 vec) {
 }
 */
 
+static void orbit_camera_zoom(const float amount) {
+  orbit_camera.distance += amount;
+}
+
 static glm::mat4 orbit_camera_view() {
   glm::vec3 s = glm::vec3(0.0, 0.0, -orbit_camera.distance);
   glm::quat q = glm::conjugate(orbit_camera.rotation);

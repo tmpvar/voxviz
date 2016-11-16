@@ -9,5 +9,5 @@ out vec3 rayOrigin;
 void main() {
   color = vec4(position/dims, 1.0);
   rayOrigin = position;
-  gl_Position = MVP * vec4(position * vec3(1.1), 1.0);
+  gl_Position = MVP * vec4(position, 1.0);
 }

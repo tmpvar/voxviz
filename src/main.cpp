@@ -65,7 +65,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 int main(void) {
   memset(keys, 0, sizeof(keys));
 
-  int d = 64;
+  int d = 256;
   int hd = d / 2;
   int dims[3] = { d, d, d };
   size_t total_voxels = dims[0] * dims[1] * dims[2];
@@ -82,7 +82,7 @@ int main(void) {
         int dy = y - hd;
         int dz = z - hd;
 
-        vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 8) > 0 ? 255 : 0;
+        vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 15) > 0 ? 255 : 0;
       }
     }
   }
@@ -146,7 +146,7 @@ int main(void) {
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, volume);
-
+  glfwSwapInterval(0);
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -158,13 +158,21 @@ int main(void) {
     viewMatrix = orbit_camera_view();
     MVP = perspectiveMatrix * viewMatrix;
 
+    if (keys[GLFW_KEY_W]) {
+      orbit_camera_zoom(-5);
+    }
+
+    if (keys[GLFW_KEY_S]) {
+      orbit_camera_zoom(5);
+    }
+
 
     // prog->use()->uniformMat4("MVP", MVP)->uniformVec3i("dims", dims);;
     // voxel_mesh->render(prog, "position");
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     // TODO: this might be wrong
-    glm::vec3 currentEye(invertedView[0][3], invertedView[1][3], invertedView[2][3]);
+    glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
     raytracer->render(MVP, currentEye);
 
     glfwSwapBuffers(window);
