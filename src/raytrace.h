@@ -35,38 +35,22 @@
       this->mesh = new Mesh();
 
       this->mesh
-        ->face( 0,  1,  2)->face( 0,  2,  3)
-        ->face( 4,  5,  6)->face( 4,  6,  7)
-        ->face( 8,  9, 10)->face( 8, 10, 11)
+        ->face(0, 1, 2)->face(0, 2, 3)
+        ->face(4, 6, 5)->face(4, 7, 6)
+        ->face(8, 10, 9)->face( 8, 11, 10)
         ->face(12, 13, 14)->face(12, 14, 15)
-        ->face(16, 17, 18)->face(16, 18, 19)
+        ->face(16, 18, 17)->face(19, 18, 16)
         ->face(20, 21, 22)->face(20, 22, 23);
 
       this->mesh
-        ->vert(-hd[0], -hd[1],  hd[2])
-        ->vert( hd[0], -hd[1],  hd[2])
-        ->vert( hd[0],  hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1],  hd[2])
-        ->vert( hd[0],  hd[1],  hd[2])
-        ->vert( hd[0],  hd[1], -hd[2])
-        ->vert( hd[0], -hd[1], -hd[2])
-        ->vert( hd[0], -hd[1],  hd[2])
-        ->vert(-hd[0], -hd[1], -hd[2])
-        ->vert( hd[0], -hd[1], -hd[2])
-        ->vert( hd[0],  hd[1], -hd[2])
-        ->vert(-hd[0],  hd[1], -hd[2])
-        ->vert(-hd[0], -hd[1], -hd[2])
-        ->vert(-hd[0], -hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1], -hd[2])
-        ->vert( hd[0],  hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1], -hd[2])
-        ->vert( hd[0],  hd[1], -hd[2])
-        ->vert(-hd[0], -hd[1], -hd[2])
-        ->vert( hd[0], -hd[1], -hd[2])
-        ->vert( hd[0], -hd[1],  hd[2])
-        ->vert(-hd[0], -hd[1],  hd[2])
+        ->vert(-hd[0], -hd[1],  hd[2])->vert( hd[0], -hd[1],  hd[2])->vert( hd[0],  hd[1],  hd[2])
+        ->vert(-hd[0],  hd[1],  hd[2])->vert( hd[0],  hd[1],  hd[2])->vert( hd[0],  hd[1], -hd[2])
+        ->vert( hd[0], -hd[1], -hd[2])->vert( hd[0], -hd[1],  hd[2])->vert(-hd[0], -hd[1], -hd[2])
+        ->vert( hd[0], -hd[1], -hd[2])->vert( hd[0],  hd[1], -hd[2])->vert(-hd[0],  hd[1], -hd[2])
+        ->vert(-hd[0], -hd[1], -hd[2])->vert(-hd[0], -hd[1],  hd[2])->vert(-hd[0],  hd[1],  hd[2])
+        ->vert(-hd[0],  hd[1], -hd[2])->vert( hd[0],  hd[1],  hd[2])->vert(-hd[0],  hd[1],  hd[2])
+        ->vert(-hd[0],  hd[1], -hd[2])->vert( hd[0],  hd[1], -hd[2])->vert(-hd[0], -hd[1], -hd[2])
+        ->vert( hd[0], -hd[1], -hd[2])->vert( hd[0], -hd[1],  hd[2])->vert(-hd[0], -hd[1],  hd[2])
         ->upload();
 
       // convert the volume into a 3d texture

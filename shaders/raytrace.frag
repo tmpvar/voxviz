@@ -29,20 +29,23 @@ void main() {
 
   ivec3 mapPos = ivec3(floor(pos + 0.));
 
+  // ensure we are inside
+  if (gl_FrontFacing == false) {
+    mapPos = ivec3(floor(eye + 0.));
+  }
+
   vec3 deltaDist = abs(vec3(length(dir)) / dir);
 
   ivec3 rayStep = ivec3(sign(dir));
 
   vec3 sideDist = (sign(dir) * (vec3(mapPos) - pos) + (sign(dir) * 0.5) + 0.5) * deltaDist;
 
-  // bvec3 mask;
-
   vec3 uv = (fdims / 2.0 + pos)/ (fdims);
 
   bvec3 mask;
-  for (int i=0; i<10000; i++) {
+  for (int i=0; i<500; i++) {
     if (getVoxel(mapPos, fdims) > 0.0) {
-      outColor = vec4(uv, 1.0);
+      outColor = vec4((fdims / 2.0 + mapPos)/ (fdims), 1.0);
       break;
     }
 
@@ -54,18 +57,16 @@ void main() {
     sideDist += vec3(mask) * deltaDist;
     mapPos += ivec3(mask) * rayStep;
 
-    if (any(greaterThanEqual(abs(mapPos), dims))) {
-      discard;
-      return;
-    }
+    // if (any(greaterThanEqual(abs(mapPos), dims))) {
+    //   discard;
+    //   return;
+    // }
   }
 
   if (mask.x) {
-    outColor = vec4(uv * 0.5, 1.0);
-  } else if (mask.y) {
-    outColor = vec4(uv * 1.0, 1.0);
+    outColor = outColor * 0.5;
   } else if (mask.z) {
-    outColor = vec4(uv * 0.75, 1.0);
+    outColor = outColor * 0.75;
   }
 
 }

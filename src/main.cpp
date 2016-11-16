@@ -146,7 +146,7 @@ int main(void) {
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, volume);
-  glfwSwapInterval(0);
+
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
