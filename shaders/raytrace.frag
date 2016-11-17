@@ -1,16 +1,17 @@
 #version 330 core
 
 in vec3 rayOrigin;
-in vec4 color;
+
 out vec4 outColor;
 
 uniform sampler3D volume;
 uniform ivec3 dims;
 uniform vec3 eye;
+uniform vec3 center;
 uniform int showHeat;
 
 float getVoxel(vec3 worldPos, vec3 fdims, vec3 hfdims) {
-  vec3 pos = (hfdims + worldPos) / (fdims);
+  vec3 pos = (hfdims + worldPos - center) / (fdims);
   return texture(volume, pos).r;
 }
 
@@ -30,9 +31,9 @@ void main() {
   vec3 fdims = vec3(dims);
   vec3 hfdims = fdims / 2.0;
   vec3 pos = rayOrigin;
-  vec3 dir = rayOrigin - eye;
+  vec3 dir = normalize(rayOrigin - eye);
 
-  ivec3 mapPos = gl_FrontFacing ? ivec3(floor(pos + 0.)) : ivec3(floor(eye + 0.));
+  ivec3 mapPos = gl_FrontFacing ? ivec3(floor(pos)) : ivec3(floor(eye));
 
   vec3 deltaDist = abs(vec3(length(dir)) / dir);
 
@@ -40,6 +41,7 @@ void main() {
 
   vec3 sideDist = (sign(dir) * (vec3(mapPos) - pos) + (sign(dir) * 0.5) + 0.5) * deltaDist;
   int i;
+  bool miss = true;
   for (i=0; i<300; i++) {
     bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
     if (getVoxel(mapPos, fdims, hfdims) > 0.0) {
@@ -51,23 +53,27 @@ void main() {
       } else if (mask.z) {
         outColor = outColor * 0.75;
       }
-
+      miss = false;
       break;
     }
-
-    //All components of mask are false except for the corresponding largest component
-    //of sideDist, which is the axis along which the ray should be incremented.
 
     sideDist += vec3(mask) * deltaDist;
     mapPos += ivec3(mask) * rayStep;
 
-    if (any(lessThan(mapPos, -hfdims)) || any(greaterThan(mapPos, hfdims))) {
+    if (any(lessThan(mapPos, (center-hfdims))) || any(greaterThan(mapPos, (center + hfdims)))) {
       break;
     }
   }
 
   if (showHeat == 1) {
-    outColor = mix(outColor, heat(i, 300), 0.75);
+    outColor = heat(i, 300);
+    return;
+  }
+
+  // putting this inside of the if above causes the computer to hang
+  // this works a bit better, but is probably slower?
+  if (miss) {
+    discard;
   }
 }
 

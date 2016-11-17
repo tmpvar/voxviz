@@ -7,8 +7,10 @@
   #include <glm/glm.hpp>
   #include <string.h>
 
+  #include "volume.h"
   using namespace std;
 
+  #define VOLUME_COUNT 4
 
   class Raytracer {
     public:
@@ -19,6 +21,8 @@
     GLuint volumeTexture;
 
     int showHeat;
+
+    Volume *volumes[VOLUME_COUNT];
 
     Raytracer(int *dimensions, int *volume) {
       this->dims = dimensions;
@@ -45,57 +49,36 @@
         ->face(20, 21, 22)->face(20, 22, 23);
 
       this->mesh
-        ->vert(-hd[0], -hd[1],  hd[2])->vert( hd[0], -hd[1],  hd[2])->vert( hd[0],  hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1],  hd[2])->vert( hd[0],  hd[1],  hd[2])->vert( hd[0],  hd[1], -hd[2])
-        ->vert( hd[0], -hd[1], -hd[2])->vert( hd[0], -hd[1],  hd[2])->vert(-hd[0], -hd[1], -hd[2])
-        ->vert( hd[0], -hd[1], -hd[2])->vert( hd[0],  hd[1], -hd[2])->vert(-hd[0],  hd[1], -hd[2])
-        ->vert(-hd[0], -hd[1], -hd[2])->vert(-hd[0], -hd[1],  hd[2])->vert(-hd[0],  hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1], -hd[2])->vert( hd[0],  hd[1],  hd[2])->vert(-hd[0],  hd[1],  hd[2])
-        ->vert(-hd[0],  hd[1], -hd[2])->vert( hd[0],  hd[1], -hd[2])->vert(-hd[0], -hd[1], -hd[2])
-        ->vert( hd[0], -hd[1], -hd[2])->vert( hd[0], -hd[1],  hd[2])->vert(-hd[0], -hd[1],  hd[2])
+        ->vert(-1, -1,  1)->vert( 1, -1,  1)->vert( 1,  1,  1)
+        ->vert(-1,  1,  1)->vert( 1,  1,  1)->vert( 1,  1, -1)
+        ->vert( 1, -1, -1)->vert( 1, -1,  1)->vert(-1, -1, -1)
+        ->vert( 1, -1, -1)->vert( 1,  1, -1)->vert(-1,  1, -1)
+        ->vert(-1, -1, -1)->vert(-1, -1,  1)->vert(-1,  1,  1)
+        ->vert(-1,  1, -1)->vert( 1,  1,  1)->vert(-1,  1,  1)
+        ->vert(-1,  1, -1)->vert( 1,  1, -1)->vert(-1, -1, -1)
+        ->vert( 1, -1, -1)->vert( 1, -1,  1)->vert(-1, -1,  1)
         ->upload();
 
-      // convert the volume into a 3d texture
-      size_t size = dimensions[0] * dimensions[1] * dimensions[2];
-      size_t textureSize = size * 3;
-      this->volume = (GLbyte *)malloc(textureSize * sizeof(GLbyte));
-      memset(this->volume, 0, size);
-      for (size_t i=0; i<size; i++) {
-        int val = volume[i];
-        this->volume[i*3+0] = val;
-        this->volume[i*3+1] = val;
-        this->volume[i*3+2] = val;
+      for (int v = 0; v<VOLUME_COUNT; v++) {
+        this->volumes[v] = new Volume(glm::vec3(0.0, v * float(DIMS) - DIMS/2.0, 0.0));
+        // convert the volume into a 3d texture
+        size_t size = dimensions[0] * dimensions[1] * dimensions[2];
+        for (size_t i=0; i<size; i++) {
+          int val = volume[i];
+          this->volumes[v]->data[i*3+0] = val;
+          this->volumes[v]->data[i*3+1] = val;
+          this->volumes[v]->data[i*3+2] = val;
+        }
+
+        this->volumes[v]->upload();
       }
-
-      glGenTextures(1, &this->volumeTexture);
-      gl_error();
-      glBindTexture(GL_TEXTURE_3D, this->volumeTexture);
-      gl_error();
-
-      glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-      glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-      glTexImage3D(
-        GL_TEXTURE_3D,
-        0,
-        GL_RGB,
-        this->dims[0],
-        this->dims[1],
-        this->dims[2],
-        0,
-        GL_RGB,
-        GL_UNSIGNED_BYTE,
-        this->volume
-      );
-
-      gl_error();
     }
 
     ~Raytracer() {
       delete this->mesh;
-      free(this->volume);
+      for (int v = 0; v<VOLUME_COUNT; v++) {
+        delete this->volumes[v];
+      }
     }
 
     void render (glm::mat4 mvp, glm::vec3 eye) {
@@ -106,13 +89,10 @@
           ->uniformVec3i("dims", this->dims)
           ->uniform1i("showHeat", this->showHeat);
 
-      glBindTexture(GL_TEXTURE_3D, this->volumeTexture);
-      glActiveTexture(GL_TEXTURE0);
-      gl_error();
-
-      this->program->uniform1i("volume", 0);
-
-      this->mesh->render(this->program, "position");
+      for (int v = 0; v<VOLUME_COUNT; v++) {
+        this->volumes[v]->bind(this->program);
+        this->mesh->render(this->program, "position");
+      }
     }
   };
 

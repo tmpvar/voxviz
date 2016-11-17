@@ -154,10 +154,6 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    orbit_camera_rotate(0, 0, -.01, .01);
-    viewMatrix = orbit_camera_view();
-    MVP = perspectiveMatrix * viewMatrix;
-
     if (keys[GLFW_KEY_W]) {
       orbit_camera_zoom(-5);
     }
@@ -172,12 +168,30 @@ int main(void) {
       raytracer->showHeat = 0;
     }
 
+    if (keys[GLFW_KEY_LEFT]) {
+      orbit_camera_rotate(-.01, 0, 0, 0);
+    }
+
+    if (keys[GLFW_KEY_RIGHT]) {
+      orbit_camera_rotate(.01, 0, 0, 0);
+    }
+
+    if (keys[GLFW_KEY_UP]) {
+      orbit_camera_rotate(0, 0, 0, -.01);
+    }
+
+    if (keys[GLFW_KEY_DOWN]) {
+      orbit_camera_rotate(.01, 0, 0, 0.01);
+    }
+
+    // orbit_camera_rotate(0, 0, -.01, .01);
+    viewMatrix = orbit_camera_view();
+    MVP = perspectiveMatrix * viewMatrix;
 
     // prog->use()->uniformMat4("MVP", MVP)->uniformVec3i("dims", dims);;
     // voxel_mesh->render(prog, "position");
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
-    // TODO: this might be wrong
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
     raytracer->render(MVP, currentEye);
 
