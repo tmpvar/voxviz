@@ -24,7 +24,6 @@ add_executable(
   include/gl-wrap.h
   include/mesher.h
   include/orbit-camera.h
-  build/shaders/built.h
 )
 
 add_dependencies(voxviz shaders_out)
