@@ -95,7 +95,7 @@
 
     ~Raytracer() {
       delete this->mesh;
-      // free(this->volume);
+      free(this->volume);
     }
 
     void render (glm::mat4 mvp, glm::vec3 eye) {
