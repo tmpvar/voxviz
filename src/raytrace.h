@@ -18,9 +18,11 @@
     GLbyte *volume;
     GLuint volumeTexture;
 
+    int showHeat;
+
     Raytracer(int *dimensions, int *volume) {
       this->dims = dimensions;
-
+      this->showHeat = 0;
       glm::vec3 hd(dims[0]/2, dims[1]/2, dims[2]/2);
 
       this->program = new Program();
@@ -101,7 +103,8 @@
       this->program
           ->uniformMat4("MVP", mvp)
           ->uniformVec3("eye", eye)
-          ->uniformVec3i("dims", this->dims);
+          ->uniformVec3i("dims", this->dims)
+          ->uniform1i("showHeat", this->showHeat);
 
       glBindTexture(GL_TEXTURE_3D, this->volumeTexture);
       glActiveTexture(GL_TEXTURE0);

@@ -51,7 +51,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   int width, height;
 
   // When reshape is called, update the view and projection matricies since this means the view orientation or size changed
-  
+
   perspectiveMatrix = glm::perspective(
     45.0f,
     window_aspect(window, &width, &height),
@@ -65,7 +65,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 int main(void) {
   memset(keys, 0, sizeof(keys));
 
-  int d = 256;
+  int d = 128;
   int hd = d / 2;
   int dims[3] = { d, d, d };
   size_t total_voxels = dims[0] * dims[1] * dims[2];
@@ -82,7 +82,7 @@ int main(void) {
         int dy = y - hd;
         int dz = z - hd;
 
-        vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 15) > 0 ? 255 : 0;
+        vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 8) > 0 ? 255 : 0;
       }
     }
   }
@@ -164,6 +164,12 @@ int main(void) {
 
     if (keys[GLFW_KEY_S]) {
       orbit_camera_zoom(5);
+    }
+
+    if (keys[GLFW_KEY_H]) {
+      raytracer->showHeat = 1;
+    } else {
+      raytracer->showHeat = 0;
     }
 
 
