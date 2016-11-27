@@ -8,19 +8,11 @@
 #include "compute.h"
 
 #include <shaders/built.h>
-
-/*
-  https://github.com/nothings/stb/blob/master/stb_voxel_render.h
-*/
-
 #include <iostream>
 
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <string.h>
-
-
-#define vol(i, j, k) volume[i + dims[0] * (j + dims[1] * k)]
 
 bool keys[1024];
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
@@ -70,23 +62,7 @@ int main(void) {
   int hd = d / 2;
   int dims[3] = { d, d, d };
   size_t total_voxels = dims[0] * dims[1] * dims[2];
-  int *volume = (int *)malloc(total_voxels * sizeof(int));
-  // memset(volume, 0, total_voxels * sizeof(int));
-  //
   float camera_z = sqrt(d*d + d*d + d*d) * 1.5;
-  //
-  // for (int x=0; x<dims[0]; x++) {
-  //   for (int y=0; y<dims[1]; y++) {
-  //     for (int z=0; z<dims[2]; z++) {
-  //
-  //       int dx = x - hd;
-  //       int dy = y - hd;
-  //       int dz = z - hd;
-  //
-  //       vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 8) > 0 ? 255 : 0;
-  //     }
-  //   }
-  // }
 
   GLFWwindow* window;
 
@@ -112,19 +88,6 @@ int main(void) {
   gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
   Mesh *voxel_mesh = new Mesh();
-  // std::vector<float> out_verts;
-  // std::vector<unsigned int> out_faces;
-
-  // vx_mesher(volume, dims, voxel_mesh->verts, voxel_mesh->faces);
-
-  // std::cout << "verts: "
-  //           << voxel_mesh->verts.size()
-  //           << " elements: "
-  //           << voxel_mesh->faces.size()
-  //           << std::endl;
-
-  // voxel_mesh->upload();
-
   Compute *compute = new Compute();
 
   Shaders::init();
@@ -192,12 +155,8 @@ int main(void) {
       compute->fill(raytracer->volumes[i]->computeBuffer, time);
     }
 
-    // orbit_camera_rotate(0, 0, -.01, .01);
     viewMatrix = orbit_camera_view();
     MVP = perspectiveMatrix * viewMatrix;
-
-    // prog->use()->uniformMat4("MVP", MVP)->uniformVec3i("dims", dims);;
-    // voxel_mesh->render(prog, "position");
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
