@@ -48,10 +48,4 @@ std::map<std::string, Shader *> Shaders::instances;
 
 out.push('#endif')
 
-// const src = fs.readFileSync(, 'utf8')
-
-// console.log(src)
-
-
-
 fs.writeFileSync(process.argv[2], out.join('\n') + '\n')

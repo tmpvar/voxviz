@@ -9,17 +9,28 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 find_package(OpenGL REQUIRED)
 
+# find opencl
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps/cmake-findopencl/cmake")
+find_package(OpenCL)
+
 add_subdirectory(deps/glfw)
 add_subdirectory(deps/glm)
 add_subdirectory(shaders)
 
-include_directories(include ${OPENGL_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+include_directories(
+  include
+  ${OPENGL_INCLUDE_DIR}
+  ${OPENCL_INCLUDE_DIRS}
+  ${CMAKE_CURRENT_BINARY_DIR}
+)
 
 add_executable(
   voxviz
   src/main.cpp
   src/glad.c
   src/mesher.cpp
+  src/compute.cpp
+  src/clu.cpp
   src/raytrace.h
   include/gl-wrap.h
   include/mesher.h
@@ -28,5 +39,11 @@ add_executable(
 
 add_dependencies(voxviz shaders_out)
 
-target_link_libraries(voxviz glfw glm ${OPENGL_gl_LIBRARY})
+target_link_libraries(
+  voxviz
+  glfw
+  glm
+  ${OPENGL_gl_LIBRARY}
+  ${OPENCL_LIBRARIES}
+)
 target_link_libraries(voxviz )

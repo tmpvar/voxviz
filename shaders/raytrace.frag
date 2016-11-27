@@ -42,12 +42,12 @@ void main() {
   vec3 sideDist = (sign(dir) * (vec3(mapPos) - pos) + (sign(dir) * 0.5) + 0.5) * deltaDist;
   int i;
   bool miss = true;
-  for (i=0; i<300; i++) {
+  for (i=0; i<400; i++) {
     bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
     if (getVoxel(mapPos, fdims, hfdims) > 0.0) {
 
       outColor = vec4((hfdims + mapPos) / (fdims), 1.0);
-
+      
       if (mask.x) {
         outColor = outColor * 0.5;
       } else if (mask.z) {
@@ -76,4 +76,3 @@ void main() {
     discard;
   }
 }
-

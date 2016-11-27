@@ -1,11 +1,12 @@
 #ifndef GL_WRAP_H
 #define GL_WRAP_H
 
-#if defined(__APPLE__)
-#define GLFW_INCLUDE_GLCOREARB
-#else
-#define GL_GLEXT_PROTOTYPES
-#endif
+  #ifdef __APPLE__
+    #define GLFW_INCLUDE_GLCOREARB
+  #else
+    #define GL_GLEXT_PROTOTYPES
+  #endif
+
   #include <glad/glad.h>
   #include <GLFW/glfw3.h>
   #include <iostream>
@@ -156,7 +157,7 @@
 
     Program *uniformVec3(const char *name, glm::vec3 v) {
       GLint loc = glGetUniformLocation(this->handle, name);
-		
+
       glUniform3f(loc, v[0], v[1], v[2]);
       return this;
     }

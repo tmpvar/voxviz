@@ -8,9 +8,11 @@
   #include <string.h>
 
   #include "volume.h"
+  #include "cl/clu.h"
+
   using namespace std;
 
-  #define VOLUME_COUNT 4
+  #define VOLUME_COUNT 1
 
   class Raytracer {
     public:
@@ -19,12 +21,12 @@
     int *dims;
     GLbyte *volume;
     GLuint volumeTexture;
-
+    cl_mem volumeMemory;
     int showHeat;
 
     Volume *volumes[VOLUME_COUNT];
 
-    Raytracer(int *dimensions, int *volume) {
+    Raytracer(int *dimensions, clu_job_t job) {
       this->dims = dimensions;
       this->showHeat = 0;
       glm::vec3 hd(dims[0]/2, dims[1]/2, dims[2]/2);
@@ -60,17 +62,17 @@
         ->upload();
 
       for (int v = 0; v<VOLUME_COUNT; v++) {
-        this->volumes[v] = new Volume(glm::vec3(0.0, v * float(DIMS) - DIMS/2.0, 0.0));
-        // convert the volume into a 3d texture
-        size_t size = dimensions[0] * dimensions[1] * dimensions[2];
-        for (size_t i=0; i<size; i++) {
-          int val = volume[i];
-          this->volumes[v]->data[i*3+0] = val;
-          this->volumes[v]->data[i*3+1] = val;
-          this->volumes[v]->data[i*3+2] = val;
-        }
+        this->volumes[v] = new Volume(glm::vec3(0.0, v * float(DIMS), 0.0));
+        // // convert the volume into a 3d texture
+        // size_t size = dimensions[0] * dimensions[1] * dimensions[2];
+        // for (size_t i=0; i<size; i++) {
+        //   int val = volume[i];
+        //   this->volumes[v]->data[i*3+0] = val;
+        //   this->volumes[v]->data[i*3+1] = val;
+        //   this->volumes[v]->data[i*3+2] = val;
+        // }
 
-        this->volumes[v]->upload();
+        this->volumes[v]->upload(job);
       }
     }
 

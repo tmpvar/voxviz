@@ -5,6 +5,7 @@
 #include "orbit-camera.h"
 #include "mesher.h"
 #include "raytrace.h"
+#include "compute.h"
 
 #include <shaders/built.h>
 
@@ -70,22 +71,22 @@ int main(void) {
   int dims[3] = { d, d, d };
   size_t total_voxels = dims[0] * dims[1] * dims[2];
   int *volume = (int *)malloc(total_voxels * sizeof(int));
-  memset(volume, 0, total_voxels * sizeof(int));
-
+  // memset(volume, 0, total_voxels * sizeof(int));
+  //
   float camera_z = sqrt(d*d + d*d + d*d) * 1.5;
-
-  for (int x=0; x<dims[0]; x++) {
-    for (int y=0; y<dims[1]; y++) {
-      for (int z=0; z<dims[2]; z++) {
-
-        int dx = x - hd;
-        int dy = y - hd;
-        int dz = z - hd;
-
-        vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 8) > 0 ? 255 : 0;
-      }
-    }
-  }
+  //
+  // for (int x=0; x<dims[0]; x++) {
+  //   for (int y=0; y<dims[1]; y++) {
+  //     for (int z=0; z<dims[2]; z++) {
+  //
+  //       int dx = x - hd;
+  //       int dy = y - hd;
+  //       int dz = z - hd;
+  //
+  //       vol(x, y, z) = sqrt(dx*dx + dy*dy + dz*dz) - (hd + 8) > 0 ? 255 : 0;
+  //     }
+  //   }
+  // }
 
   GLFWwindow* window;
 
@@ -124,6 +125,8 @@ int main(void) {
 
   // voxel_mesh->upload();
 
+  Compute *compute = new Compute();
+
   Shaders::init();
 
   Program *prog = new Program();
@@ -138,14 +141,14 @@ int main(void) {
 
   // Setup the orbit camera
   glm::vec3 eye(0.0, 0.0, camera_z);
-  glm::vec3 center(0.0, 0.0, 0.0);//vec3_create(dims[0]/2.0f, dims[1]/2.0f, dims[2]/2.0f);
+  glm::vec3 center(dims[0]/2.0f, dims[1]/2.0f, dims[2]/2.0f);
   glm::vec3 up(0.0, 1.0, 0.0);
 
   orbit_camera_init(eye, center, up);
 
   window_resize(window);
 
-  Raytracer *raytracer = new Raytracer(dims, volume);
+  Raytracer *raytracer = new Raytracer(dims, compute->job);
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -183,6 +186,8 @@ int main(void) {
     if (keys[GLFW_KEY_DOWN]) {
       orbit_camera_rotate(.01, 0, 0, 0.01);
     }
+
+    compute->fill(raytracer->volumes[0]->computeBuffer);
 
     // orbit_camera_rotate(0, 0, -.01, .01);
     viewMatrix = orbit_camera_view();
