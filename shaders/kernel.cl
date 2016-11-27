@@ -16,7 +16,7 @@ __kernel void hello(__write_only image3d_t image, const int time) {
   float dx = get_global_id(0) - hd;
   float dy = get_global_id(1) - hd;
   float dz = get_global_id(2) - hd;
-  float sphere = sqrt(dx*dx + dy*dy + dz*dz) - (hd - 8);/
+  float sphere = sqrt(dx*dx + dy*dy + dz*dz) - (hd - 8);
 
   float x = (float)get_global_id(0);
   float y = (float)get_global_id(1);
