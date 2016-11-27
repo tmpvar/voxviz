@@ -4,6 +4,7 @@
 
   #include "shaders/built.h"
   #include <iostream>
+  #include <vector>
   #include <glm/glm.hpp>
   #include <string.h>
 
@@ -24,7 +25,7 @@
     cl_mem volumeMemory;
     int showHeat;
 
-    Volume *volumes[VOLUME_COUNT];
+    vector<Volume *> volumes;
 
     Raytracer(int *dimensions, clu_job_t job) {
       this->dims = dimensions;
@@ -62,17 +63,10 @@
         ->upload();
 
       for (int v = 0; v<VOLUME_COUNT; v++) {
-        this->volumes[v] = new Volume(glm::vec3(0.0, v * float(DIMS), 0.0));
-        // // convert the volume into a 3d texture
-        // size_t size = dimensions[0] * dimensions[1] * dimensions[2];
-        // for (size_t i=0; i<size; i++) {
-        //   int val = volume[i];
-        //   this->volumes[v]->data[i*3+0] = val;
-        //   this->volumes[v]->data[i*3+1] = val;
-        //   this->volumes[v]->data[i*3+2] = val;
-        // }
+        Volume *volume = new Volume(glm::vec3(0.0, v * float(DIMS), 0.0));
+        volume->upload(job);
 
-        this->volumes[v]->upload(job);
+        this->volumes.push_back(volume);
       }
     }
 
@@ -91,8 +85,19 @@
           ->uniformVec3i("dims", this->dims)
           ->uniform1i("showHeat", this->showHeat);
 
-      for (int v = 0; v<VOLUME_COUNT; v++) {
-        this->volumes[v]->bind(this->program);
+      sort(
+        this->volumes.begin(),
+        this->volumes.end(),
+        [eye](const Volume *a, const Volume *b) -> bool {
+          float ad = glm::distance(eye, a->center);
+          float bd = glm::distance(eye, b->center);
+
+          return ad < bd;
+        }
+      );
+
+      for (auto& volume: this->volumes) {
+        volume->bind(this->program);
         this->mesh->render(this->program, "position");
       }
     }
