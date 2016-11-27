@@ -12,7 +12,7 @@
 
   using namespace std;
 
-  #define VOLUME_COUNT 1
+  #define VOLUME_COUNT 4
 
   class Raytracer {
     public:

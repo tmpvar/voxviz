@@ -11,8 +11,9 @@ uniform vec3 center;
 uniform int showHeat;
 
 float getVoxel(vec3 worldPos, vec3 fdims, vec3 hfdims) {
-  vec3 pos = (hfdims + worldPos - center) / (fdims);
-  return texture(volume, pos).r;
+  vec3 pos = clamp((hfdims + worldPos - center) / (fdims), vec3(0.0), fdims);
+
+  return any(lessThanEqual(pos, vec3(0.0))) || any(greaterThanEqual(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -47,7 +48,7 @@ void main() {
     if (getVoxel(mapPos, fdims, hfdims) > 0.0) {
 
       outColor = vec4((hfdims + mapPos) / (fdims), 1.0);
-      
+
       if (mask.x) {
         outColor = outColor * 0.5;
       } else if (mask.z) {

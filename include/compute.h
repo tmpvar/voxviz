@@ -14,7 +14,7 @@
       Compute();
       ~Compute();
 
-      void fill(cl_mem texture) {
+      void fill(cl_mem texture, int time) {
         size_t global_threads[3] = {
           128,
           128,
@@ -31,8 +31,6 @@
         ));
 
         clSetKernelArg(this->job.kernel, 0, sizeof(texture), &texture);
-        static int time = 0;
-        time ++;
         clSetKernelArg(this->job.kernel, 1, sizeof(int), &time);
 
         CL_CHECK_ERROR(clEnqueueNDRangeKernel(

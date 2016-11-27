@@ -149,7 +149,7 @@ int main(void) {
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
-
+  int time = 0;
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -187,7 +187,10 @@ int main(void) {
       orbit_camera_rotate(.01, 0, 0, 0.01);
     }
 
-    compute->fill(raytracer->volumes[0]->computeBuffer);
+    time++;
+    for (int i=0; i<VOLUME_COUNT; i++) {
+      compute->fill(raytracer->volumes[i]->computeBuffer, time);
+    }
 
     // orbit_camera_rotate(0, 0, -.01, .01);
     viewMatrix = orbit_camera_view();

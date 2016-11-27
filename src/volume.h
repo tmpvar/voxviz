@@ -16,11 +16,9 @@ public:
 
   Volume(glm::vec3 center) {
     this->center = center;
-    // this->data = (GLbyte *)malloc(DIMS*DIMS*DIMS*3*sizeof(GLbyte));
   }
 
   ~Volume() {
-    // free(this->data);
   }
 
   void upload (clu_job_t job) {
