@@ -47,7 +47,7 @@ void main() {
     bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
     if (getVoxel(mapPos, fdims, hfdims) > 0.0) {
 
-      outColor = vec4((hfdims + mapPos) / (fdims), 1.0);
+      outColor = vec4((hfdims + mapPos - center) / (fdims), 1.0);
 
       if (mask.x) {
         outColor = outColor * 0.5;
