@@ -42,10 +42,10 @@ void main() {
 
   vec3 sideDist = (sign(dir) * (vec3(mapPos) - pos) + (sign(dir) * 0.5) + 0.5) * deltaDist;
   int i;
-  bool miss = true;
   for (i=0; i<400; i++) {
     bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
-    if (getVoxel(mapPos, fdims, hfdims) > 0.0) {
+    float val = getVoxel(mapPos, fdims, hfdims);
+    if (val > 0.0) {
 
       outColor = vec4((hfdims + mapPos - center) / (fdims), 1.0);
 
@@ -54,7 +54,7 @@ void main() {
       } else if (mask.z) {
         outColor = outColor * 0.75;
       }
-      miss = false;
+
       break;
     }
 
@@ -73,7 +73,7 @@ void main() {
 
   // putting this inside of the if above causes the computer to hang
   // this works a bit better, but is probably slower?
-  if (miss) {
+  if (all(equal(vec4(0.0), outColor))) {
     discard;
   }
 }
