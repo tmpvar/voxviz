@@ -5,12 +5,6 @@ __kernel void hello(__write_only image3d_t image, const int time) {
     get_global_id(2)
   );
 
-  int3 dims = int3(
-    get_global_size(0),
-    get_global_size(1),
-    get_global_size(2)
-  );
-
   float hd = (float) get_global_size(0) / 2;
 
   float dx = get_global_id(0) - hd;
