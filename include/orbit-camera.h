@@ -39,20 +39,20 @@ static glm::quat quat_from_vec3(const glm::vec3 vec) {
 }
 
 static void orbit_camera_rotate(const float sx, const float sy, const float ex, const float ey) {
-  const glm::vec3 vs = glm::vec3(sx, sy, 0.0f);
-  const glm::vec3 ve = glm::vec3(ex, ey, 0.0f);
- 
-  glm::quat s = quat_from_vec3(vs);
-  glm::quat e = glm::inverse(quat_from_vec3(ve));
+  const glm::vec3 vs = glm::vec3(sy, 0.0, sx);
+  const glm::vec3 ve = glm::vec3(ey, 0.0, ex);
+
+  glm::quat s = glm::quat(ve);
+  glm::quat e = glm::conjugate(glm::quat(vs));
 
   s = s * e;
- 
+
   if(glm::length(s) < 1e-6) {
     printf("MISS %f\n", glm::length(s));
     return;
   }
 
-  orbit_camera.rotation = glm::normalize(orbit_camera.rotation * s);
+  orbit_camera.rotation = glm::normalize(s * orbit_camera.rotation);
 }
 /*
 static glm::vec3 orbit_camera_unproject(const glm::vec3 vec, const vec4 viewport, const glm::mat4 inv) {

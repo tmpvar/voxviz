@@ -135,19 +135,19 @@ int main(void) {
     }
 
     if (keys[GLFW_KEY_LEFT]) {
-      orbit_camera_rotate(-.01, 0, 0, 0);
+      orbit_camera_rotate(0, 0,0.02, 0);
     }
 
     if (keys[GLFW_KEY_RIGHT]) {
-      orbit_camera_rotate(.01, 0, 0, 0);
+      orbit_camera_rotate(0, 0, -0.02, 0);
     }
 
     if (keys[GLFW_KEY_UP]) {
-      orbit_camera_rotate(0, 0, 0, -.01);
+      orbit_camera_rotate(0, 0, 0, -0.02);
     }
 
     if (keys[GLFW_KEY_DOWN]) {
-      orbit_camera_rotate(.01, 0, 0, 0.01);
+      orbit_camera_rotate(0, 0, 0, 0.02);
     }
 
     time++;
