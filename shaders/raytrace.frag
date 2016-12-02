@@ -42,7 +42,7 @@ void main() {
 
   vec3 sideDist = (sign(dir) * (vec3(mapPos) - pos) + (sign(dir) * 0.5) + 0.5) * deltaDist;
   int i;
-  for (i=0; i<400; i++) {
+  for (i=0; i<250; i++) {
     bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
     float val = getVoxel(mapPos, fdims, hfdims);
     if (val > 0.0) {
@@ -67,7 +67,7 @@ void main() {
   }
 
   if (showHeat == 1) {
-    outColor = heat(i, 300);
+    outColor = heat(i, 250);
     return;
   }
 

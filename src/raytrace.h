@@ -62,8 +62,9 @@
         ->vert( 1, -1, -1)->vert( 1, -1,  1)->vert(-1, -1,  1)
         ->upload();
 
+      int square = sqrt(VOLUME_COUNT);
       for (int v = 0; v<VOLUME_COUNT; v++) {
-        Volume *volume = new Volume(glm::vec3(0.0, v * float(DIMS), 0.0));
+        Volume *volume = new Volume(glm::vec3(v/square * float(DIMS), (v%square) * float(DIMS), 0.0));
         volume->upload(job);
 
         this->volumes.push_back(volume);
