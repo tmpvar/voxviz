@@ -1,20 +1,22 @@
 #ifndef __CLU_H__
 #define __CLU_H__
 
-  #ifdef __APPLE__
+  #if defined(__APPLE__)
     #include <OpenCL/opencl.h>
     #include <GLFW/glfw3.h>
     #include <OpenGL/OpenGL.h>
     #include <OpenCL/opencl.h>
     #include <OpenCL/cl_gl.h>
-  #else
+  #elif defined(_WIN32)
     #include <CL/cl.h>
+    #include <CL/cl_gl.h>
+    #include <Windows.h>
   #endif
 
   #include <stdio.h>
   #include <iostream>
   using namespace std;
-  
+
   #define MEM_SIZE (128)
   #define MAX_SOURCE_SIZE (0x100000)
   #define CL_CHECK_ERROR(err) do{if (err) {printf("FATAL ERROR %d at " __FILE__ ":%d\n",err,__LINE__); clu_error(err); exit(1); } } while(0)

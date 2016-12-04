@@ -1,4 +1,7 @@
-#include "cl/clu.h"
+#include "clu.h"
+#include <vector>
+
+cl_device_id *devices;
 
 void clu_error(cl_int err) {
   switch(err) {
@@ -312,6 +315,13 @@ cl_int clu_program_from_fs(cl_device_id device, cl_context context, const char *
 }
 
 int clu_compute_init(clu_job_t *job) {
+  cl_int ret;
+  cl_uint platformIdCount = 0;
+  clGetPlatformIDs(0, nullptr, &platformIdCount);
+
+  std::vector<cl_platform_id> platformIds(platformIdCount);
+  clGetPlatformIDs(platformIdCount, platformIds.data(), nullptr);
+
   #ifdef linux
     cl_context_properties properties[] = {
       CL_GL_CONTEXT_KHR, (cl_context_properties) glXGetCurrentContext(),
@@ -323,10 +333,38 @@ int clu_compute_init(clu_job_t *job) {
     cl_context_properties properties[] = {
       CL_GL_CONTEXT_KHR, (cl_context_properties) wglGetCurrentContext(),
       CL_WGL_HDC_KHR, (cl_context_properties) wglGetCurrentDC(),
-      CL_CONTEXT_PLATFORM, (cl_context_properties) platform,
+      CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties> (platformIds [0]),
       0
     };
-  #elif defined TARGET_OS_MAC
+
+    cl_uint deviceIdCount = 0;
+    clGetDeviceIDs(
+      platformIds[0],
+      CL_DEVICE_TYPE_ALL,
+      0,
+      nullptr,
+      &deviceIdCount
+    );
+
+    std::vector<cl_device_id> deviceIds(deviceIdCount);
+    clGetDeviceIDs(
+      platformIds[0],
+      CL_DEVICE_TYPE_ALL,
+      deviceIdCount,
+      deviceIds.data(),
+      nullptr
+    );
+
+    job->context = clCreateContext(
+      properties,
+      deviceIdCount,
+      deviceIds.data(),
+      nullptr,
+      nullptr,
+      &ret
+    );
+
+#elif defined TARGET_OS_MAC
     CGLContextObj glContext = CGLGetCurrentContext();
     CGLShareGroupObj shareGroup = CGLGetShareGroup(glContext);
     cl_context_properties properties[] = {
@@ -334,16 +372,15 @@ int clu_compute_init(clu_job_t *job) {
       (cl_context_properties)shareGroup,
       0
     };
+    job->context = clCreateContext(properties, 0, 0, 0, 0, 0);
   #endif
 
   cl_platform_id platform_id = NULL;
   cl_uint ret_num_devices;
   cl_uint ret_num_platforms;
-  cl_int ret;
   size_t ret_size;
   int i;
 
-  job->context = clCreateContext(properties, 0, 0, 0, 0, 0);
   if (!job->context) {
     printf("clCreateContext failed\n");
   }
@@ -355,28 +392,9 @@ int clu_compute_init(clu_job_t *job) {
   }
   ret_num_devices = ret_size/sizeof(cl_device_id);
 
-  // get the device list
-  cl_device_id devices[ret_num_devices];
-  ret = clGetContextInfo(job->context, CL_CONTEXT_DEVICES, ret_size, devices, &ret_size);
-  if(ret) {
-    printf("clGetContextInfo failed\n");
-  }
-
-  // get the GPU device and queue
-  for(i=0; i<ret_num_devices; i++) {
-    cl_int deviceType, error;
-
-    ret = clGetDeviceInfo(devices[i], CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType, &ret_size);
-    if(ret) {
-      printf("clGetDeviceInfo failed\n");
-    }
-
-    if(deviceType == CL_DEVICE_TYPE_GPU) {
-      job->device = devices[i];
-      job->command_queue = clCreateCommandQueue(job->context, job->device, 0, &error);
-      break;
-    }
-  }
+  cl_int deviceType, error;
+  clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_GPU, 1, &job->device, NULL);
+  job->command_queue = clCreateCommandQueue(job->context, job->device, 0, &error);
 
   clu_print_device_info(job->device);
 
@@ -396,4 +414,5 @@ void clu_compute_destroy(clu_job_t *job) {
   clReleaseProgram(job->program);
   clReleaseCommandQueue(job->command_queue);
   clReleaseContext(job->context);
-}
+  clReleaseDevice(job->device);
+};

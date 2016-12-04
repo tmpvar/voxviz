@@ -9,9 +9,12 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 find_package(OpenGL REQUIRED)
 
-# find opencl
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps/cmake-findopencl/cmake")
-find_package(OpenCL)
+# find opencl on osx/linux
+if(UNIX)
+	set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps/cmake-findopencl/cmake")
+ENDIF()
+
+FIND_PACKAGE(OpenCL REQUIRED)
 
 add_subdirectory(deps/glfw)
 add_subdirectory(deps/glm)
@@ -21,6 +24,7 @@ include_directories(
   include
   ${OPENGL_INCLUDE_DIR}
   ${OPENCL_INCLUDE_DIRS}
+  ${OpenCL_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
@@ -35,6 +39,8 @@ add_executable(
   include/gl-wrap.h
   include/mesher.h
   include/orbit-camera.h
+  include/clu.h
+  include/compute.h
 )
 
 add_dependencies(voxviz shaders_out)
@@ -45,5 +51,6 @@ target_link_libraries(
   glm
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
+  ${OpenCL_LIBRARIES}
 )
 target_link_libraries(voxviz )
