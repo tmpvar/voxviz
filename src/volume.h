@@ -3,14 +3,13 @@
 
 #include <glm/glm.hpp>
 #include "gl-wrap.h"
-#include "cl/clu.h"
+#include "clu.h"
 
 #define DIMS 128
 
 class Volume {
 public:
   glm::vec3 center;
-  GLbyte *data;
   GLuint textureId;
   cl_mem computeBuffer;
 
@@ -42,7 +41,7 @@ public:
       0,
       GL_RGB,
       GL_UNSIGNED_BYTE,
-      0 // TODO: let opencl populate the data: this->data
+      0
     );
 
     gl_error();
@@ -65,9 +64,11 @@ public:
   void bind(Program *program) {
     glBindTexture(GL_TEXTURE_3D, this->textureId);
     glActiveTexture(GL_TEXTURE0);
+    glm::vec3 dims(DIMS, DIMS, DIMS);
     // TODO: setup center/aabb
     program->uniform1i("volume", 0)
-           ->uniformVec3("center", this->center);
+           ->uniformVec3("center", this->center)
+           ->uniformVec3("dims", dims);
   }
 };
 

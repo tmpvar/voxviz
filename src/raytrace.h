@@ -5,15 +5,16 @@
   #include "shaders/built.h"
   #include <iostream>
   #include <vector>
+  #include <algorithm>
   #include <glm/glm.hpp>
   #include <string.h>
 
   #include "volume.h"
-  #include "cl/clu.h"
+  #include "clu.h"
 
   using namespace std;
 
-  #define VOLUME_COUNT 4
+  #define VOLUME_COUNT 64
 
   class Raytracer {
     public:
@@ -24,7 +25,7 @@
     GLuint volumeTexture;
     cl_mem volumeMemory;
     int showHeat;
-
+    glm::vec3 center;
     vector<Volume *> volumes;
 
     Raytracer(int *dimensions, clu_job_t job) {
@@ -63,6 +64,8 @@
         ->upload();
 
       int square = sqrt(VOLUME_COUNT);
+      float center = (float)square / 2.0 * float(DIMS);
+      this->center = glm::vec3(center, 0.0, center);
       for (int v = 0; v<VOLUME_COUNT; v++) {
         Volume *volume = new Volume(glm::vec3(v/square * float(DIMS), (v%square) * float(DIMS), 0.0));
         volume->upload(job);

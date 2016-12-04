@@ -74,6 +74,7 @@ int main(void) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwSwapInterval(0);
 
   window = glfwCreateWindow(640, 480, "voxviz", NULL, NULL);
   glfwSetWindowSizeCallback(window, window_resize);
@@ -103,15 +104,16 @@ int main(void) {
   GLint dimsUniform = glGetUniformLocation(prog->handle, "dims");
 
   // Setup the orbit camera
-  glm::vec3 eye(0.0, 0.0, camera_z);
-  glm::vec3 center(dims[0]/2.0f, dims[1]/2.0f, dims[2]/2.0f);
+  glm::vec3 center(256.0, 0.0, 0.0);
+  glm::vec3 eye(0.0, 0.0, 200);//glm::length(center) * 2.0);
+  
   glm::vec3 up(0.0, 1.0, 0.0);
-
-  orbit_camera_init(eye, center, up);
-
+  
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
+  orbit_camera_init(eye, center, up);
+
   int time = 0;
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -150,11 +152,6 @@ int main(void) {
       orbit_camera_rotate(0, 0, 0, 0.02);
     }
 
-    time++;
-    for (int i=0; i<VOLUME_COUNT; i++) {
-      compute->fill(raytracer->volumes[i]->computeBuffer, time);
-    }
-
     viewMatrix = orbit_camera_view();
     MVP = perspectiveMatrix * viewMatrix;
 
@@ -163,6 +160,11 @@ int main(void) {
     raytracer->render(MVP, currentEye);
 
     glfwSwapBuffers(window);
+    
+    time++;
+    for (int i = 0; i<VOLUME_COUNT; i++) {
+      compute->fill(raytracer->volumes[i]->computeBuffer, raytracer->volumes[i]->center, time);
+    }
     glfwPollEvents();
   }
 

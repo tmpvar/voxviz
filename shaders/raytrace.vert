@@ -18,5 +18,5 @@ void main() {
   aabb_lb = -dims/2.0;
   aabb_ub =  dims/2.0;
 
-  gl_Position = MVP * vec4(pos + center, 1.0);
+  gl_Position = MVP * vec4(rayOrigin, 1.0);
 }

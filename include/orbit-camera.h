@@ -93,11 +93,53 @@ static void orbit_camera_zoom(const float amount) {
   orbit_camera.distance += amount;
 }
 
+static glm::mat4 fromRotationTranslation(glm::quat q, glm::vec3 v) {
+
+  // Quaternion math
+  float x = q[0], y = q[1], z = q[2], w = q[3],
+    x2 = x + x,
+    y2 = y + y,
+    z2 = z + z,
+
+    xx = x * x2,
+    xy = x * y2,
+    xz = x * z2,
+    yy = y * y2,
+    yz = y * z2,
+    zz = z * z2,
+    wx = w * x2,
+    wy = w * y2,
+    wz = w * z2;
+  glm::mat4 out;
+
+  return out;
+/*
+  out[0] = 1 - (yy + zz);
+  out[1] = xy + wz;
+  out[2] = xz - wy;
+  out[3] = 0;
+  out[4] = xy - wz;
+  out[5] = 1 - (xx + zz);
+  out[6] = yz + wx;
+  out[7] = 0;
+  out[8] = xz + wy;
+  out[9] = yz - wx;
+  out[10] = 1 - (xx + yy);
+  out[11] = 0;
+  out[12] = v[0];
+  out[13] = v[1];
+  out[14] = v[2];
+  out[15] = 1;
+*/
+  return out;
+
+}
+
 static glm::mat4 orbit_camera_view() {
   glm::vec3 s = glm::vec3(0.0, 0.0, -orbit_camera.distance);
   glm::quat q = glm::conjugate(orbit_camera.rotation);
 
-  glm::mat4 rot = glm::mat4_cast(orbit_camera.rotation);
+  glm::mat4 rot = glm::mat4_cast(q);
   glm::mat4 trans = glm::translate(glm::mat4(1.0f), s);
   glm::mat4 view = trans * rot;
   return view;

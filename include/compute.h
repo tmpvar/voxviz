@@ -1,7 +1,8 @@
 #ifndef __COMPUTE_H__
 #define __COMPUTE_H__
 
-  #include "cl/clu.h"
+  #include "clu.h"
+  #include <glm/glm.hpp>
 
   using namespace cl;
 
@@ -10,50 +11,12 @@
     public:
       // TODO: meh, why does this have to be exposed?
       clu_job_t job;
+      cl_mem position_buffer;
     public:
       Compute();
       ~Compute();
 
-      void fill(cl_mem texture, int time) {
-        size_t global_threads[3] = {
-          128,
-          128,
-          128
-        };
-
-        CL_CHECK_ERROR(clEnqueueAcquireGLObjects(
-          this->job.command_queue,
-          1,
-          &texture,
-          0,
-          0,
-          NULL
-        ));
-
-        clSetKernelArg(this->job.kernel, 0, sizeof(texture), &texture);
-        clSetKernelArg(this->job.kernel, 1, sizeof(int), &time);
-
-        CL_CHECK_ERROR(clEnqueueNDRangeKernel(
-          this->job.command_queue,
-          this->job.kernel,
-          3,
-          NULL,
-          global_threads,
-          NULL,
-          0,
-          NULL, // no waitlist
-          NULL  // no callback
-        ));
-
-        CL_CHECK_ERROR(clEnqueueReleaseGLObjects(
-          this->job.command_queue,
-          1,
-          &texture,
-          0,
-          0,
-          NULL
-        ));
-      }
+      void fill(cl_mem texture, glm::vec3, int time);
   };
 
 #endif
