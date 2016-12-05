@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <glm/glm.hpp>
 
-#include "orbit-camera.h"
+#include "camera-orbit.h"
+#include "camera-free.h"
 #include "mesher.h"
 #include "raytrace.h"
 #include "compute.h"
@@ -15,6 +16,8 @@
 #include <string.h>
 
 bool keys[1024];
+double mouse[2];
+
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -114,6 +117,9 @@ int main(void) {
   Raytracer *raytracer = new Raytracer(dims, compute->job);
   orbit_camera_init(eye, center, up);
 
+  //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  glfwGetCursorPos(window, &mouse[0], &mouse[1]);
+  FreeCamera *camera = new FreeCamera();
   int time = 0;
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -123,10 +129,22 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     if (keys[GLFW_KEY_W]) {
+      camera->translate(0.0, 0.0, 10.0);
       orbit_camera_zoom(-5);
     }
 
     if (keys[GLFW_KEY_S]) {
+      camera->translate(0.0, 0.0, -10.0);
+      orbit_camera_zoom(5);
+    }
+
+    if (keys[GLFW_KEY_A]) {
+      camera->translate(5.0, 0.0, 0.0);
+      orbit_camera_zoom(-5);
+    }
+
+    if (keys[GLFW_KEY_D]) {
+      camera->translate(-5.0, 0.0, 0.0);
       orbit_camera_zoom(5);
     }
 
@@ -137,22 +155,50 @@ int main(void) {
     }
 
     if (keys[GLFW_KEY_LEFT]) {
-      orbit_camera_rotate(0, 0,0.02, 0);
+      orbit_camera_rotate(0, 0, 0.02, 0);
+      camera->yaw(-0.02);
     }
 
     if (keys[GLFW_KEY_RIGHT]) {
       orbit_camera_rotate(0, 0, -0.02, 0);
+      camera->yaw(0.02);
     }
 
     if (keys[GLFW_KEY_UP]) {
       orbit_camera_rotate(0, 0, 0, -0.02);
+      camera->pitch(-0.02);
     }
 
     if (keys[GLFW_KEY_DOWN]) {
       orbit_camera_rotate(0, 0, 0, 0.02);
+      camera->pitch(0.02);
     }
 
-    viewMatrix = orbit_camera_view();
+    /* mouse look like free-fly/fps
+    double xpos, ypos, delta[2];
+    glfwGetCursorPos(window, &xpos, &ypos);
+    delta[0] = xpos - mouse[0];
+    delta[1] = ypos - mouse[1];
+    mouse[0] = xpos;
+    mouse[1] = ypos;
+
+    camera->pitch(delta[1] / 500.0);
+    camera->yaw(delta[0] / 500.0);
+    */
+
+    if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
+      int axis_count;
+      const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
+
+      camera->translate(axis[0] * -5.0, 0.0, axis[1] * 5.0);
+
+      camera->pitch(-axis[3]/20.0);
+      camera->yaw(axis[2]/20.0);
+    }
+
+    viewMatrix = camera->view();
+
+    //viewMatrix = orbit_camera_view();
     MVP = perspectiveMatrix * viewMatrix;
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
