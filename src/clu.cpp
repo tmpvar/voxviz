@@ -179,9 +179,11 @@ void clu_error(cl_int err) {
     case CL_INVALID_DEVICE_PARTITION_COUNT:
       printf("ERROR CL_INVALID_DEVICE_PARTITION_COUNT:\n  clCreateSubDevices  if the partition name specified in properties is CL_DEVICE_PARTITION_ BY_COUNTS and the number of sub-devices requested exceeds CL_DEVICE_PARTITION_ MAX_SUB_DEVICES or the total number of compute units requested exceeds CL_DEVICE_PARTITION_ MAX_COMPUTE_UNITS for in_device, or the number of compute units requested for one or more sub-devices is less than zero or the number of sub-devices requested exceeds CL_DEVICE_PARTITION_ MAX_COMPUTE_UNITS for in_device.\n");
     break;
-    case CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR:
-      printf("ERROR CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR:\n Returned by clCreateContext, clCreateContextFromType, and clGetGLContextInfoKHR when an invalid OpenGL context or share group object handle is specified in <properties>\n");
-    break;
+    #ifdef CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR
+      case CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR:
+        printf("ERROR CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR:\n Returned by clCreateContext, clCreateContextFromType, and clGetGLContextInfoKHR when an invalid OpenGL context or share group object handle is specified in <properties>\n");
+      break;
+    #endif
   }
 }
 
