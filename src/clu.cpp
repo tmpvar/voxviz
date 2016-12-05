@@ -434,13 +434,6 @@ int clu_compute_init(clu_job_t *job) {
     printf("clCreateContext failed\n");
   }
 
-  // compute the number of devices
-  ret = clGetContextInfo(job->context, CL_CONTEXT_DEVICES, 0, NULL, &ret_size);
-  if(!ret_size || ret != CL_SUCCESS) {
-    printf("clGetDeviceInfo failed\n");
-  }
-  ret_num_devices = ret_size/sizeof(cl_device_id);
-
   for (int i=0; i<TOTAL_COMMAND_QUEUES; i++) {
     job->command_queues[i] = clCreateCommandQueue(
       job->context,
