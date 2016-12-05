@@ -219,9 +219,9 @@ int main(void) {
       NULL
     ));
     clFinish(compute->job.command_queues[1]);
-   for (int i = 0; i < VOLUME_COUNT; i++) {
+    for (int i = 0; i < VOLUME_COUNT; i++) {
       compute->fill(
-        compute->job.command_queues[i%TOTAL_COMMAND_QUEUES],
+        compute->job.command_queues[1],
         raytracer->volumes[i]->computeBuffer,
         raytracer->volumes[i]->mem_center,
         time
@@ -237,9 +237,7 @@ int main(void) {
       NULL
     ));
 
-    // TODO: flush all queues
-    // clFinish(compute->job.command_queue);
-
+    clFinish(compute->job.command_queues[1]);
     time++;
 
     glfwPollEvents();

@@ -324,8 +324,6 @@ int clu_compute_init(clu_job_t *job) {
   cl_uint platformIdCount = 0;
   clGetPlatformIDs(0, nullptr, &platformIdCount);
 
-  std::vector<cl_platform_id> platformIds(platformIdCount);
-  clGetPlatformIDs(platformIdCount, platformIds.data(), nullptr);
 
   #ifdef linux
     cl_context_properties properties[] = {
@@ -335,6 +333,9 @@ int clu_compute_init(clu_job_t *job) {
       0
     };
   #elif defined _WIN32
+    std::vector<cl_platform_id> platformIds(platformIdCount);
+    clGetPlatformIDs(platformIdCount, platformIds.data(), nullptr);
+
     cl_context_properties properties[] = {
       CL_GL_CONTEXT_KHR, (cl_context_properties) wglGetCurrentContext(),
       CL_WGL_HDC_KHR, (cl_context_properties) wglGetCurrentDC(),
@@ -369,6 +370,8 @@ int clu_compute_init(clu_job_t *job) {
       &ret
     );
 
+    clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_GPU, 1, &job->device, NULL);
+
 #elif defined TARGET_OS_MAC
     CGLContextObj glContext = CGLGetCurrentContext();
     CGLShareGroupObj shareGroup = CGLGetShareGroup(glContext);
@@ -377,14 +380,55 @@ int clu_compute_init(clu_job_t *job) {
       (cl_context_properties)shareGroup,
       0
     };
+
     job->context = clCreateContext(properties, 0, 0, 0, 0, 0);
+
+    cl_platform_id platform_id = NULL;
+    cl_uint ret_num_devices;
+    cl_uint ret_num_platforms;
+    size_t ret_size;
+    int i;
+
+    job->context = clCreateContext(properties, 0, 0, 0, 0, 0);
+    if (!job->context) {
+      printf("clCreateContext failed\n");
+    }
+
+    // compute the number of devices
+    ret = clGetContextInfo(job->context, CL_CONTEXT_DEVICES, 0, NULL, &ret_size);
+    if(!ret_size || ret != CL_SUCCESS) {
+      printf("clGetDeviceInfo failed\n");
+    }
+    ret_num_devices = ret_size/sizeof(cl_device_id);
+
+    // get the device list
+    cl_device_id devices[ret_num_devices];
+    ret = clGetContextInfo(job->context, CL_CONTEXT_DEVICES, ret_size, devices, &ret_size);
+    if(ret) {
+      printf("clGetContextInfo failed\n");
+    }
+
+    // get the GPU device and queue
+    for(i=0; i<ret_num_devices; i++) {
+      cl_int deviceType, error;
+
+      ret = clGetDeviceInfo(devices[i], CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType, &ret_size);
+      if(ret) {
+        printf("clGetDeviceInfo failed\n");
+      }
+
+      if(deviceType == CL_DEVICE_TYPE_GPU) {
+        job->device = devices[i];
+        break;
+      }
+    }
   #endif
 
-  cl_platform_id platform_id = NULL;
-  cl_uint ret_num_devices;
-  cl_uint ret_num_platforms;
-  size_t ret_size;
-  int i;
+  clu_print_device_info(job->device);
+
+  cl_int error;
+//  size_t ret_size;
+//  int i;
 
   if (!job->context) {
     printf("clCreateContext failed\n");
@@ -397,8 +441,6 @@ int clu_compute_init(clu_job_t *job) {
   }
   ret_num_devices = ret_size/sizeof(cl_device_id);
 
-  cl_int deviceType, error;
-  clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_GPU, 1, &job->device, NULL);
   for (int i=0; i<TOTAL_COMMAND_QUEUES; i++) {
     job->command_queues[i] = clCreateCommandQueue(
       job->context,
@@ -406,11 +448,11 @@ int clu_compute_init(clu_job_t *job) {
       0,
       &error
     );
+
+    CL_CHECK_ERROR(error);
   }
 
-  clu_print_device_info(job->device);
-
-  clu_program_from_fs(job->device, job->context, "../shaders/kernel.cl", &job->program);
+  clu_program_from_fs(job->device, job->context, "../../shaders/kernel.cl", &job->program);
 
   job->kernel = clCreateKernel(job->program, "hello", &ret);
   CL_CHECK_ERROR(ret);
