@@ -11,10 +11,9 @@
 
   #include "volume.h"
   #include "clu.h"
+  #include "core.h"
 
   using namespace std;
-
-  #define VOLUME_COUNT 64
 
   class Raytracer {
     public:
@@ -23,7 +22,7 @@
     int *dims;
     GLbyte *volume;
     GLuint volumeTexture;
-    cl_mem volumeMemory;
+    cl_mem volumeMemory[VOLUME_COUNT];
     int showHeat;
     glm::vec3 center;
     vector<Volume *> volumes;
@@ -64,11 +63,17 @@
         ->upload();
 
       int square = sqrt(VOLUME_COUNT);
-      float center = (float)square / 2.0 * float(DIMS);
+      float center = (float)square / 2.0 * float(VOLUME_DIMS);
       this->center = glm::vec3(center, 0.0, center);
       for (int v = 0; v<VOLUME_COUNT; v++) {
-        Volume *volume = new Volume(glm::vec3(v/square * float(DIMS), (v%square) * float(DIMS), 0.0));
+        Volume *volume = new Volume(glm::vec3(
+          v/square * float(VOLUME_DIMS),
+          0.0,
+          (v%square) * float(VOLUME_DIMS)
+        ));
         volume->upload(job);
+
+        this->volumeMemory[v] = volume->computeBuffer;
 
         this->volumes.push_back(volume);
       }

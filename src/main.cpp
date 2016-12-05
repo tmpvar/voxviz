@@ -7,6 +7,8 @@
 #include "mesher.h"
 #include "raytrace.h"
 #include "compute.h"
+#include "core.h"
+#include "clu.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -61,7 +63,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 int main(void) {
   memset(keys, 0, sizeof(keys));
 
-  int d = 128;
+  int d = VOLUME_DIMS;
   int hd = d / 2;
   int dims[3] = { d, d, d };
   size_t total_voxels = dims[0] * dims[1] * dims[2];
@@ -79,7 +81,7 @@ int main(void) {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwSwapInterval(0);
 
-  window = glfwCreateWindow(640, 480, "voxviz", NULL, NULL);
+  window = glfwCreateWindow(1024, 768, "voxviz", NULL, NULL);
   glfwSetWindowSizeCallback(window, window_resize);
 
   if (!window) {
@@ -109,9 +111,9 @@ int main(void) {
   // Setup the orbit camera
   glm::vec3 center(256.0, 0.0, 0.0);
   glm::vec3 eye(0.0, 0.0, 200);//glm::length(center) * 2.0);
-  
+
   glm::vec3 up(0.0, 1.0, 0.0);
-  
+
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
@@ -124,7 +126,6 @@ int main(void) {
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -150,7 +151,8 @@ int main(void) {
 
     if (keys[GLFW_KEY_H]) {
       raytracer->showHeat = 1;
-    } else {
+    }
+    else {
       raytracer->showHeat = 0;
     }
 
@@ -206,11 +208,40 @@ int main(void) {
     raytracer->render(MVP, currentEye);
 
     glfwSwapBuffers(window);
-    
-    time++;
-    for (int i = 0; i<VOLUME_COUNT; i++) {
-      compute->fill(raytracer->volumes[i]->computeBuffer, raytracer->volumes[i]->center, time);
+    glFinish();
+
+    CL_CHECK_ERROR(clEnqueueAcquireGLObjects(
+      compute->job.command_queues[1],
+      VOLUME_COUNT,
+      raytracer->volumeMemory,
+      0,
+      0,
+      NULL
+    ));
+    clFinish(compute->job.command_queues[1]);
+   for (int i = 0; i < VOLUME_COUNT; i++) {
+      compute->fill(
+        compute->job.command_queues[i%TOTAL_COMMAND_QUEUES],
+        raytracer->volumes[i]->computeBuffer,
+        raytracer->volumes[i]->mem_center,
+        time
+      );
     }
+
+    CL_CHECK_ERROR(clEnqueueReleaseGLObjects(
+      compute->job.command_queues[1],
+      VOLUME_COUNT,
+      raytracer->volumeMemory,
+      0,
+      0,
+      NULL
+    ));
+
+    // TODO: flush all queues
+    // clFinish(compute->job.command_queue);
+
+    time++;
+
     glfwPollEvents();
   }
 

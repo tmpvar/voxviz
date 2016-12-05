@@ -179,6 +179,9 @@ void clu_error(cl_int err) {
     case CL_INVALID_DEVICE_PARTITION_COUNT:
       printf("ERROR CL_INVALID_DEVICE_PARTITION_COUNT:\n  clCreateSubDevices  if the partition name specified in properties is CL_DEVICE_PARTITION_ BY_COUNTS and the number of sub-devices requested exceeds CL_DEVICE_PARTITION_ MAX_SUB_DEVICES or the total number of compute units requested exceeds CL_DEVICE_PARTITION_ MAX_COMPUTE_UNITS for in_device, or the number of compute units requested for one or more sub-devices is less than zero or the number of sub-devices requested exceeds CL_DEVICE_PARTITION_ MAX_COMPUTE_UNITS for in_device.\n");
     break;
+    case CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR:
+      printf("ERROR CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR:\n Returned by clCreateContext, clCreateContextFromType, and clGetGLContextInfoKHR when an invalid OpenGL context or share group object handle is specified in <properties>\n");
+    break;
   }
 }
 
@@ -394,7 +397,14 @@ int clu_compute_init(clu_job_t *job) {
 
   cl_int deviceType, error;
   clGetDeviceIDs(platformIds[0], CL_DEVICE_TYPE_GPU, 1, &job->device, NULL);
-  job->command_queue = clCreateCommandQueue(job->context, job->device, 0, &error);
+  for (int i=0; i<TOTAL_COMMAND_QUEUES; i++) {
+    job->command_queues[i] = clCreateCommandQueue(
+      job->context,
+      job->device,
+      0,
+      &error
+    );
+  }
 
   clu_print_device_info(job->device);
 
@@ -408,11 +418,15 @@ int clu_compute_init(clu_job_t *job) {
 
 void clu_compute_destroy(clu_job_t *job) {
   /* Finalization */
-  clFlush(job->command_queue);
-  clFinish(job->command_queue);
+  for (int i = 0; i<TOTAL_COMMAND_QUEUES; i++) {
+    clReleaseCommandQueue(job->command_queues[i]);
+    clFlush(job->command_queues[i]);
+    clFinish(job->command_queues[i]);
+  }
   clReleaseKernel(job->kernel);
   clReleaseProgram(job->program);
-  clReleaseCommandQueue(job->command_queue);
+
+
   clReleaseContext(job->context);
   clReleaseDevice(job->device);
 };

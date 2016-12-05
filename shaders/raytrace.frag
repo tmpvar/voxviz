@@ -33,7 +33,8 @@ void main() {
   vec3 pos = rayOrigin;
   vec3 dir = normalize(rayOrigin - eye);
 
-  ivec3 mapPos = ivec3(floor(pos));//gl_FrontFacing ? ivec3(floor(pos)) : ivec3(floor(eye));
+  vec3 actualPos = gl_FrontFacing ? pos : floor(eye);
+  ivec3 mapPos = ivec3(floor(dir + actualPos));
 
   vec3 deltaDist = abs(vec3(length(dir)) / dir);
 
@@ -41,10 +42,12 @@ void main() {
 
   vec3 sideDist = (sign(dir) * (vec3(mapPos) - pos) + (sign(dir) * 0.5) + 0.5) * deltaDist;
   int i;
-  for (i=0; i<250; i++) {
+  for (i=0; i<1000; i++) {
     bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
     float val = getVoxel(mapPos, fdims, hfdims);
     if (val > 0.0) {
+
+      // outColor = vec4(1.0);
 
       outColor = vec4((hfdims + mapPos - center) / (fdims), 1.0);
 

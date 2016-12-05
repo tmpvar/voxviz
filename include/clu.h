@@ -13,11 +13,11 @@
     #include <Windows.h>
   #endif
 
+  #include "core.h"
   #include <stdio.h>
   #include <iostream>
   using namespace std;
 
-  #define MEM_SIZE (128)
   #define MAX_SOURCE_SIZE (0x100000)
   #define CL_CHECK_ERROR(err) do{if (err) {printf("FATAL ERROR %d at " __FILE__ ":%d\n",err,__LINE__); clu_error(err); exit(1); } } while(0)
 
@@ -124,7 +124,7 @@
   typedef struct {
     cl_device_id device;
     cl_context context;
-    cl_command_queue command_queue;
+    cl_command_queue command_queues[TOTAL_COMMAND_QUEUES];
     cl_program program;
     cl_kernel kernel;
   } clu_job_t;

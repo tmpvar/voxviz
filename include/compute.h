@@ -1,6 +1,7 @@
 #ifndef __COMPUTE_H__
 #define __COMPUTE_H__
 
+  #include "core.h"
   #include "clu.h"
   #include <glm/glm.hpp>
 
@@ -16,7 +17,9 @@
       Compute();
       ~Compute();
 
-      void fill(cl_mem texture, glm::vec3, int time);
+      void fill(cl_command_queue queue, cl_mem texture, cl_mem center, int time);
+      void lock(cl_command_queue queue, cl_mem texture);
+      void unlock(cl_command_queue queue, cl_mem texture);
   };
 
 #endif

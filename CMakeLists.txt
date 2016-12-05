@@ -35,12 +35,15 @@ add_executable(
   src/mesher.cpp
   src/compute.cpp
   src/clu.cpp
-  src/raytrace.h
+  include/raytrace.h
   include/gl-wrap.h
   include/mesher.h
-  include/orbit-camera.h
+  include/camera-orbit.h
+  include/camera-free.h
   include/clu.h
   include/compute.h
+  include/core.h
+  include/volume.h
 )
 
 add_dependencies(voxviz shaders_out)

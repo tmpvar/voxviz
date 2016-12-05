@@ -11,7 +11,11 @@
   #include <GLFW/glfw3.h>
   #include <iostream>
   #include <vector>
+  #include <string>
+  #include <map>
   #include <glm/glm.hpp>
+
+  using namespace std;
 
   GLint gl_error() {
     GLint error = glGetError();
@@ -108,6 +112,7 @@
   };
 
   class Program {
+    map<string, GLint> uniforms;
   public:
     GLuint handle;
 
@@ -117,6 +122,18 @@
 
     ~Program() {
       glDeleteProgram(this->handle);
+    }
+
+    GLint uniformLocation(string name) {
+      GLint ret;
+      if (this->uniforms.find(name) == this->uniforms.end()) {
+        ret = glGetUniformLocation(this->handle, name.c_str());
+        this->uniforms[name] = ret;
+        cout << "miss: " << name << endl;
+      } else {
+        ret = this->uniforms[name];
+      }
+      return ret;
     }
 
     Program *add(const Shader *shader) {
@@ -137,51 +154,51 @@
       return this;
     }
 
-    Program *output(const char *name, const GLuint location = 0) {
-      glBindFragDataLocation(this->handle, location, name);
+    Program *output(string name, const GLuint location = 0) {
+      glBindFragDataLocation(this->handle, location, name.c_str());
       return this;
     }
 
-    Program *attribute(const char *name) {
+    Program *attribute(string name) {
       glUseProgram(this->handle);
-      GLint posAttrib = glGetAttribLocation(this->handle, name);
+      GLint posAttrib = glGetAttribLocation(this->handle, name.c_str());
       glEnableVertexAttribArray(posAttrib);
       return this;
     }
 
-    Program *uniformVec2(const char *name, glm::vec2 v) {
-      GLint loc = glGetUniformLocation(this->handle, name);
+    Program *uniformVec2(string name, glm::vec2 v) {
+      GLint loc = this->uniformLocation(name);
       glUniform2f(loc, v[0], v[1]);
       return this;
     }
 
-    Program *uniformVec3(const char *name, glm::vec3 v) {
-      GLint loc = glGetUniformLocation(this->handle, name);
+    Program *uniformVec3(string name, glm::vec3 v) {
+      GLint loc = this->uniformLocation(name);
 
       glUniform3f(loc, v[0], v[1], v[2]);
       return this;
     }
 
-    Program *uniformVec3i(const char *name, int v[3]) {
-      GLint loc = glGetUniformLocation(this->handle, name);
+    Program *uniformVec3i(string name, int v[3]) {
+      GLint loc = this->uniformLocation(name);
       glUniform3i(loc, v[0], v[1], v[2]);
       return this;
     }
 
-    Program *uniformVec4(const char *name, glm::vec3 v) {
-      GLint loc = glGetUniformLocation(this->handle, name);
+    Program *uniformVec4(string name, glm::vec3 v) {
+      GLint loc = this->uniformLocation(name);
       glUniform4f(loc, v[0], v[1], v[2], v[3]);
       return this;
     }
 
-    Program *uniformMat4(const char *name, glm::mat4 v) {
-      GLint loc = glGetUniformLocation(this->handle, name);
+    Program *uniformMat4(string name, glm::mat4 v) {
+      GLint loc = this->uniformLocation(name);
       glUniformMatrix4fv(loc, 1, GL_FALSE, &v[0][0]);
       return this;
     }
 
-    Program *uniform1i(const char *name, int i) {
-      GLint loc = glGetUniformLocation(this->handle, name);
+    Program *uniform1i(string name, int i) {
+      GLint loc = this->uniformLocation(name);
       glUniform1i(loc, i);
       return this;
     }
