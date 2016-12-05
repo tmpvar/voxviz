@@ -452,7 +452,7 @@ int clu_compute_init(clu_job_t *job) {
     CL_CHECK_ERROR(error);
   }
 
-  clu_program_from_fs(job->device, job->context, "../../shaders/kernel.cl", &job->program);
+  clu_program_from_fs(job->device, job->context, "../shaders/kernel.cl", &job->program);
 
   job->kernel = clCreateKernel(job->program, "hello", &ret);
   CL_CHECK_ERROR(ret);
