@@ -11,9 +11,8 @@ uniform vec3 center;
 uniform int showHeat;
 
 float getVoxel(vec3 worldPos, vec3 fdims, vec3 hfdims) {
-  vec3 pos = clamp((hfdims + worldPos - center) / (fdims), vec3(0.0), fdims);
-
-  return any(lessThanEqual(pos, vec3(0.0))) || any(greaterThanEqual(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
+  vec3 pos = (hfdims + worldPos - center) / (fdims);
+  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -66,10 +65,7 @@ void main() {
     }
   }
 
-  if (showHeat == 1) {
-    outColor = heat(i, 250);
-    return;
-  }
+  outColor = mix(outColor, heat(i, 128), showHeat);
 
   // putting this inside of the if above causes the computer to hang
   // this works a bit better, but is probably slower?
