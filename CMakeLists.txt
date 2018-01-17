@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 project(VoxelViz)
 
-set(CMAKE_CXX_FLAGS "-std=c++0x -g -march=native -msse4.2 -mavx")
-
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -10,8 +8,13 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 find_package(OpenGL REQUIRED)
 
 # find opencl on osx/linux
-if(UNIX)
+IF(UNIX)
 	set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps/cmake-findopencl/cmake")
+	set(CMAKE_CXX_FLAGS "-std=c++0x -g -march=native -msse4.2 -mavx")
+ENDIF()
+
+IF(WINDOWS)
+	set_target_properties(voxviz PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS /EHsc")
 ENDIF()
 
 FIND_PACKAGE(OpenCL REQUIRED)
@@ -32,12 +35,10 @@ add_executable(
   voxviz
   src/main.cpp
   src/glad.c
-  src/mesher.cpp
   src/compute.cpp
   src/clu.cpp
   include/raytrace.h
   include/gl-wrap.h
-  include/mesher.h
   include/camera-orbit.h
   include/camera-free.h
   include/clu.h

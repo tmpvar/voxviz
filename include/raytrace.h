@@ -62,20 +62,24 @@
         ->vert( 1, -1, -1)->vert( 1, -1,  1)->vert(-1, -1,  1)
         ->upload();
 
-      int square = sqrt(VOLUME_COUNT);
-      float center = (float)square / 2.0 * float(VOLUME_DIMS);
+      float square = floor(sqrt((float)VOLUME_COUNT));
+      float center = (float)square / 2.0f * float(VOLUME_DIMS);
       this->center = glm::vec3(center, 0.0, center);
-      for (int v = 0; v<VOLUME_COUNT; v++) {
-        Volume *volume = new Volume(glm::vec3(
-          v/square * float(VOLUME_DIMS),
-          0.0,
-          (v%square) * float(VOLUME_DIMS)
-        ));
-        volume->upload(job);
 
-        this->volumeMemory[v] = volume->computeBuffer;
+      int v = 0;
+      for (float x = 0; x < VOLUME_SIDE; x++) {
+        for (float y = 0; y < VOLUME_SIDE; y++) {
+          for (float z = 0; z < VOLUME_SIDE; z++) {
+            Volume *volume = new Volume(glm::vec3(
+              x*VOLUME_DIMS, y*VOLUME_DIMS, z*VOLUME_DIMS
+            ));
+            volume->upload(job);
 
-        this->volumes.push_back(volume);
+            this->volumeMemory[v] = volume->computeBuffer;
+            this->volumes.push_back(volume);
+            v++;
+          }
+        }
       }
     }
 
@@ -93,7 +97,7 @@
           ->uniformVec3("eye", eye)
           ->uniformVec3i("dims", this->dims)
           ->uniform1i("showHeat", this->showHeat);
-
+      /*
       sort(
         this->volumes.begin(),
         this->volumes.end(),
@@ -103,7 +107,7 @@
 
           return ad < bd;
         }
-      );
+      );*/
 
       for (auto& volume: this->volumes) {
         volume->bind(this->program);

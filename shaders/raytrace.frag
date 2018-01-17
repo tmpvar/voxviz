@@ -10,8 +10,18 @@ uniform vec3 eye;
 uniform vec3 center;
 uniform int showHeat;
 
+#define ITERATIONS 50
+
 float getVoxel(vec3 worldPos, vec3 fdims, vec3 hfdims) {
-  vec3 pos = (hfdims + worldPos - center) / (fdims);
+  vec3 pos = (hfdims + worldPos - center) / vec3(dims);
+  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
+}
+
+float voxel(vec3 worldPos) {
+  vec3 fdims = vec3(dims);
+  vec3 hfdims = fdims * 0.5;
+
+  vec3 pos = (hfdims + worldPos - center) / fdims;
   return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
 }
 
@@ -27,52 +37,98 @@ vec4 heat(float amount, float total) {
   return vec4(hsv2rgb(hsv), 1.0);
 }
 
+// phong shading
+vec3 shading( vec3 v, vec3 n, vec3 eye ) {
+	vec3 final = vec3( 0.0 );
+
+	// light 0
+	{
+		vec3 light_pos = eye + vec3(0.0, 0.0, 10.0);//vec3( 100.0, 110.0, 150.0 );
+		vec3 light_color = vec3( 1.0 );
+		vec3 vl = normalize( light_pos - v );
+		float diffuse  = max( 0.0, dot( vl, n ) );
+		final += light_color * diffuse;
+	}
+
+	// light 1
+	{
+		vec3 light_pos = -vec3( 100.0, 110.0, 120.0 );
+		vec3 light_color = vec3( 1.0 );
+		vec3 vl = normalize( light_pos - v );
+		float diffuse  = max( 0.0, dot( vl, n ) );
+		final += light_color * diffuse;
+	}
+
+	return final;
+}
+
+float march(vec3 pos, vec3 dir, out vec3 mask, out vec3 center, out float hit, out float iterations) {
+	// grid space
+  vec3 grid = floor( pos );
+	vec3 grid_step = sign( dir );
+	vec3 corner = max( grid_step, vec3( 0.0 ) );
+
+	// ray space
+	vec3 inv = vec3( 1.0 ) / dir;
+	vec3 ratio = ( grid + corner - pos ) * inv;
+	vec3 ratio_step = grid_step * inv;
+
+	// dda
+	hit = -1.0;
+  iterations = 0.0;
+	for ( int i = 0; i < ITERATIONS; i++ ) {
+		if ( voxel( grid ) > 0.0 ) {
+			hit = 1.0;
+			continue;
+		}
+    iterations++;
+		vec3 cp = step( ratio, ratio.yzx );
+
+		mask = cp * ( vec3( 1.0 ) - cp.zxy );
+
+		grid  += grid_step  * mask;
+		ratio += ratio_step * mask;
+	}
+
+	center = grid + vec3( 0.5 );
+	return dot( ratio - ratio_step, mask ) * hit;
+}
+
 void main() {
   vec3 fdims = vec3(dims);
   vec3 hfdims = fdims / 2.0;
-  vec3 pos = rayOrigin;
-  vec3 dir = normalize(rayOrigin - eye);
 
-  vec3 actualPos = gl_FrontFacing ? pos : floor(eye);
-  ivec3 mapPos = ivec3(floor(dir + actualPos));
+  vec3 fulldims = fdims * 16.0;
 
-  vec3 deltaDist = abs(vec3(length(dir)) / dir);
+  vec3 pos = gl_FrontFacing ? rayOrigin : eye;
+  vec3 dir = normalize(gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin);
 
-  ivec3 rayStep = ivec3(sign(dir));
+  vec3 mask, center;
+  float hit, iterations;
+  float depth = march(pos, dir, mask, center, hit, iterations);
 
-  vec3 sideDist = (sign(dir) * (vec3(mapPos) - pos) + (sign(dir) * 0.5) + 0.5) * deltaDist;
-  int i;
-  for (i=0; i<1000; i++) {
-    bvec3 mask = lessThanEqual(sideDist.xyz, min(sideDist.yzx, sideDist.zxy));
-    float val = getVoxel(mapPos, fdims, hfdims);
-    if (val > 0.0) {
-
-      // outColor = vec4(1.0);
-
-      outColor = vec4((hfdims + mapPos - center) / (fdims), 1.0);
-
-      // if (mask.x) {
-      //   outColor = outColor * 0.5;
-      // } else if (mask.z) {
-      //   outColor = outColor * 0.75;
-      // }
-
-      break;
-    }
-
-    sideDist += vec3(mask) * deltaDist;
-    mapPos += ivec3(mask) * rayStep;
-
-    if (any(lessThan(mapPos, (center-hfdims))) || any(greaterThan(mapPos, (center + hfdims)))) {
-      break;
-    }
-  }
-
-  outColor = mix(outColor, heat(i, 128), showHeat);
-
-  // putting this inside of the if above causes the computer to hang
-  // this works a bit better, but is probably slower?
-  if (all(equal(vec4(0.0), outColor))) {
+  if (hit <= 0.0) {
+    // we have to discard to avoid obscuring opaque bricks that live behind
+    // the current one
     discard;
   }
+
+	vec3 p = pos + dir * depth;
+	vec3 n = -vec3(mask) * sign( dir );
+  vec3 color = shading( p, n, eye );
+
+  outColor = vec4(color * p / fulldims, 1.0);
+
+  // outColor = vec4(normalize(sideDist), 1.0);
+  // outColor = vec4(vec3(mask), 1.0);
+
+  //outColor = outColor * distance()
+
+  // if (mask.x) {
+  //   outColor = outColor * 0.5;
+  // } else if (mask.z) {
+  //   outColor = outColor * 0.75;
+  // }
+
+  outColor = mix(outColor, heat(iterations, ITERATIONS), showHeat);
 }

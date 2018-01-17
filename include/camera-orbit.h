@@ -27,27 +27,27 @@ static glm::quat quat_from_vec3(const glm::vec3 vec) {
   float y = vec[1];
   float z = vec[2];
   float s = x*x + y*y;
-  if (s > 1.0) {
-    s = 1.0;
+  if (s > 1.0f) {
+    s = 1.0f;
   }
 
   if (z == 0.0) {
-    z = sqrtf(1.0 - s);
+    z = sqrtf(1.0f - s);
   }
 
-  return glm::quat(-x, y, z, 0.0);
+  return glm::quat(-x, y, z, 0.0f);
 }
 
 static void orbit_camera_rotate(const float sx, const float sy, const float ex, const float ey) {
-  const glm::vec3 vs = glm::vec3(sy, 0.0, sx);
-  const glm::vec3 ve = glm::vec3(ey, 0.0, ex);
+  const glm::vec3 vs = glm::vec3(sy, 0.0f, sx);
+  const glm::vec3 ve = glm::vec3(ey, 0.0f, ex);
 
   glm::quat s = glm::quat(ve);
   glm::quat e = glm::conjugate(glm::quat(vs));
 
   s = s * e;
 
-  if(glm::length(s) < 1e-6) {
+  if(glm::length(s) < 1e-6f) {
     printf("MISS %f\n", glm::length(s));
     return;
   }

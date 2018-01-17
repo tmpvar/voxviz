@@ -34,7 +34,7 @@ void Compute::unlock(cl_command_queue queue, cl_mem texture) {
 
 
 void Compute::fill(cl_command_queue queue, cl_mem texture, cl_mem center, int time) {
-  size_t global_threads[3] = {
+  static const size_t global_threads[3] = {
     VOLUME_DIMS,
     VOLUME_DIMS,
     VOLUME_DIMS
