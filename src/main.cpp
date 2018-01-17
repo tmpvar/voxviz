@@ -23,7 +23,8 @@ bool keys[1024];
 bool prevKeys[1024];
 double mouse[2];
 bool fullscreen = 0;
-int windowDimensions[2] = { 1024, 768 };
+// int windowDimensions[2] = { 1024, 768 };
+int windowDimensions[2] = { 640, 480 };
 
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 
@@ -170,6 +171,12 @@ int main(void) {
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+
+    glDepthMask(GL_TRUE);
+    glCullFace(GL_BACK);
+    glEnable(GL_CULL_FACE);
+
+    glClearDepth(1.0);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

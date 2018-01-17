@@ -97,7 +97,7 @@
           ->uniformVec3("eye", eye)
           ->uniformVec3i("dims", this->dims)
           ->uniform1i("showHeat", this->showHeat);
-      /*
+
       sort(
         this->volumes.begin(),
         this->volumes.end(),
@@ -107,7 +107,7 @@
 
           return ad < bd;
         }
-      );*/
+      );
 
       for (auto& volume: this->volumes) {
         volume->bind(this->program);

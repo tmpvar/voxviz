@@ -12,17 +12,13 @@ uniform int showHeat;
 
 #define ITERATIONS 50
 
-float getVoxel(vec3 worldPos, vec3 fdims, vec3 hfdims) {
-  vec3 pos = (hfdims + worldPos - center) / vec3(dims);
-  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
-}
-
 float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);
   vec3 hfdims = fdims * 0.5;
 
-  vec3 pos = (hfdims + worldPos - center) / fdims;
+  vec3 pos = floor((hfdims + worldPos - center)) / fdims;
   return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
+  // return texture(volume, pos).r;
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -77,7 +73,7 @@ float march(vec3 pos, vec3 dir, out vec3 mask, out vec3 center, out float hit, o
 	hit = -1.0;
   iterations = 0.0;
 	for ( int i = 0; i < ITERATIONS; i++ ) {
-		if ( voxel( grid ) > 0.0 ) {
+		if (voxel( grid ) > 0.0) {
 			hit = 1.0;
 			continue;
 		}
@@ -95,40 +91,26 @@ float march(vec3 pos, vec3 dir, out vec3 mask, out vec3 center, out float hit, o
 }
 
 void main() {
-  vec3 fdims = vec3(dims);
-  vec3 hfdims = fdims / 2.0;
-
-  vec3 fulldims = fdims * 16.0;
-
   vec3 pos = gl_FrontFacing ? rayOrigin : eye;
-  vec3 dir = normalize(gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin);
+  vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
+  vec3 dir = normalize(eyeToPlane);
 
   vec3 mask, center;
   float hit, iterations;
   float depth = march(pos, dir, mask, center, hit, iterations);
+  gl_FragDepth = hit < 0.0 ? 1.0 : -depth;
 
-  if (hit <= 0.0) {
-    // we have to discard to avoid obscuring opaque bricks that live behind
-    // the current one
-    discard;
-  }
+  // if (hit <= 0.0 && showHeat < 1) {
+  //   // we have to discard to avoid obscuring opaque bricks that live behind
+  //   // the current one
+  //   // discard;
+  //   outColor = vec4(1.0, 0.0, 0.0, 0.5);
+  //   return;
+  // }
 
 	vec3 p = pos + dir * depth;
 	vec3 n = -vec3(mask) * sign( dir );
-  vec3 color = shading( p, n, eye );
-
-  outColor = vec4(color * p / fulldims, 1.0);
-
-  // outColor = vec4(normalize(sideDist), 1.0);
-  // outColor = vec4(vec3(mask), 1.0);
-
-  //outColor = outColor * distance()
-
-  // if (mask.x) {
-  //   outColor = outColor * 0.5;
-  // } else if (mask.z) {
-  //   outColor = outColor * 0.75;
-  // }
-
+  // vec3 color = shading( p, n, eye );
+  outColor = vec4(vec3(mask), 1.0);
   outColor = mix(outColor, heat(iterations, ITERATIONS), showHeat);
 }
