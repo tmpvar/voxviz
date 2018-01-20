@@ -113,6 +113,7 @@
 
   class Program {
     map<string, GLint> uniforms;
+    map<string, GLint> attributes;
   public:
     GLuint handle;
 
@@ -160,8 +161,15 @@
     }
 
     Program *attribute(string name) {
+      GLint posAttrib;
       glUseProgram(this->handle);
-      GLint posAttrib = glGetAttribLocation(this->handle, name.c_str());
+      if (attributes.find(name) == this->attributes.end()) {
+        posAttrib = glGetAttribLocation(this->handle, name.c_str());
+        this->attributes[name] = posAttrib;
+      }
+      else {
+        posAttrib = this->attributes[name];
+      }
       glEnableVertexAttribArray(posAttrib);
       return this;
     }
