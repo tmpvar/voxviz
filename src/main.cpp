@@ -84,7 +84,7 @@ void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
 
   for (cl_uint i = 0; i < total; i++) {
     compute->fill(
-      "sphere",
+      "fillAll",
       queue,
       raytracer->volumes[i],
       time
@@ -159,9 +159,9 @@ int main(void) {
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
 
-  for (float x = 0; x < 4; x++) {
+  for (float x = 0; x < 8; x++) {
     //for (float y = 0; y < VOLUME_SIDE; y++) {
-      for (float z = 0; z < 4; z++) {
+      for (float z = 0; z < 8; z++) {
         raytracer->addVolumeAtIndex(x, 0.0, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
       }
     //}
@@ -177,18 +177,17 @@ int main(void) {
   update_volumes(raytracer, compute, time);
 #endif
 
-  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 64, 64, 64);
+  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 64, 256, 64);
   compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
-    "fillAll",
+    "cylinder",
     compute->job.command_queues[0],
     tool,
     0
   );
-
   compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
-  tool->position(0.0, 20.0, 0.0);
-
+  tool->position(0.0, 256.0, 0.0);
+  
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -274,7 +273,7 @@ int main(void) {
     camera->pitch((float)(delta[1] / 500.0));
     camera->yaw((float)(delta[0] / 500.0));
 
-    tool->position(sinf((float)time / 100.0f) * 200.0f,100.0f, cosf((float)time / 100.0f) * 200.0f);
+    //tool->position(sinf((float)time / 100.0f) * 200.0f,100.0f, cosf((float)time / 100.0f) * 200.0f);
 
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       int axis_count;

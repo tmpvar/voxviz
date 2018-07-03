@@ -143,7 +143,5 @@ void main() {
   color = vec3(depth/1.0);
   color = local;
 
-
-
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
 }

@@ -116,7 +116,7 @@ __kernel void hello1(__write_only image3d_t image, const __global float3* center
   write_imagef(image, (int4)(ipos, 0.0f), (float4)(on, on, on, on));
 }
 
-__kernel void hello2(__write_only image3d_t image, const __global float3* centerPointer, const int time) {
+__kernel void waves(__write_only image3d_t image, const __global float3* centerPointer, const int time) {
   float on = 1.0;
 
   int3 pos = (int3)(
@@ -166,6 +166,27 @@ __kernel void sphere(__write_only image3d_t image, const __global float *centerP
   float sphere = sqrt(dx*dx + dy*dy + dz*dz) - hd;
 
   float on = sphere < 0.0 ? 1.0 : 0.0;
+  write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
+}
+
+// sphere
+__kernel void cylinder(__write_only image3d_t image, const __global float *centerPointer, const int time) {
+  int3 pos = (int3)(
+    get_global_id(0),
+    get_global_id(1),
+    get_global_id(2)
+  );
+
+  float2 fpos = (float2)((float)pos.x, (float)pos.z);
+  float2 hp = (float2)(
+    (float) get_global_size(0) / 2.0f,
+    (float) get_global_size(2) / 2.0f
+  );
+
+  float r = fmin(hp.x, hp.y) - 4.0f;
+  float d = distance(hp, fpos) - r;
+
+  float on = d < 0.0f ? 1.0 : 0.0;
   write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
 }
 
