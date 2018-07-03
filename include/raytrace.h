@@ -22,12 +22,13 @@
     int *dims;
     GLbyte *volume;
     GLuint volumeTexture;
-    cl_mem volumeMemory[VOLUME_COUNT];
+    clu_job_t job;
     int showHeat;
-    glm::vec3 center;
     vector<Volume *> volumes;
+    
 
     Raytracer(int *dimensions, clu_job_t job) {
+      this->job = job;
       this->dims = dimensions;
       this->showHeat = 0;
       glm::vec3 hd(dims[0]/2, dims[1]/2, dims[2]/2);
@@ -61,42 +62,41 @@
         ->vert(-1,  1, -1)->vert( 1,  1, -1)->vert(-1, -1, -1)
         ->vert( 1, -1, -1)->vert( 1, -1,  1)->vert(-1, -1,  1)
         ->upload();
-
-      float square = floor(sqrt((float)VOLUME_COUNT));
-      float center = (float)square / 2.0f * float(VOLUME_DIMS);
-      this->center = glm::vec3(center, 0.0, center);
-
-      int v = 0;
-      for (float x = 0; x < VOLUME_SIDE; x++) {
-        for (float y = 0; y < VOLUME_SIDE; y++) {
-          for (float z = 0; z < VOLUME_SIDE; z++) {
-            Volume *volume = new Volume(glm::vec3(
-              x*VOLUME_DIMS, y*VOLUME_DIMS, z*VOLUME_DIMS
-            ));
-            volume->upload(job);
-
-            this->volumeMemory[v] = volume->computeBuffer;
-            this->volumes.push_back(volume);
-            v++;
-          }
-        }
-      }
     }
 
     ~Raytracer() {
       delete this->mesh;
-      for (int v = 0; v<VOLUME_COUNT; v++) {
-        delete this->volumes[v];
-      }
+      this->reset();
+    }
+
+	  void reset() {
+      size_t total = this->volumes.size();
+		  for (size_t v = 0; v<total; v++) {
+			  delete this->volumes[v];
+		  }
+      this->volumes.clear();
+	  }
+
+    Volume *addVolumeAtIndex(float x, float y, float z, unsigned int w, unsigned int h, unsigned d) {
+      glm::vec3 pos(x*w, y*h, z*d);
+      glm::uvec3 dims(w, h, d);
+
+      Volume *volume = new Volume(pos, dims);
+
+      volume->upload(this->job);
+
+      this->volumes.push_back(volume);
+      // TODO: add this volume to a spacial hash
+
+      return volume;
     }
 
     void render (glm::mat4 mvp, glm::vec3 eye) {
       this->program->use();
       this->program
-          ->uniformMat4("MVP", mvp)
-          ->uniformVec3("eye", eye)
-          ->uniformVec3i("dims", this->dims)
-          ->uniform1i("showHeat", this->showHeat);
+        ->uniformMat4("MVP", mvp)
+        ->uniformVec3("eye", eye)
+        ->uniform1i("showHeat", this->showHeat);
 
       sort(
         this->volumes.begin(),
@@ -109,6 +109,7 @@
         }
       );
 
+      // TODO: batch render
       for (auto& volume: this->volumes) {
         volume->bind(this->program);
         this->mesh->render(this->program, "position");

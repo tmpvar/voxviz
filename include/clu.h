@@ -16,6 +16,7 @@
   #include "core.h"
   #include <stdio.h>
   #include <iostream>
+  #include <map>
   using namespace std;
 
   #define MAX_SOURCE_SIZE (0x100000)
@@ -31,7 +32,7 @@
   void clu_print_device_info(cl_device_id d);
   cl_int clu_program_from_string(cl_device_id device, cl_context context, const char* source_str, size_t source_size, cl_program *program);
   cl_int clu_program_from_fs(cl_device_id device, cl_context context, const char *file, cl_program *program);
-
+ 
   namespace cl {
     template <class T> class Buffer {
       public:
@@ -126,9 +127,11 @@
     cl_context context;
     cl_command_queue command_queues[TOTAL_COMMAND_QUEUES];
     cl_program program;
-    cl_kernel kernel;
+    map<string, cl_kernel> kernels;
   } clu_job_t;
 
   int clu_compute_init(clu_job_t *job);
   void clu_compute_destroy(clu_job_t *job);
+  map<string, cl_kernel> clu_create_all_kernels(cl_program prog);
+
 #endif

@@ -1,4 +1,3 @@
-#include "gl-wrap.h"
 #include <stdio.h>
 #include <glm/glm.hpp>
 
@@ -15,9 +14,6 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <string.h>
-
-#define RENDER_STATIC 1
-#define RENDER_DYNAMIC 0
 
 bool keys[1024];
 bool prevKeys[1024];
@@ -69,33 +65,35 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 }
 
 void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
+  const cl_uint total = (cl_uint)raytracer->volumes.size();
+  cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
+  cl_command_queue queue = compute->job.command_queues[0];
+
+  for (cl_uint i = 0; i < total; i++) {
+    mem[i] = raytracer->volumes[i]->computeBuffer;
+  }
+
   CL_CHECK_ERROR(clEnqueueAcquireGLObjects(
-    compute->job.command_queues[0],
-    VOLUME_COUNT,
-    raytracer->volumeMemory,
+    queue,
+    total,
+    mem,
     0,
     0,
     NULL
   ));
 
-  for (int i = 0; i < VOLUME_COUNT; i++) {
-    int queue = 0;
+  for (cl_uint i = 0; i < total; i++) {
     compute->fill(
-      compute->job.command_queues[queue],
-      raytracer->volumes[i]->computeBuffer,
-      raytracer->volumes[i]->mem_center,
+      "sphere",
+      queue,
+      raytracer->volumes[i],
       time
     );
   }
 
-  CL_CHECK_ERROR(clEnqueueReleaseGLObjects(
-    compute->job.command_queues[0],
-    VOLUME_COUNT,
-    raytracer->volumeMemory,
-    0,
-    0,
-    NULL
-  ));
+  CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
+
+  free(mem);
 }
 
 int main(void) {
@@ -121,8 +119,15 @@ int main(void) {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwSwapInterval(0);
 
+#ifndef FULLSCREEN
   window = glfwCreateWindow(windowDimensions[0], windowDimensions[1], "voxviz", NULL, NULL);
+#else
+  // fullscreen
+  GLFWmonitor* primary = glfwGetPrimaryMonitor();
+  const GLFWvidmode* mode = glfwGetVideoMode(primary);
+  window = glfwCreateWindow(mode->width, mode->height, "voxviz", glfwGetPrimaryMonitor(), NULL);
   glfwSetWindowSizeCallback(window, window_resize);
+#endif
 
   if (!window) {
     glfwTerminate();
@@ -144,9 +149,6 @@ int main(void) {
       ->link()
       ->use();
 
-  GLint mvpUniform = glGetUniformLocation(prog->handle, "MVP");
-  GLint dimsUniform = glGetUniformLocation(prog->handle, "dims");
-
   // Setup the orbit camera
   glm::vec3 center(256.0, 0.0, 0.0);
   glm::vec3 eye(0.0, 0.0, -glm::length(center) * 2.0);
@@ -156,6 +158,14 @@ int main(void) {
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
+
+  for (float x = 0; x < 4; x++) {
+    //for (float y = 0; y < VOLUME_SIDE; y++) {
+      for (float z = 0; z < 4; z++) {
+        raytracer->addVolumeAtIndex(x, 0.0, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
+      }
+    //}
+  }
   orbit_camera_init(eye, center, up);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -167,14 +177,26 @@ int main(void) {
   update_volumes(raytracer, compute, time);
 #endif
 
+  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 64, 64, 64);
+  compute->lock(compute->job.command_queues[0], tool->computeBuffer);
+  compute->fill(
+    "fillAll",
+    compute->job.command_queues[0],
+    tool,
+    0
+  );
+
+  compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
+  tool->position(0.0, 20.0, 0.0);
+
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-
     glDepthMask(GL_TRUE);
-    glCullFace(GL_BACK);
-    glEnable(GL_CULL_FACE);
+    
+    //glCullFace(GL_BACK);
+    //glEnable(GL_CULL_FACE);
 
     glClearDepth(1.0);
     glClearColor(0.0, 0.0, 0.0, 1.0);
@@ -249,9 +271,10 @@ int main(void) {
     mouse[0] = xpos;
     mouse[1] = ypos;
 
-    camera->pitch(delta[1] / 500.0);
-    camera->yaw(delta[0] / 500.0);
+    camera->pitch((float)(delta[1] / 500.0));
+    camera->yaw((float)(delta[0] / 500.0));
 
+    tool->position(sinf((float)time / 100.0f) * 200.0f,100.0f, cosf((float)time / 100.0f) * 200.0f);
 
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       int axis_count;

@@ -5,12 +5,12 @@ in vec3 rayOrigin;
 out vec4 outColor;
 
 uniform sampler3D volume;
-uniform ivec3 dims;
+uniform uvec3 dims;
 uniform vec3 eye;
 uniform vec3 center;
 uniform int showHeat;
 
-#define ITERATIONS 50
+#define ITERATIONS 256
 
 float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);
@@ -35,59 +35,87 @@ vec4 heat(float amount, float total) {
 
 // phong shading
 vec3 shading( vec3 v, vec3 n, vec3 eye ) {
-	vec3 final = vec3( 0.0 );
+  vec3 final = vec3( 0.0 );
 
-	// light 0
-	{
-		vec3 light_pos = eye + vec3(0.0, 0.0, 10.0);//vec3( 100.0, 110.0, 150.0 );
-		vec3 light_color = vec3( 1.0 );
-		vec3 vl = normalize( light_pos - v );
-		float diffuse  = max( 0.0, dot( vl, n ) );
-		final += light_color * diffuse;
-	}
+  // light 0
+  {
+    vec3 light_pos = eye + vec3(0.0, 0.0, 10.0);//vec3( 100.0, 110.0, 150.0 );
+    vec3 light_color = vec3( 1.0 );
+    vec3 vl = normalize( light_pos - v );
+    float diffuse  = max( 0.0, dot( vl, n ) );
+    final += light_color * diffuse;
+  }
 
-	// light 1
-	{
-		vec3 light_pos = -vec3( 100.0, 110.0, 120.0 );
-		vec3 light_color = vec3( 1.0 );
-		vec3 vl = normalize( light_pos - v );
-		float diffuse  = max( 0.0, dot( vl, n ) );
-		final += light_color * diffuse;
-	}
+  // light 1
+  {
+    vec3 light_pos = -vec3( 100.0, 110.0, 120.0 );
+    vec3 light_color = vec3( 1.0 );
+    vec3 vl = normalize( light_pos - v );
+    float diffuse  = max( 0.0, dot( vl, n ) );
+    final += light_color * diffuse;
+  }
 
-	return final;
+  return final;
 }
 
-float march(vec3 pos, vec3 dir, out vec3 mask, out vec3 center, out float hit, out float iterations) {
-	// grid space
-  vec3 grid = floor( pos );
-	vec3 grid_step = sign( dir );
-	vec3 corner = max( grid_step, vec3( 0.0 ) );
+float march(in out vec3 pos, vec3 dir, out vec3 center, out float hit, out float iterations) {
+  // grid space
+  vec3 grid = floor(pos);
+  vec3 grid_step = sign( dir );
+  vec3 corner = max( grid_step, vec3( 0.0 ) );
+  bvec3 mask;
+  
 
-	// ray space
-	vec3 inv = vec3( 1.0 ) / dir;
-	vec3 ratio = ( grid + corner - pos ) * inv;
-	vec3 ratio_step = grid_step * inv;
+  // ray space
+  vec3 inv = vec3( 1.0 ) / dir;
+  vec3 ratio = ( grid + corner - pos ) * inv;
+  vec3 ratio_step = grid_step * inv;
 
-	// dda
-	hit = -1.0;
-  iterations = 0.0;
-	for ( int i = 0; i < ITERATIONS; i++ ) {
-		if (voxel( grid ) > 0.0) {
-			hit = 1.0;
-			continue;
-		}
+  // dda
+  hit = -1.0;
+  for (iterations = 0.0; iterations < ITERATIONS; iterations++ ) {
+    if (hit > 0.0 || voxel( grid ) > 0.0) {
+      hit = 1.0;
+      continue;
+    }
     iterations++;
-		vec3 cp = step( ratio, ratio.yzx );
 
-		mask = cp * ( vec3( 1.0 ) - cp.zxy );
+    /*
+      x < y && x < z :: step x
+      x < y && x > z :: step z
+      x > y && y < z :: step y
+      x > y && y > z :: step z
+    */
+    mask = lessThanEqual(ratio.xyz, min(ratio.yzx, ratio.zxy));
+    grid += ivec3(grid_step) * ivec3(mask);
+    pos += grid_step * ivec3(mask);
+    ratio += ratio_step * vec3(mask);
+  }
 
-		grid  += grid_step  * mask;
-		ratio += ratio_step * mask;
-	}
+  center = floor(pos) + vec3( 0.5 );
 
-	center = grid + vec3( 0.5 );
-	return dot( ratio - ratio_step, mask ) * hit;
+  // vec3 s = sign(dir);
+  // vec3 diff = normalize(pos - (floor(pos) + vec3(0.5)));
+  // vec3 m = vec3(greaterThan(diff.xyz, max(diff.yzx, diff.zxy)));
+
+  // TODO: ensure we go the right direction into the voxel to get the center
+  // normal = m * sign(diff);//normalize(pos - floor(pos) + vec3(0.5));
+  // normal = vec3(mask);
+  return dot( ratio - ratio_step, vec3(mask) ) * hit;
+}
+
+void main1() {
+  vec3 pos = gl_FrontFacing ? rayOrigin : eye;
+  vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
+  vec3 dir = normalize(eyeToPlane);
+ 
+  vec3 diff = pos - center;
+  vec3 adiff = abs(diff);
+
+  vec3 mask = vec3(greaterThan(adiff.xyz, max(adiff.yzx, adiff.zxy)));
+
+  vec3 color = mask;//((vec3(1.0) + diff) * mask) * 0.5;
+  outColor = vec4(color, 1.0);
 }
 
 void main() {
@@ -95,22 +123,27 @@ void main() {
   vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
   vec3 dir = normalize(eyeToPlane);
 
-  vec3 mask, center;
+  vec3 normal;
+  vec3 voxelCenter;
   float hit, iterations;
-  float depth = march(pos, dir, mask, center, hit, iterations);
+  float depth = march(pos, dir, voxelCenter, hit, iterations);
   gl_FragDepth = hit < 0.0 ? 1.0 : -depth;
 
-  // if (hit <= 0.0 && showHeat < 1) {
-  //   // we have to discard to avoid obscuring opaque bricks that live behind
-  //   // the current one
-  //   // discard;
-  //   outColor = vec4(1.0, 0.0, 0.0, 0.5);
-  //   return;
-  // }
+  vec3 color;
 
-	vec3 p = pos + dir * depth;
-	vec3 n = -vec3(mask) * sign( dir );
-  // vec3 color = shading( p, n, eye );
-  outColor = vec4(vec3(mask), 1.0);
-  outColor = mix(outColor, heat(iterations, ITERATIONS), showHeat);
+  vec3 fdims = vec3(dims);
+  vec3 hfdims = fdims * 0.5;
+
+  vec3 local = (hfdims + pos - center) / fdims;
+
+
+  vec3 adiff = fract(local);
+  vec3 mask = vec3(greaterThan(adiff.xyz, max(adiff.yzx, adiff.zxy)));
+
+  color = vec3(depth/1.0);
+  color = local;
+
+
+
+  outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
 }

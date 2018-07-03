@@ -1,6 +1,7 @@
 #include "clu.h"
 #include "compute.h"
 #include "core.h"
+#include "volume.h"
 
 Compute::Compute() {
   clu_compute_init(&this->job);
@@ -33,20 +34,26 @@ void Compute::unlock(cl_command_queue queue, cl_mem texture) {
 }
 
 
-void Compute::fill(cl_command_queue queue, cl_mem texture, cl_mem center, int time) {
-  static const size_t global_threads[3] = {
-    VOLUME_DIMS,
-    VOLUME_DIMS,
-    VOLUME_DIMS
+void Compute::fill(string kernelName, cl_command_queue queue, Volume* volume, int time) {
+  
+  static const size_t global_threads[3] = { 
+    volume->dims.x,
+    volume->dims.y,
+    volume->dims.z
   };
 
-  CL_CHECK_ERROR(clSetKernelArg(this->job.kernel, 0, sizeof(texture), &texture));
-  CL_CHECK_ERROR(clSetKernelArg(this->job.kernel, 1, sizeof(cl_mem), &center));
-  CL_CHECK_ERROR(clSetKernelArg(this->job.kernel, 2, sizeof(int), &time));
+  cl_kernel kernel = this->job.kernels[kernelName];
+
+  cl_mem texture = volume->computeBuffer;
+  cl_mem center = volume->mem_center;
+
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 0, sizeof(texture), &texture));
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 1, sizeof(cl_mem), &center));
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 2, sizeof(int), &time));
 
   CL_CHECK_ERROR(clEnqueueNDRangeKernel(
     queue,
-    this->job.kernel,
+    kernel,
     3,
     NULL,
     global_threads,

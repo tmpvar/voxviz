@@ -4,6 +4,7 @@
   #include "core.h"
   #include "clu.h"
   #include <glm/glm.hpp>
+  #include "volume.h"
 
   using namespace cl;
 
@@ -17,7 +18,7 @@
       Compute();
       ~Compute();
 
-      void fill(cl_command_queue queue, cl_mem texture, cl_mem center, int time);
+      void fill(string kernelName, cl_command_queue queue, Volume * volume, int time);
       void lock(cl_command_queue queue, cl_mem texture);
       void unlock(cl_command_queue queue, cl_mem texture);
   };

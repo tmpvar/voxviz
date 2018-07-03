@@ -29,6 +29,7 @@ include_directories(
   ${OPENCL_INCLUDE_DIRS}
   ${OpenCL_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}
+  ${GLM_INCLUDE_DIR}
 )
 
 add_executable(

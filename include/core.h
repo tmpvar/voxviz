@@ -1,11 +1,15 @@
 #ifndef __CORE_H
 #define __CORE_H
 
-#define VOLUME_DIMS 32
+#define VOLUME_DIMS 128
 
-#define VOLUME_SIDE 6
-#define VOLUME_COUNT VOLUME_SIDE * VOLUME_SIDE * VOLUME_SIDE
+#define VOLUME_SIDE 8
 
 #define TOTAL_COMMAND_QUEUES 16
+
+#define RENDER_STATIC 1
+//#define RENDER_DYNAMIC 1
+
+#define FULLSCREEN
 
 #endif

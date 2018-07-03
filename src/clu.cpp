@@ -267,24 +267,24 @@ void clu_print_device_info(cl_device_id d) {
 
   // workgroup stuff
   clGetDeviceInfo(d, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(tmp), &tmp, NULL);
-  printf("  max workgroup size: %lu\n", tmp);
+  printf("  max workgroup size: %zu\n", tmp);
 
   clGetDeviceInfo(d, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(tuint), &tuint, NULL);
   printf("  max work item dimensions: %u\n", tuint);
 
   // 2d image max dimensions
   clGetDeviceInfo(d, CL_DEVICE_IMAGE2D_MAX_HEIGHT, sizeof(tmp), &tmp, NULL);
-  printf("  image2d max: %lu", tmp);
+  printf("  image2d max: %zu", tmp);
   clGetDeviceInfo(d, CL_DEVICE_IMAGE2D_MAX_WIDTH, sizeof(tmp), &tmp, NULL);
-  printf(" x %lu\n", tmp);
+  printf(" x %zu\n", tmp);
 
   // 3d image max dimensions
   clGetDeviceInfo(d, CL_DEVICE_IMAGE3D_MAX_HEIGHT, sizeof(tmp), &tmp, NULL);
-  printf("  image3d max: %lu", tmp);
+  printf("  image3d max: %zu", tmp);
   clGetDeviceInfo(d, CL_DEVICE_IMAGE3D_MAX_WIDTH, sizeof(tmp), &tmp, NULL);
-  printf(" x %lu", tmp);
+  printf(" x %zu", tmp);
   clGetDeviceInfo(d, CL_DEVICE_IMAGE3D_MAX_DEPTH, sizeof(tmp), &tmp, NULL);
-  printf(" x %lu\n", tmp);
+  printf(" x %zu\n", tmp);
 }
 
 cl_int clu_program_from_string(cl_device_id device, cl_context context, const char* source_str, size_t source_size, cl_program *program) {
@@ -447,8 +447,7 @@ int clu_compute_init(clu_job_t *job) {
 
   clu_program_from_fs(job->device, job->context, "../shaders/kernel.cl", &job->program);
 
-  job->kernel = clCreateKernel(job->program, "hello", &ret);
-  CL_CHECK_ERROR(ret);
+  job->kernels = clu_create_all_kernels(job->program);
 
   return 1;
 }
@@ -460,10 +459,53 @@ void clu_compute_destroy(clu_job_t *job) {
     clFlush(job->command_queues[i]);
     clFinish(job->command_queues[i]);
   }
-  clReleaseKernel(job->kernel);
-  clReleaseProgram(job->program);
 
+  for (const auto &p : job->kernels) {
+    clReleaseKernel(p.second);
+  }
+
+  clReleaseProgram(job->program);
 
   clReleaseContext(job->context);
   clReleaseDevice(job->device);
 };
+
+map<string, cl_kernel> clu_create_all_kernels(cl_program prog) {
+
+  cl_uint num_kernels = 0;
+  CL_CHECK_ERROR(clCreateKernelsInProgram(prog, 0, NULL, &num_kernels));
+  cout << "found " << num_kernels << " opencl kernels:" << endl;
+  
+  cl_kernel *kernels = (cl_kernel *)malloc(sizeof(cl_kernel) *  num_kernels);
+  CL_CHECK_ERROR(clCreateKernelsInProgram(prog, num_kernels, kernels, &num_kernels));
+
+  map<string, cl_kernel> ret;
+
+  size_t len = 0;
+  for (cl_uint i = 0; i < num_kernels; i++) {
+    CL_CHECK_ERROR(clGetKernelInfo(
+      kernels[i],
+      CL_KERNEL_FUNCTION_NAME,
+      NULL,
+      NULL,
+      &len
+    ));
+
+
+    char *str = (char *)malloc(sizeof(char) * len);
+
+    CL_CHECK_ERROR(clGetKernelInfo(
+      kernels[i],
+      CL_KERNEL_FUNCTION_NAME,
+      len,
+      str,
+      &len
+    ));
+    cout << "  " << str << endl;
+    ret[str] = kernels[i];
+
+    free(str);
+  }
+  
+  return ret;
+}
