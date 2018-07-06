@@ -184,6 +184,10 @@ void clu_error(cl_int err) {
         printf("ERROR CL_INVALID_GL_SHAREGROUP_REFERENCE_KHR:\n Returned by clCreateContext, clCreateContextFromType, and clGetGLContextInfoKHR when an invalid OpenGL context or share group object handle is specified in <properties>\n");
       break;
     #endif
+    case -9999:
+      printf("ERROR -9999:\nIllegal read or write to a buffer\n");
+    break;
+
   }
 }
 

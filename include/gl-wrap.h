@@ -135,6 +135,12 @@
       return this;
     }
 
+    Program *uniformFloat(string name, float v) {
+      GLint loc = this->uniformLocation(name);
+      glUniform1f(loc, v);
+      return this;
+    }
+
     Program *uniformVec2(string name, glm::vec2 v) {
       GLint loc = this->uniformLocation(name);
       glUniform2f(loc, v[0], v[1]);

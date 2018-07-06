@@ -10,6 +10,6 @@
 #define RENDER_STATIC 1
 //#define RENDER_DYNAMIC 1
 
-//#define FULLSCREEN
+#define FULLSCREEN
 
 #endif

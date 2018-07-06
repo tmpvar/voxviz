@@ -72,7 +72,7 @@ float3 getRadiusFactor(int i) {
 }
 
 
-__kernel void hello1(__write_only image3d_t image, const __global float3* centerPointer, const int time) {
+__kernel void hello1(__write_only image3d_t image, __global float3* centerPointer, int time) {
   float on = 1.0;
 
   int3 ipos = (int3)(
@@ -116,7 +116,7 @@ __kernel void hello1(__write_only image3d_t image, const __global float3* center
   write_imagef(image, (int4)(ipos, 0.0f), (float4)(on, on, on, on));
 }
 
-__kernel void waves(__write_only image3d_t image, const __global float3* centerPointer, const int time) {
+__kernel void waves(__write_only image3d_t image, __global float3* centerPointer, int time) {
   float on = 1.0;
 
   int3 pos = (int3)(
@@ -149,7 +149,7 @@ __kernel void waves(__write_only image3d_t image, const __global float3* centerP
 }
 
 // sphere
-__kernel void sphere(__write_only image3d_t image, const __global float *centerPointer, const int time) {
+__kernel void sphere(__write_only image3d_t image, __global float *centerPointer, int time) {
   int3 pos = (int3)(
     get_global_id(0),
     get_global_id(1),
@@ -170,7 +170,7 @@ __kernel void sphere(__write_only image3d_t image, const __global float *centerP
 }
 
 // sphere
-__kernel void cylinder(__write_only image3d_t image, const __global float *centerPointer, const int time) {
+__kernel void cylinder(__write_only image3d_t image, __global float *centerPointer, int time) {
   int3 pos = (int3)(
     get_global_id(0),
     get_global_id(1),
@@ -192,7 +192,7 @@ __kernel void cylinder(__write_only image3d_t image, const __global float *cente
 
 
 // fill all
-__kernel void fillAll(__write_only image3d_t image, const __global float *centerPointer, const int time) {
+__kernel void fillAll(__write_only image3d_t image, __global float *centerPointer, int time) {
   int3 pos = (int3)(
     get_global_id(0),
     get_global_id(1),
@@ -201,4 +201,28 @@ __kernel void fillAll(__write_only image3d_t image, const __global float *center
 
   float on = 1.0;
   write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
+}
+
+// cut
+
+
+__constant sampler_t tool_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
+
+__kernel void opCut(write_only image3d_t stock, const __global int3 *stock_offset, read_only image3d_t cutter, const __global int3 *cutter_offset)
+{
+  int3 pos = (int3)(
+    get_global_id(0),
+    get_global_id(1),
+    get_global_id(2)
+  );
+
+
+  int3 read_pos = pos + (*cutter_offset);
+  int3 write_pos = pos + (*stock_offset);
+
+  float v = read_imagef(cutter, tool_sampler,(int4)(read_pos, 0.0)).x;
+  if (v > 0.0) {
+    float on = 0.0;
+    write_imagef(stock, (int4)(write_pos, 0.0), (float4)(on, on, on, on));
+  }
 }

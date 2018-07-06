@@ -9,8 +9,9 @@ uniform uvec3 dims;
 uniform vec3 eye;
 uniform vec3 center;
 uniform int showHeat;
+uniform float debug;
 
-#define ITERATIONS 256
+#define ITERATIONS 512
 
 float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);
@@ -143,5 +144,8 @@ void main() {
   color = vec3(depth/1.0);
   color = local;
 
+  color = mix(color, vec3(1.0, 0.0, 0.0), debug);
+
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
+
 }

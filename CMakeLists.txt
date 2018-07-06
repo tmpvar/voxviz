@@ -34,10 +34,13 @@ include_directories(
 
 add_executable(
   voxviz
+  src/aabb.cpp
   src/main.cpp
   src/glad.c
   src/compute.cpp
   src/clu.cpp
+  src/volume.cpp
+  src/gl-wrap.cpp
   include/raytrace.h
   include/gl-wrap.h
   include/camera-orbit.h
@@ -46,6 +49,7 @@ add_executable(
   include/compute.h
   include/core.h
   include/volume.h
+  include/aabb.h
 )
 
 add_dependencies(voxviz shaders_out)

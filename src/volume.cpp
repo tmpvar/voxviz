@@ -4,6 +4,7 @@
 Volume::Volume(glm::vec3 center, glm::uvec3 dims) {
   this->center = center;
   this->dims = dims;
+  this->debug = 0.0f;
 }
 
 Volume::~Volume() {
@@ -44,7 +45,7 @@ void Volume::upload(clu_job_t job) {
   // Create clgl shared texture
   this->computeBuffer = clCreateFromGLTexture(
     job.context,
-    CL_MEM_WRITE_ONLY,
+    CL_MEM_READ_WRITE,
     GL_TEXTURE_3D,
     0,
     this->textureId,
@@ -80,7 +81,8 @@ void Volume::bind(Program *program) {
 
   program->uniform1i("volume", 0)
     ->uniformVec3("center", this->center)
-    ->uniformVec3ui("dims", this->dims);
+    ->uniformVec3ui("dims", this->dims)
+    ->uniformFloat("debug", this->debug);
 
 }
 
@@ -88,4 +90,43 @@ void Volume::position(float x, float y, float z) {
   this->center.x = x;
   this->center.y = y;
   this->center.z = z;
+}
+
+aabb_t Volume::aabb() {
+  // TODO: cache aabb and recompute on reposition
+  aabb_t ret;
+
+  glm::vec3 hd = (glm::vec3)this->dims / glm::vec3(2.0, 2.0, 2.0);
+  glm::vec3 lower = center - hd;
+
+
+  ret.lower = lower;
+  ret.upper = lower + (glm::vec3)this->dims;
+  return ret;
+}
+
+bool Volume::isect(Volume *other, aabb_t *out) {
+  aabb_t a = this->aabb();
+  aabb_t b = other->aabb();
+
+  if (
+    !(
+      (a.lower.x <= b.upper.x && a.upper.x >= b.lower.x) &&
+      (a.lower.y <= b.upper.y && a.upper.y >= b.lower.y) &&
+      (a.lower.z <= b.upper.z && a.upper.z >= b.lower.z)
+     )
+  )
+  {
+    return false;
+  }
+
+  out->upper.x = min(a.upper.x, b.upper.x);
+  out->upper.y = min(a.upper.y, b.upper.y);
+  out->upper.z = min(a.upper.z, b.upper.z);
+
+  out->lower.x = max(a.lower.x, b.lower.x);
+  out->lower.y = max(a.lower.y, b.lower.y);
+  out->lower.z = max(a.lower.z, b.lower.z);
+
+  return true;
 }

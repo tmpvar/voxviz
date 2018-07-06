@@ -19,6 +19,7 @@
       ~Compute();
 
       void fill(string kernelName, cl_command_queue queue, Volume * volume, int time);
+      void opCut(Volume *target, Volume *cutter);
       void lock(cl_command_queue queue, cl_mem texture);
       void unlock(cl_command_queue queue, cl_mem texture);
   };

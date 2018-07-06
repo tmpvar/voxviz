@@ -20,7 +20,6 @@
     Mesh *mesh;
     Program *program;
     int *dims;
-    GLbyte *volume;
     GLuint volumeTexture;
     clu_job_t job;
     int showHeat;
@@ -78,7 +77,7 @@
 	  }
 
     Volume *addVolumeAtIndex(float x, float y, float z, unsigned int w, unsigned int h, unsigned d) {
-      glm::vec3 pos(x*w, y*h, z*d);
+      glm::vec3 pos(x*w + w/2.0f, y*h + h / 2.0f, z*d + d / 2.0f);
       glm::uvec3 dims(w, h, d);
 
       Volume *volume = new Volume(pos, dims);

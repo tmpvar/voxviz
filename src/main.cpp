@@ -73,26 +73,38 @@ void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
     mem[i] = raytracer->volumes[i]->computeBuffer;
   }
 
-  CL_CHECK_ERROR(clEnqueueAcquireGLObjects(
-    queue,
-    total,
-    mem,
-    0,
-    0,
-    NULL
-  ));
+  cl_event opengl_get_completion;
+  CL_CHECK_ERROR(clEnqueueAcquireGLObjects(queue, total, mem, 0, nullptr, &opengl_get_completion));
+  clWaitForEvents(1, &opengl_get_completion);
+  clReleaseEvent(opengl_get_completion);
 
   for (cl_uint i = 0; i < total; i++) {
-    compute->fill(
-      "fillAll",
-      queue,
-      raytracer->volumes[i],
-      time
-    );
+    compute->fill("fillAll", queue, raytracer->volumes[i], time);
   }
 
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
 
+  free(mem);
+}
+
+
+void apply_tool(Raytracer *raytracer, Compute *compute) {
+  const cl_uint total = (cl_uint)raytracer->volumes.size();
+  cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
+  cl_command_queue queue = compute->job.command_queues[0];
+
+  for (cl_uint i = 0; i < total; i++) {
+    mem[i] = raytracer->volumes[i]->computeBuffer;
+  }
+
+  cl_event opengl_get_completion;
+  CL_CHECK_ERROR(clEnqueueAcquireGLObjects(queue, total, mem, 0, nullptr, &opengl_get_completion));
+  clWaitForEvents(1, &opengl_get_completion);
+  clReleaseEvent(opengl_get_completion);
+ 
+  compute->opCut(raytracer->volumes[0], raytracer->volumes[1]);
+
+  CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
   free(mem);
 }
 
@@ -159,9 +171,9 @@ int main(void) {
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
 
-  for (float x = 0; x < 8; x++) {
+  for (float x = 0; x < 4; x++) {
     //for (float y = 0; y < VOLUME_SIDE; y++) {
-      for (float z = 0; z < 8; z++) {
+      for (float z = 0; z < 4; z++) {
         raytracer->addVolumeAtIndex(x, 0.0, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
       }
     //}
@@ -177,7 +189,7 @@ int main(void) {
   update_volumes(raytracer, compute, time);
 #endif
 
-  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 64, 256, 64);
+  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 32, 128, 64);
   compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
     "cylinder",
@@ -186,8 +198,9 @@ int main(void) {
     0
   );
   compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
-  tool->position(0.0, 256.0, 0.0);
-  
+  tool->position(0.0, 128, 0.0);
+
+  clFinish(compute->job.command_queues[0]);
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -272,8 +285,7 @@ int main(void) {
 
     camera->pitch((float)(delta[1] / 500.0));
     camera->yaw((float)(delta[0] / 500.0));
-
-    //tool->position(sinf((float)time / 100.0f) * 200.0f,100.0f, cosf((float)time / 100.0f) * 200.0f);
+  
 
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       int axis_count;
@@ -298,6 +310,25 @@ int main(void) {
 #if RENDER_DYNAMIC == 1
     update_volumes(raytracer, compute, time);
 #endif
+    glFinish();
+
+    tool->position(
+      128.0f * 2.0f + sinf((float)time / 50.0f) * fmod(time, 3000.0f) / 10.0f,
+      128.0f - time / 100.0f,
+      128.0f * 2.0f + cosf((float)time / 50.0f) * fmod(time, 3000.0f) / 10.0f
+    );
+
+
+    size_t total = raytracer->volumes.size();
+    for (unsigned int i = 0; i < total; i++) {
+      if (raytracer->volumes[i] == tool) {
+        continue;
+      }
+
+      compute->opCut(raytracer->volumes[i], tool);
+    }
+    clFinish(compute->job.command_queues[0]);
+ 
     time++;
 
     glfwPollEvents();
