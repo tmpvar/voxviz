@@ -172,11 +172,11 @@ int main(void) {
   Raytracer *raytracer = new Raytracer(dims, compute->job);
 
   for (float x = 0; x < 4; x++) {
-    //for (float y = 0; y < VOLUME_SIDE; y++) {
+    for (float y = 0; y < 2; y++) {
       for (float z = 0; z < 4; z++) {
-        raytracer->addVolumeAtIndex(x, 0.0, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
+        raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
       }
-    //}
+    }
   }
   orbit_camera_init(eye, center, up);
 
@@ -189,7 +189,7 @@ int main(void) {
   update_volumes(raytracer, compute, time);
 #endif
 
-  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 32, 128, 64);
+  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
   compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
     "cylinder",
@@ -313,9 +313,9 @@ int main(void) {
     glFinish();
 
     tool->position(
-      128.0f * 2.0f + sinf((float)time / 50.0f) * fmod(time, 3000.0f) / 10.0f,
-      128.0f - time / 100.0f,
-      128.0f * 2.0f + cosf((float)time / 50.0f) * fmod(time, 3000.0f) / 10.0f
+      256.0f * 2.0f + sinf((float)time / 50.0f) * fmod(time, 3000.0f) / 5.0f,
+      512.0f - time / 100.0f,
+      256.0f * 2.0f + cosf((float)time / 50.0f) * fmod(time, 3000.0f) / 5.0f
     );
 
 

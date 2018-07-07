@@ -83,13 +83,12 @@ void Volume::bind(Program *program) {
     ->uniformVec3("center", this->center)
     ->uniformVec3ui("dims", this->dims)
     ->uniformFloat("debug", this->debug);
-
 }
 
 void Volume::position(float x, float y, float z) {
-  this->center.x = x;
-  this->center.y = y;
-  this->center.z = z;
+  this->center.x = floorf(x);
+  this->center.y = floorf(y);
+  this->center.z = floorf(z);
 }
 
 aabb_t Volume::aabb() {

@@ -78,7 +78,6 @@ void Compute::opCut(Volume *target, Volume *cutter) {
   aabb_t overlap;
 
   if (!cutter->isect(target, &overlap)) {
-    cout << "bail no isect" << endl;
     target->debug = 0.0;
     return;
   }

@@ -11,15 +11,14 @@ uniform vec3 center;
 uniform int showHeat;
 uniform float debug;
 
-#define ITERATIONS 512
+#define ITERATIONS 768
 
 float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);
   vec3 hfdims = fdims * 0.5;
 
-  vec3 pos = floor((hfdims + worldPos - center)) / fdims;
+  vec3 pos = round((hfdims + worldPos - center)) / fdims;
   return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
-  // return texture(volume, pos).r;
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -59,7 +58,8 @@ vec3 shading( vec3 v, vec3 n, vec3 eye ) {
   return final;
 }
 
-float march(in out vec3 pos, vec3 dir, out vec3 center, out float hit, out float iterations) {
+float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float hit, out float iterations) {
+  dir = normalize(dir);
   // grid space
   vec3 grid = floor(pos);
   vec3 grid_step = sign( dir );
@@ -74,7 +74,8 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out float hit, out float
 
   // dda
   hit = -1.0;
-  for (iterations = 0.0; iterations < ITERATIONS; iterations++ ) {
+  iterations = 0.0;
+  for (float i = 0.0; i < ITERATIONS; i++ ) {
     if (hit > 0.0 || voxel( grid ) > 0.0) {
       hit = 1.0;
       continue;
@@ -95,6 +96,9 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out float hit, out float
 
   center = floor(pos) + vec3( 0.5 );
 
+  //normal = iterations == 0.0 ? vec3(lessThan(ratio.xyz, min(ratio.yzx, ratio.zxy))) :  vec3(greaterThan(ratio.xyz, max(ratio.yzx, ratio.zxy)));
+  vec3 d = abs(center - pos);
+  normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
   // vec3 s = sign(dir);
   // vec3 diff = normalize(pos - (floor(pos) + vec3(0.5)));
   // vec3 m = vec3(greaterThan(diff.xyz, max(diff.yzx, diff.zxy)));
@@ -127,7 +131,8 @@ void main() {
   vec3 normal;
   vec3 voxelCenter;
   float hit, iterations;
-  float depth = march(pos, dir, voxelCenter, hit, iterations);
+
+  float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
   gl_FragDepth = hit < 0.0 ? 1.0 : -depth;
 
   vec3 color;
@@ -143,7 +148,7 @@ void main() {
 
   color = vec3(depth/1.0);
   color = local;
-
+  color = normal;
   color = mix(color, vec3(1.0, 0.0, 0.0), debug);
 
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
