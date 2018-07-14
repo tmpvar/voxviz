@@ -22,6 +22,7 @@ class Program;
     void upload(clu_job_t job);
     void bind(Program * program);
     void position(float x, float y, float z);
+    void move(float x, float y, float z);
     aabb_t aabb();
     bool isect(Volume *other, aabb_t *out);
   };

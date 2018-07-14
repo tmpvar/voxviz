@@ -91,6 +91,12 @@ void Volume::position(float x, float y, float z) {
   this->center.z = floorf(z);
 }
 
+void Volume::move(float x, float y, float z) {
+  this->center.x += floorf(x);
+  this->center.y += floorf(y);
+  this->center.z += floorf(z);
+}
+
 aabb_t Volume::aabb() {
   // TODO: cache aabb and recompute on reposition
   aabb_t ret;

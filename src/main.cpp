@@ -291,7 +291,19 @@ int main(void) {
       int axis_count;
       const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
 
-      camera->translate(axis[0] * -5.0f, 0.0f, axis[1] * 5.0f);
+      tool->move(
+        axis[2] * 5.0f,
+        axis[1] * 5.0f,
+        axis[3] * -5.0f
+      );
+    }
+    else if (false) {
+      tool->position(
+        256.0f * 2.0f + sinf((float)time / 50.0f) * fmod(time, 3000.0f) / 5.0f,
+        512.0f - time / 100.0f,
+        256.0f * 2.0f + cosf((float)time / 50.0f) * fmod(time, 3000.0f) / 5.0f
+      );
+    }
 
       camera->pitch(-axis[3]/20.0f);
       camera->yaw(axis[2]/20.0f);
