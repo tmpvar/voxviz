@@ -52,6 +52,9 @@ add_executable(
   include/core.h
   include/volume.h
   include/aabb.h
+
+  src/fullscreen-surface.cpp
+  include/fullscreen-surface.h
 )
 
 add_dependencies(voxviz shaders_out)

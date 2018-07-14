@@ -7,6 +7,7 @@
 #include "compute.h"
 #include "core.h"
 #include "clu.h"
+#include "fullscreen-surface.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -239,13 +240,6 @@ int main(void) {
 
   Shaders::init();
 
-  Program *prog = new Program();
-  prog->add(Shaders::get("basic.vert"))
-      ->add(Shaders::get("color.frag"))
-      ->output("outColor")
-      ->link()
-      ->use();
-
   // Setup the orbit camera
   glm::vec3 center(256.0, 0.0, 0.0);
   glm::vec3 eye(0.0, 0.0, -glm::length(center) * 2.0);
@@ -286,6 +280,16 @@ int main(void) {
   tool->position(0.0, 128, 0.0);
 
   clFinish(compute->job.command_queues[0]);
+
+  Program *fullscreen_program = new Program();
+  fullscreen_program
+    ->add(Shaders::get("basic.vert"))
+    ->add(Shaders::get("color.frag"))
+    ->output("outColor")
+    ->link();
+
+  FullscreenSurface *fullscreen_surface = new FullscreenSurface();
+  
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -411,6 +415,7 @@ int main(void) {
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
+    fullscreen_surface->render(fullscreen_program);
     raytracer->render(MVP, currentEye, max_distance);
 
     glfwSwapBuffers(window);
@@ -436,7 +441,8 @@ int main(void) {
     glfwPollEvents();
   }
 
-  delete prog;
+  delete fullscreen_program;
+  delete fullscreen_surface;
   delete raytracer;
 
   Shaders::destroy();
