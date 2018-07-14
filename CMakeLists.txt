@@ -21,6 +21,7 @@ FIND_PACKAGE(OpenCL REQUIRED)
 
 add_subdirectory(deps/glfw)
 add_subdirectory(deps/glm)
+add_subdirectory(deps/libuv)
 add_subdirectory(shaders)
 
 include_directories(
@@ -30,6 +31,7 @@ include_directories(
   ${OpenCL_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${GLM_INCLUDE_DIR}
+  deps/libuv/include
 )
 
 add_executable(
@@ -58,6 +60,7 @@ target_link_libraries(
   voxviz
   glfw
   glm
+  uv_a
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
   ${OpenCL_LIBRARIES}
