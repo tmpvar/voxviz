@@ -90,12 +90,13 @@
       return volume;
     }
 
-    void render (glm::mat4 mvp, glm::vec3 eye) {
+    void render (glm::mat4 mvp, glm::vec3 eye, float max_distance) {
       this->program->use();
       this->program
         ->uniformMat4("MVP", mvp)
         ->uniformVec3("eye", eye)
-        ->uniform1i("showHeat", this->showHeat);
+        ->uniform1i("showHeat", this->showHeat)
+        ->uniformFloat("maxDistance", max_distance);
 
       sort(
         this->volumes.begin(),

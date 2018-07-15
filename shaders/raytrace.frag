@@ -10,6 +10,7 @@ uniform vec3 eye;
 uniform vec3 center;
 uniform int showHeat;
 uniform float debug;
+uniform float maxDistance;
 
 #define ITERATIONS 768
 
@@ -106,7 +107,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   // TODO: ensure we go the right direction into the voxel to get the center
   // normal = m * sign(diff);//normalize(pos - floor(pos) + vec3(0.5));
   // normal = vec3(mask);
-  return dot( ratio - ratio_step, vec3(mask) ) * hit;
+  return distance(eye, pos) / maxDistance;
 }
 
 void main1() {
@@ -133,7 +134,7 @@ void main() {
   float hit, iterations;
 
   float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
-  gl_FragDepth = hit < 0.0 ? 1.0 : -depth;
+  gl_FragDepth = hit < 0.0 ? 1.0 : depth;
 
   vec3 color;
 

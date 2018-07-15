@@ -255,7 +255,7 @@ int main(void) {
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
-
+  float max_distance = 10000.0f;
   for (float x = 0; x < 8; x++) {
     for (float y = 0; y < 1; y++) {
       for (float z = 0; z < 4; z++) {
@@ -411,7 +411,7 @@ int main(void) {
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
-    raytracer->render(MVP, currentEye);
+    raytracer->render(MVP, currentEye, max_distance);
 
     glfwSwapBuffers(window);
 
