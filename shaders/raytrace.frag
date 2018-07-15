@@ -2,7 +2,7 @@
 
 in vec3 rayOrigin;
 
-out vec4 outColor;
+layout(location = 0) out vec4 outColor;
 
 uniform sampler3D volume;
 uniform uvec3 dims;

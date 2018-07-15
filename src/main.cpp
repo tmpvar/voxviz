@@ -284,12 +284,14 @@ int main(void) {
   Program *fullscreen_program = new Program();
   fullscreen_program
     ->add(Shaders::get("basic.vert"))
-    ->add(Shaders::get("color.frag"))
+    ->add(Shaders::get("composite.frag"))
     ->output("outColor")
     ->link();
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   
+  glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
+  FBO *fbo = new FBO(windowDimensions[0], windowDimensions[1]);
 
   while (!glfwWindowShouldClose(window)) {
     glEnable(GL_DEPTH_TEST);
@@ -411,12 +413,19 @@ int main(void) {
 
     viewMatrix = camera->view();
 
-     MVP = perspectiveMatrix * viewMatrix;
+    MVP = perspectiveMatrix * viewMatrix;
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
-    fullscreen_surface->render(fullscreen_program);
+
+    fbo->bind();
     raytracer->render(MVP, currentEye, max_distance);
+    fbo->unbind();
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    fullscreen_program->use()->uniform1i("color", fbo->texture_color);
+    fullscreen_surface->render(fullscreen_program);
 
     glfwSwapBuffers(window);
 

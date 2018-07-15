@@ -17,6 +17,7 @@
 
   using namespace std;
   
+  GLint gl_ok(GLint error);
   GLint gl_error();
   void gl_shader_log(GLuint shader);
   
@@ -287,6 +288,113 @@
         GL_UNSIGNED_INT,
         0
       );
+    }
+  };
+
+
+  class FBO {
+
+    GLuint fb;
+    unsigned int width;
+    unsigned int height;
+
+  public:
+    GLuint texture_color;
+    GLuint texture_depth;
+    FBO(unsigned int width, unsigned int height) {
+      this->fb = 0;
+      this->width = width;
+      this->height = height;
+      this->create();
+    }
+
+    ~FBO() {
+      this->destroy();
+    }
+
+    FBO* setDimensions(unsigned int width, unsigned int height) {
+      this->destroy();
+      this->width = width;
+      this->height = height;
+      this->create();
+      return this;
+    }
+
+    void destroy() {
+      glDeleteTextures(1, &texture_color);
+      glDeleteTextures(1, &texture_depth);
+ 
+      // ensure we return the main render target back to 
+      // the screen (aka 0)
+      this->unbind();
+
+      glDeleteFramebuffers(1, &this->fb);
+    }
+
+    FBO* bind() {
+      // Avoid needless rebinding when already bound.
+      if (!this->isCurrentlyBound()) {
+        glBindFramebuffer(GL_FRAMEBUFFER, this->fb);
+      }
+
+      return this;
+    }
+
+    bool isCurrentlyBound() {
+      GLint current;
+      glGetIntegerv(GL_FRAMEBUFFER_BINDING, &current);
+      gl_ok(current);
+      return current == this->fb;
+    }
+
+    FBO* unbind() {
+      // If another fbo is bound don't unbind it.
+      if (this->isCurrentlyBound()) {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      }
+
+      return this;
+    }
+    
+    void create() {
+      //RGBA8 2D texture
+      glGenTextures(1, &texture_color);
+      glBindTexture(GL_TEXTURE_2D, texture_color);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      //NULL means reserve texture memory, but texels are undefined
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, this->width, this->height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+
+      // depth texture
+      //glGenTextures(1, &texture_depth);
+      //glBindTexture(GL_TEXTURE_2D, texture_depth);
+      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      //glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
+      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
+      //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+      //NULL means reserve texture memory, but texels are undefined
+      //glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, this->width, this->height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
+      //-------------------------
+      glGenFramebuffers(1, &this->fb);
+      glBindFramebuffer(GL_FRAMEBUFFER, fb);
+      //Attach 2D texture to this FBO
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_color, 0/*mipmap level*/);
+      //-------------------------
+      //Attach depth texture to FBO
+      //glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture_depth, 0/*mipmap level*/);
+      //-------------------------
+
+      GLenum buffers[1] = { GL_COLOR_ATTACHMENT0 };
+      glDrawBuffers(1, buffers);
+
+      //Does the GPU support current FBO configuration?
+      std::cout << "framebuffer status" << std::endl;
+      gl_ok(glCheckFramebufferStatus(GL_FRAMEBUFFER));
     }
   };
 #endif
