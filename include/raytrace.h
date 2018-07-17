@@ -98,17 +98,6 @@
         ->uniform1i("showHeat", this->showHeat)
         ->uniformFloat("maxDistance", max_distance);
 
-      sort(
-        this->volumes.begin(),
-        this->volumes.end(),
-        [eye](const Volume *a, const Volume *b) -> bool {
-          float ad = glm::distance(eye, a->center);
-          float bd = glm::distance(eye, b->center);
-
-          return ad < bd;
-        }
-      );
-
       // TODO: batch render
       for (auto& volume: this->volumes) {
         volume->bind(this->program);
