@@ -153,5 +153,4 @@ void main() {
   color = mix(color, vec3(1.0, 0.0, 0.0), debug);
 
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
-
 }

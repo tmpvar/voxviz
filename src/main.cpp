@@ -288,23 +288,19 @@ int main(void) {
     ->output("outColor")
     ->link();
 
+  Program *fullscreen_debug_program = new Program();
+  fullscreen_debug_program
+    ->add(Shaders::get("basic.vert"))
+    ->add(Shaders::get("color.frag"))
+    ->output("outColor")
+    ->link();
+
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   FBO *fbo = new FBO(windowDimensions[0], windowDimensions[1]);
 
   while (!glfwWindowShouldClose(window)) {
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glDepthMask(GL_TRUE);
-    
-    glCullFace(GL_BACK);
-    glEnable(GL_CULL_FACE);
-
-    glClearDepth(1.0);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     if (keys[GLFW_KEY_W]) {
       camera->translate(0.0f, 0.0f, 10.0f);
       orbit_camera_zoom(-5.0f);
@@ -369,6 +365,10 @@ int main(void) {
         fullscreen = false;
       }
       prevKeys[GLFW_KEY_ENTER] = false;
+
+      delete fbo;
+      glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
+      fbo = new FBO(windowDimensions[0], windowDimensions[1]);
     }
 
     // mouse look like free-fly/fps
@@ -417,14 +417,26 @@ int main(void) {
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
-
+    
     fbo->bind();
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+
+    glCullFace(GL_BACK);
+    glEnable(GL_CULL_FACE);
+
+    glClearDepth(1.0);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     raytracer->render(MVP, currentEye, max_distance);
     fbo->unbind();
-
+    //fbo->debugRender(windowDimensions);
+     
+    fullscreen_program->use()->texture2d("color", fbo->texture_color);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    fullscreen_program->use()->uniform1i("color", fbo->texture_color);
     fullscreen_surface->render(fullscreen_program);
 
     glfwSwapBuffers(window);

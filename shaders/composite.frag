@@ -5,7 +5,6 @@ in vec2 uv;
 uniform sampler2D color;
 
 void main() {
-
   outColor = texture(color, uv);
-  //outColor = vec4(abs(uv), 0.5, 1.0);
+  gl_FragDepth = 0.0;
 }
