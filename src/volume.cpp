@@ -28,12 +28,12 @@ void Volume::upload(clu_job_t job) {
   glTexImage3D(
     GL_TEXTURE_3D,
     0,
-    GL_RGB,
+    GL_RED,
     this->dims.x,
     this->dims.y,
     this->dims.z,
     0,
-    GL_RGB,
+    GL_RED,
     GL_UNSIGNED_BYTE,
     0
   );
