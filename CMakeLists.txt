@@ -34,6 +34,8 @@ include_directories(
   deps/libuv/include
 )
 
+file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl)
+
 add_executable(
   voxviz
   src/aabb.cpp
@@ -55,7 +57,11 @@ add_executable(
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
+
+  ${SHADER_FILES}
 )
+
+source_group("shaders" FILES ${SHADER_FILES})
 
 add_dependencies(voxviz shaders_out)
 
