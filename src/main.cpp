@@ -268,10 +268,10 @@ int main(void) {
   update_volumes(raytracer, compute, time);
 #endif
 
-  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 64, 512, 64);
+  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 512, 512, 512);
   compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
-    "cylinder",
+    "torus",
     compute->job.command_queues[0],
     tool,
     0
@@ -299,6 +299,8 @@ int main(void) {
   
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   FBO *fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+
+  uint32_t total_affected = 0;
 
   while (!glfwWindowShouldClose(window)) {
     if (keys[GLFW_KEY_W]) {
@@ -392,6 +394,7 @@ int main(void) {
         axis[3] * -5.0f
       );
     }
+
     else if (false) {
       tool->position(
         256.0f * 2.0f + sinf((float)time / 50.0f) * fmod(time, 3000.0f) / 5.0f,
@@ -447,16 +450,29 @@ int main(void) {
     glFlush();
 
     size_t total = raytracer->volumes.size();
+    total_affected = 0;
     for (unsigned int i = 0; i < total; i++) {
       if (raytracer->volumes[i] == tool) {
         continue;
       }
 
-      compute->opCut(raytracer->volumes[i], tool);
+      total_affected += compute->opCut(raytracer->volumes[i], tool);
     }
     clFinish(compute->job.command_queues[0]);
  
     time++;
+    
+    if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
+      glfwSetJoystickVibration(GLFW_JOYSTICK_1, total_affected, 0);
+    }
+    
+    if (total_affected <= 1000) {
+      total_affected = 0;
+    }
+    else {
+      total_affected -= 1000;
+    }
+
 
     uv_run(loop, UV_RUN_NOWAIT);
     glfwPollEvents();

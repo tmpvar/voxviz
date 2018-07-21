@@ -74,12 +74,12 @@ void Compute::fill(string kernelName, cl_command_queue queue, Volume* volume, in
   clReleaseEvent(kernel_completion);
 }
 
-void Compute::opCut(Volume *target, Volume *cutter) {
+uint32_t Compute::opCut(Volume *target, Volume *cutter) {
   aabb_t overlap;
 
   if (!cutter->isect(target, &overlap)) {
     target->debug = 0.0;
-    return;
+    return 0;
   }
 
   //target->debug = 1.0;
@@ -114,7 +114,7 @@ void Compute::opCut(Volume *target, Volume *cutter) {
 
   if (global_threads[0] == 0 || global_threads[1] == 0 || global_threads[2] == 0) {
     cout << "bail due to global_threads containing 0" << endl;
-    return;
+    return 0;
   }
 
   cl_event opengl_get_completion;
@@ -141,12 +141,26 @@ void Compute::opCut(Volume *target, Volume *cutter) {
   );
   CL_CHECK_ERROR(err);
 
+
+  uint32_t affected = 0;
+  cl_mem mem_affected = clCreateBuffer(
+    this->job.context,
+    CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+    sizeof(cl_uint),
+    &affected,
+    &err
+  );
+  CL_CHECK_ERROR(err);
+
+
   cl_mem mem_target = target->computeBuffer;
   cl_mem mem_cutter = cutter->computeBuffer;
   CL_CHECK_ERROR(clSetKernelArg(kernel, 0, sizeof(cl_mem), &mem_target));
-  CL_CHECK_ERROR(clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem_target_offset));
-  CL_CHECK_ERROR(clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem_cutter));
-  CL_CHECK_ERROR(clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem_cutter_offset));
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 1, sizeof(cl_mem), &mem_target));
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 2, sizeof(cl_mem), &mem_target_offset));
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 3, sizeof(cl_mem), &mem_cutter));
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 4, sizeof(cl_mem), &mem_cutter_offset));
+  CL_CHECK_ERROR(clSetKernelArg(kernel, 5, sizeof(cl_mem), &mem_affected));
 
   cl_event kernel_completion;
   err = clEnqueueNDRangeKernel(
@@ -172,10 +186,25 @@ void Compute::opCut(Volume *target, Volume *cutter) {
 
   CL_CHECK_ERROR(clReleaseEvent(kernel_completion));
 
+  err = clEnqueueReadBuffer(
+    queue,
+    mem_affected,
+    CL_TRUE, // blocking read TODO: does this need to block or can we use a completion event?
+    0,
+    sizeof(affected),
+    &affected,
+    0,
+    NULL,
+    NULL
+  );
+  CL_CHECK_ERROR(err);
+
+
   cl_event opengl_release_completion;
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, 2, mem, 0, nullptr, &opengl_release_completion));
   CL_CHECK_ERROR(clWaitForEvents(1, &opengl_release_completion));
   CL_CHECK_ERROR(clReleaseEvent(opengl_release_completion));
-
+  
+  return affected;
 }
 

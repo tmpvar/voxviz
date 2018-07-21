@@ -742,6 +742,17 @@ const float* _glfwPlatformGetJoystickAxes(int jid, int* count)
     return js->axes;
 }
 
+const void _glfwSetJoystickVibration(int jid, int left, int right)
+{
+    XINPUT_VIBRATION vibration;
+    memset(&vibration, 0, sizeof(XINPUT_VIBRATION));
+
+    vibration.wLeftMotorSpeed = left;
+    vibration.wRightMotorSpeed = right;
+    _glfw.win32.xinput.XInputSetState(jid, &vibration);
+}
+
+
 const unsigned char* _glfwPlatformGetJoystickButtons(int jid, int* count)
 {
     _GLFWjoystickWin32* js = _glfw.win32_js + jid;

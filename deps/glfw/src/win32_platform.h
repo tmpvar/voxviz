@@ -167,8 +167,11 @@ typedef DWORD (WINAPI * TIMEGETTIME_T)(void);
 // xinput.dll function pointer typedefs
 typedef DWORD (WINAPI * XINPUTGETCAPABILITIES_T)(DWORD,DWORD,XINPUT_CAPABILITIES*);
 typedef DWORD (WINAPI * XINPUTGETSTATE_T)(DWORD,XINPUT_STATE*);
+typedef DWORD (WINAPI * XINPUTSETSTATE_T)(DWORD,XINPUT_VIBRATION *);
+
 #define _glfw_XInputGetCapabilities _glfw.win32.xinput.XInputGetCapabilities
 #define _glfw_XInputGetState _glfw.win32.xinput.XInputGetState
+#define _glfw_XInputSetState _glfw.win32.xinput.XInputSetState
 
 // dinput8.dll function pointer typedefs
 typedef HRESULT (WINAPI * DIRECTINPUT8CREATE_T)(HINSTANCE,DWORD,REFIID,LPVOID*,LPUNKNOWN);
@@ -272,6 +275,7 @@ typedef struct _GLFWlibraryWin32
         HINSTANCE               instance;
         XINPUTGETCAPABILITIES_T XInputGetCapabilities;
         XINPUTGETSTATE_T        XInputGetState;
+        XINPUTSETSTATE_T        XInputSetState;
     } xinput;
 
     struct {

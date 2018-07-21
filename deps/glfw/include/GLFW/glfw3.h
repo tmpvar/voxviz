@@ -3705,6 +3705,8 @@ GLFWAPI int glfwJoystickPresent(int jid);
  */
 GLFWAPI const float* glfwGetJoystickAxes(int jid, int* count);
 
+GLFWAPI const void glfwSetJoystickVibration(int jid, int left, int right);
+
 /*! @brief Returns the state of all buttons of the specified joystick.
  *
  *  This function returns the state of all buttons of the specified joystick.

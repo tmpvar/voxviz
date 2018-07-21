@@ -582,6 +582,18 @@ GLFWAPI const float* glfwGetJoystickAxes(int jid, int* count)
     return _glfwPlatformGetJoystickAxes(jid, count);
 }
 
+// TODO: return the status of the request
+GLFWAPI const void glfwSetJoystickVibration(int jid, int left, int right) {
+    _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
+
+    if (jid < 0 || jid > GLFW_JOYSTICK_LAST)
+    {
+        _glfwInputError(GLFW_INVALID_ENUM, "Invalid joystick %i", jid);
+    }
+
+    _glfwSetJoystickVibration(jid, left, right);
+}
+
 GLFWAPI const unsigned char* glfwGetJoystickButtons(int jid, int* count)
 {
     assert(count != NULL);
