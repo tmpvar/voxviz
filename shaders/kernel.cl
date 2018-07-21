@@ -190,6 +190,30 @@ __kernel void cylinder(__write_only image3d_t image, __global float *centerPoint
   write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
 }
 
+// torus
+__kernel void torus(__write_only image3d_t image, __global float *centerPointer, int time) {
+  int3 pos = (int3)(
+    get_global_id(0),
+    get_global_id(1),
+    get_global_id(2)
+  );
+
+  float3 fpos = (float3)((float)pos.x, (float)pos.y, (float)pos.z);
+  float3 hp = (float3)(
+    (float) get_global_size(0) / 2.0f,
+    (float) get_global_size(1) / 2.0f,
+    (float) get_global_size(2) / 2.0f
+  );
+
+  float2 t = (float2)(32.0f, 10.0f);
+  float3 p = hp - fpos;
+  float2 q = (float2)(length(p.xz) - t.x, p.y);
+  float d = length(q) - t.y;
+
+  float on = d < 0.0f ? 1.0 : 0.0;
+  write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
+}
+
 
 // fill all
 __kernel void fillAll(__write_only image3d_t image, __global float *centerPointer, int time) {
