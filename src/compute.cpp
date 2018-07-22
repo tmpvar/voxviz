@@ -177,14 +177,15 @@ uint32_t Compute::opCut(Volume *target, Volume *cutter) {
 
   if (err != CL_SUCCESS) {
     cout << "err" << endl;
-  }
+    CL_CHECK_ERROR(err);
+  } else {
+    err = clWaitForEvents(1, &kernel_completion);
+    if (err != CL_SUCCESS) {
+      cout << "err" << endl;
+    }
 
-  err = clWaitForEvents(1, &kernel_completion);
-  if (err != CL_SUCCESS) {
-    cout << "err" << endl;
+    CL_CHECK_ERROR(clReleaseEvent(kernel_completion));
   }
-
-  CL_CHECK_ERROR(clReleaseEvent(kernel_completion));
 
   err = clEnqueueReadBuffer(
     queue,
@@ -199,7 +200,9 @@ uint32_t Compute::opCut(Volume *target, Volume *cutter) {
   );
   CL_CHECK_ERROR(err);
 
-
+  clReleaseMemObject(mem_target_offset);
+  clReleaseMemObject(mem_cutter_offset);
+  clReleaseMemObject(mem_affected);
   cl_event opengl_release_completion;
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, 2, mem, 0, nullptr, &opengl_release_completion));
   CL_CHECK_ERROR(clWaitForEvents(1, &opengl_release_completion));

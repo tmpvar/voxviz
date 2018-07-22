@@ -90,7 +90,7 @@
       return volume;
     }
 
-    void render (glm::mat4 mvp, glm::vec3 eye, float max_distance) {
+    void render (glm::mat4 mvp, glm::vec3 eye, float max_distance, Volume *lightVolume) {
       this->program->use();
       this->program
         ->uniformMat4("MVP", mvp)
@@ -98,9 +98,17 @@
         ->uniform1i("showHeat", this->showHeat)
         ->uniformFloat("maxDistance", max_distance);
 
+      glActiveTexture(GL_TEXTURE1);
+      glBindTexture(GL_TEXTURE_3D, lightVolume->textureId);
+
+      program->uniform1i("lightVolume", 1)
+        ->uniformVec3("lightVolumeCenter", lightVolume->center)
+        ->uniformVec3ui("lightVolumeDims", lightVolume->dims);
+
       // TODO: batch render
       for (auto& volume: this->volumes) {
         volume->bind(this->program);
+
         this->mesh->render(this->program, "position");
       }
     }

@@ -28,13 +28,13 @@ void Volume::upload(clu_job_t job) {
   glTexImage3D(
     GL_TEXTURE_3D,
     0,
-    GL_RED,
+    GL_R32F,
     this->dims.x,
     this->dims.y,
     this->dims.z,
     0,
     GL_RED,
-    GL_UNSIGNED_BYTE,
+    GL_FLOAT,
     0
   );
 
@@ -76,9 +76,9 @@ void Volume::upload(clu_job_t job) {
 }
 
 void Volume::bind(Program *program) {
-  glBindTexture(GL_TEXTURE_3D, this->textureId);
   glActiveTexture(GL_TEXTURE0);
-
+  glBindTexture(GL_TEXTURE_3D, this->textureId);
+  
   program->uniform1i("volume", 0)
     ->uniformVec3("center", this->center)
     ->uniformVec3ui("dims", this->dims)

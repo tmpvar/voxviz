@@ -257,6 +257,22 @@ int main(void) {
       }
     }
   }
+
+  glm::uvec3 lightVolumeDims(8 * VOLUME_DIMS, 1 * VOLUME_DIMS, 4 * VOLUME_DIMS);
+  glm::vec3 lightVolumePos(4 * VOLUME_DIMS, 128, 2 * VOLUME_DIMS);
+  
+
+  Volume *lightVolume = new Volume(lightVolumePos, lightVolumeDims);
+  lightVolume->upload(raytracer->job);
+  compute->lock(compute->job.command_queues[0], lightVolume->computeBuffer);
+  compute->fill(
+    "gradientXY",
+    compute->job.command_queues[0],
+    lightVolume,
+    0
+  );
+  compute->unlock(compute->job.command_queues[0], lightVolume->computeBuffer);
+
   orbit_camera_init(eye, center, up);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -268,10 +284,10 @@ int main(void) {
   update_volumes(raytracer, compute, time);
 #endif
 
-  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 512, 512, 512);
+  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 64, 256, 64);
   compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
-    "torus",
+    "cylinder",
     compute->job.command_queues[0],
     tool,
     0
@@ -433,7 +449,7 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    raytracer->render(MVP, currentEye, max_distance);
+    raytracer->render(MVP, currentEye, max_distance, lightVolume);
     fbo->unbind();
     //fbo->debugRender(windowDimensions);
      

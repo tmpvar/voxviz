@@ -6,10 +6,16 @@ layout(location = 0) out vec4 outColor;
 
 uniform sampler3D volume;
 uniform uvec3 dims;
-uniform vec3 eye;
 uniform vec3 center;
-uniform int showHeat;
 uniform float debug;
+
+uniform sampler3D lightVolume;
+uniform uvec3 lightVolumeDims;
+uniform vec3 lightVolumeCenter;
+
+
+uniform int showHeat;
+uniform vec3 eye;
 uniform float maxDistance;
 
 #define ITERATIONS 768
@@ -22,6 +28,15 @@ float voxel(vec3 worldPos) {
   return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
 }
 
+float lightVoxel(vec3 worldPos) {
+  worldPos *= 0.125;
+  vec3 fdims = vec3(lightVolumeDims);
+  vec3 hfdims = fdims;
+
+  vec3 pos = round((hfdims + worldPos - lightVolumeCenter)) / fdims;
+  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(lightVolume, pos).r;
+}
+
 vec3 hsv2rgb(vec3 c) {
   vec4 K = vec4(1.0, 0.6666666666, 0.33333333333, 3.0);
   vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
@@ -32,31 +47,6 @@ vec4 heat(float amount, float total) {
   float p = (amount / total);
   vec3 hsv = vec3(0.66 - p, 1.0, .75);
   return vec4(hsv2rgb(hsv), 1.0);
-}
-
-// phong shading
-vec3 shading( vec3 v, vec3 n, vec3 eye ) {
-  vec3 final = vec3( 0.0 );
-
-  // light 0
-  {
-    vec3 light_pos = eye + vec3(0.0, 0.0, 10.0);//vec3( 100.0, 110.0, 150.0 );
-    vec3 light_color = vec3( 1.0 );
-    vec3 vl = normalize( light_pos - v );
-    float diffuse  = max( 0.0, dot( vl, n ) );
-    final += light_color * diffuse;
-  }
-
-  // light 1
-  {
-    vec3 light_pos = -vec3( 100.0, 110.0, 120.0 );
-    vec3 light_color = vec3( 1.0 );
-    vec3 vl = normalize( light_pos - v );
-    float diffuse  = max( 0.0, dot( vl, n ) );
-    final += light_color * diffuse;
-  }
-
-  return final;
 }
 
 float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float hit, out float iterations) {
@@ -100,13 +90,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   //normal = iterations == 0.0 ? vec3(lessThan(ratio.xyz, min(ratio.yzx, ratio.zxy))) :  vec3(greaterThan(ratio.xyz, max(ratio.yzx, ratio.zxy)));
   vec3 d = abs(center - pos);
   normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
-  // vec3 s = sign(dir);
-  // vec3 diff = normalize(pos - (floor(pos) + vec3(0.5)));
-  // vec3 m = vec3(greaterThan(diff.xyz, max(diff.yzx, diff.zxy)));
 
-  // TODO: ensure we go the right direction into the voxel to get the center
-  // normal = m * sign(diff);//normalize(pos - floor(pos) + vec3(0.5));
-  // normal = vec3(mask);
   return distance(eye, pos) / maxDistance;
 }
 
@@ -151,6 +135,8 @@ void main() {
   color = local;
   color = normal;
   color = mix(color, vec3(1.0, 0.0, 0.0), debug);
+
+  color = vec3(lightVoxel(pos));
 
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
 }

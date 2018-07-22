@@ -110,9 +110,34 @@ __kernel void fillAll(__write_only image3d_t image, __global float *centerPointe
   write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
 }
 
+// Gradient y
+__kernel void gradientY(__write_only image3d_t image, __global float *centerPointer, int time) {
+  int3 pos = (int3)(
+    get_global_id(0),
+    get_global_id(1),
+    get_global_id(2)
+  );
+
+  float on = (float)pos.y / (float)get_global_size(1);
+  write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
+}
+
+// Gradient XY
+__kernel void gradientXY(__write_only image3d_t image, __global float *centerPointer, int time) {
+  int3 pos = (int3)(
+    get_global_id(0),
+    get_global_id(1),
+    get_global_id(2)
+    );
+
+  float y = (float)pos.y / (float)get_global_size(1);
+  float x = (float)pos.x / (float)get_global_size(0);
+  float on = (x + y) / 2.0;
+  write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
+}
+
+
 // cut
-
-
 __constant sampler_t tool_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 __constant sampler_t stock_sampler = CLK_NORMALIZED_COORDS_FALSE | CLK_ADDRESS_CLAMP_TO_EDGE | CLK_FILTER_NEAREST;
 
