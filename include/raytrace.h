@@ -90,9 +90,8 @@
       return volume;
     }
 
-    void render (glm::mat4 mvp, glm::vec3 eye, float max_distance) {
-      this->program->use();
-      this->program
+    void render (Program *program,  glm::mat4 mvp, glm::vec3 eye, float max_distance) {
+      program->use()
         ->uniformMat4("MVP", mvp)
         ->uniformVec3("eye", eye)
         ->uniform1i("showHeat", this->showHeat)
@@ -100,8 +99,8 @@
 
       // TODO: batch render
       for (auto& volume: this->volumes) {
-        volume->bind(this->program);
-        this->mesh->render(this->program, "position");
+        volume->bind(program);
+        this->mesh->render(program, "position");
       }
     }
   };

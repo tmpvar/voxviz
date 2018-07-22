@@ -54,6 +54,7 @@ add_executable(
   include/core.h
   include/volume.h
   include/aabb.h
+  include/shadowmap.h
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h

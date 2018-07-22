@@ -13,7 +13,7 @@ const init = files.map((file) => {
 
   return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.filter(Boolean).map((line) => {
     return `        "${line.trim()}\\n"`
-  }).join('\r\n') + `, ${type});\n`
+  }).join('\r\n') + `, "${relpath}", ${type});\n`
 }).join('\r\n      ')
 
 out.unshift(`

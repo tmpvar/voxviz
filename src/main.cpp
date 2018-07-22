@@ -8,6 +8,7 @@
 #include "core.h"
 #include "clu.h"
 #include "fullscreen-surface.h"
+#include "shadowmap.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -27,6 +28,7 @@ bool fullscreen = 0;
 int windowDimensions[2] = { 640, 480 };
 
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
+Shadowmap *shadowmap;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -64,6 +66,14 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     0.1f,
     10000.0f
   );
+
+  shadowmap->depthProjectionMatrix = glm::perspective(
+    45.0f,
+    window_aspect(window, &width, &height),
+    0.1f,
+    10000.0f
+  );
+
 
   glViewport(0, 0, width, height);
 }
@@ -206,6 +216,7 @@ int main(void) {
   // libuv junk
 
   GLFWwindow* window;
+  
 
   if (!glfwInit()) {
     return -1;
@@ -239,13 +250,8 @@ int main(void) {
   Compute *compute = new Compute();
 
   Shaders::init();
-
-  // Setup the orbit camera
-  glm::vec3 center(256.0, 0.0, 0.0);
-  glm::vec3 eye(0.0, 0.0, -glm::length(center) * 2.0);
-
-  glm::vec3 up(0.0, 1.0, 0.0);
-
+  shadowmap = new Shadowmap();
+  glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
@@ -257,11 +263,12 @@ int main(void) {
       }
     }
   }
-  orbit_camera_init(eye, center, up);
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera();
+  camera->translate(-1024, -2048, -2048);
+  camera->rotate(1.0f, 0.75f, 0.0f, 0.0f);
   int time = 0;
 
 #if RENDER_STATIC == 1
@@ -291,36 +298,33 @@ int main(void) {
   Program *fullscreen_debug_program = new Program();
   fullscreen_debug_program
     ->add(Shaders::get("basic.vert"))
-    ->add(Shaders::get("color.frag"))
+    ->add(Shaders::get("depth-to-grey.frag"))
     ->output("outColor")
     ->link();
 
-  FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   
-  glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
-  FBO *fbo = new FBO(windowDimensions[0], windowDimensions[1]);
 
+  FullscreenSurface *fullscreen_surface = new FullscreenSurface();
+  FBO *fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+  FBO *shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
+  
   uint32_t total_affected = 0;
 
   while (!glfwWindowShouldClose(window)) {
     if (keys[GLFW_KEY_W]) {
       camera->translate(0.0f, 0.0f, 10.0f);
-      orbit_camera_zoom(-5.0f);
     }
 
     if (keys[GLFW_KEY_S]) {
       camera->translate(0.0f, 0.0f, -10.0f);
-      orbit_camera_zoom(5.0f);
     }
 
     if (keys[GLFW_KEY_A]) {
       camera->translate(5.0f, 0.0f, 0.0f);
-      orbit_camera_zoom(-5.0f);
     }
 
     if (keys[GLFW_KEY_D]) {
       camera->translate(-5.0f, 0.0f, 0.0f);
-      orbit_camera_zoom(5.0f);
     }
 
     if (keys[GLFW_KEY_H]) {
@@ -331,22 +335,18 @@ int main(void) {
     }
 
     if (keys[GLFW_KEY_LEFT]) {
-      orbit_camera_rotate(0.0f, 0.0f, 0.02f, 0.0f);
       camera->yaw(-0.02f);
     }
 
     if (keys[GLFW_KEY_RIGHT]) {
-      orbit_camera_rotate(0.0f, 0.0f, -0.02f, 0.0f);
       camera->yaw(0.02f);
     }
 
     if (keys[GLFW_KEY_UP]) {
-      orbit_camera_rotate(0.0f, 0.0f, 0.0f, -0.02f);
       camera->pitch(-0.02f);
     }
 
     if (keys[GLFW_KEY_DOWN]) {
-      orbit_camera_rotate(0.0f, 0.0f, 0.0f, 0.02f);
       camera->pitch(0.02f);
     }
 
@@ -369,8 +369,11 @@ int main(void) {
       prevKeys[GLFW_KEY_ENTER] = false;
 
       delete fbo;
+      delete shadowFBO;
       glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
       fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+      shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
+
     }
 
     // mouse look like free-fly/fps
@@ -413,13 +416,34 @@ int main(void) {
       );
     }
 
-
     viewMatrix = camera->view();
 
     MVP = perspectiveMatrix * viewMatrix;
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
+
+    
+    shadowFBO->bind();
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glDepthMask(GL_TRUE);
+
+    glCullFace(GL_BACK);
+    glEnable(GL_CULL_FACE);
+
+    glClearDepth(1.0);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    shadowmap->bindCollect(shadowmap->program, shadowFBO);
+    raytracer->render(
+      raytracer->program,
+      shadowmap->depthMVP,
+      shadowmap->eye,
+      max_distance
+    );
+    shadowFBO->unbind();
+    
     
     fbo->bind();
     glEnable(GL_DEPTH_TEST);
@@ -433,15 +457,23 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    raytracer->render(MVP, currentEye, max_distance);
+    raytracer->render(
+      raytracer->program,
+      MVP,
+      currentEye,
+      max_distance
+    );
     fbo->unbind();
-    //fbo->debugRender(windowDimensions);
-     
-    fullscreen_program->use()->texture2d("color", fbo->texture_color);
+    
+    if (keys[GLFW_KEY_1]) {
+      fullscreen_program->use()->texture2d("color", shadowFBO->texture_depth);
+    } else {
+      fullscreen_program->use()->texture2d("color", fbo->texture_color);
+    }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
-
+    
     glfwSwapBuffers(window);
 
 #if RENDER_DYNAMIC == 1
@@ -481,7 +513,7 @@ int main(void) {
   delete fullscreen_program;
   delete fullscreen_surface;
   delete raytracer;
-
+  delete shadowmap;
   Shaders::destroy();
   uv_read_stop((uv_stream_t*)&stdin_pipe);
   uv_stop(uv_default_loop());

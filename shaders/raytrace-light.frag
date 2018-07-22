@@ -3,15 +3,11 @@
 in vec3 rayOrigin;
 
 layout(location = 0) out vec4 outColor;
-layout(location = 1) out vec4 outNormal;
-layout(location = 2) out vec4 outPosition;
 
 uniform sampler3D volume;
 uniform uvec3 dims;
 uniform vec3 eye;
 uniform vec3 center;
-uniform int showHeat;
-uniform float debug;
 uniform float maxDistance;
 
 #define ITERATIONS 768
@@ -24,19 +20,7 @@ float voxel(vec3 worldPos) {
   return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
 }
 
-vec3 hsv2rgb(vec3 c) {
-  vec4 K = vec4(1.0, 0.6666666666, 0.33333333333, 3.0);
-  vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-  return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-vec4 heat(float amount, float total) {
-  float p = (amount / total);
-  vec3 hsv = vec3(0.66 - p, 1.0, .75);
-  return vec4(hsv2rgb(hsv), 1.0);
-}
-
-float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float hit, out float iterations) {
+float march(in vec3 pos, in vec3 dir) {
   dir = normalize(dir);
   // grid space
   vec3 grid = floor(pos);
@@ -51,25 +35,19 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   vec3 ratio_step = grid_step * inv;
 
   // dda
-  hit = -1.0;
-  iterations = 0.0;
+  float hit = -1.0;
+
   for (float i = 0.0; i < ITERATIONS; i++ ) {
     if (hit > 0.0 || voxel( grid ) > 0.0) {
       hit = 1.0;
       continue;
     }
-    iterations++;
 
     mask = lessThanEqual(ratio.xyz, min(ratio.yzx, ratio.zxy));
     grid += ivec3(grid_step) * ivec3(mask);
-    pos += grid_step * ivec3(mask);
     ratio += ratio_step * vec3(mask);
   }
 
-  center = floor(pos) + vec3( 0.5 );
-
-  vec3 d = abs(center - pos);
-  normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
   return distance(eye, pos) / maxDistance;
 }
 
@@ -80,16 +58,9 @@ void main() {
 
   vec3 normal;
   vec3 voxelCenter;
-  float hit, iterations;
+  float hit;
 
-  float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
-  gl_FragDepth = hit < 0.0 ? 1.0 : depth;
-
-  vec3 color;
-  color = normal;
-  color = mix(color, vec3(1.0, 0.0, 0.0), debug);
-
-  outNormal = vec4(normal, 1.0);
-  outPosition = vec4(pos, 1.0);
-  outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
+  float depth = march(pos, dir);
+  gl_FragDepth = depth;
+  outColor = vec4(depth);
 }

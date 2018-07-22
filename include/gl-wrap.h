@@ -20,7 +20,7 @@
   GLint gl_ok(GLint error);
   GLint gl_error();
   void gl_shader_log(GLuint shader);
-  
+  void gl_program_log(GLuint handle);
 
   static const char *shader_type(GLuint type) {
     switch (type) {
@@ -55,7 +55,7 @@
     GLuint handle;
     GLuint type;
 
-    Shader(const char *src, const GLuint type) {
+    Shader(const char *src, const char *name, const GLuint type) {
       // this->src = src;
       this->type = type;
       this->handle = glCreateShader(type);
@@ -64,6 +64,7 @@
       std::cout << "Compile "
                 << shader_type(type)
                 << " Shader: "
+                << name
                 << std::endl;
 
       glCompileShader(this->handle);
@@ -95,7 +96,6 @@
       if (this->uniforms.find(name) == this->uniforms.end()) {
         ret = glGetUniformLocation(this->handle, name.c_str());
         this->uniforms[name] = ret;
-        cout << "miss: " << name << endl;
       } else {
         ret = this->uniforms[name];
       }
@@ -110,7 +110,7 @@
     Program *link() {
       glLinkProgram(this->handle);
       std::cout << "linking" << std::endl;
-      gl_error();
+      gl_program_log(this->handle);
 
       return this;
     }
@@ -367,44 +367,52 @@
     }
     
     void create() {
-      //RGBA8 2D texture
-      glGenTextures(1, &texture_color);
-      glBindTexture(GL_TEXTURE_2D, texture_color);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      //NULL means reserve texture memory, but texels are undefined
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, this->width, this->height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-
-      // depth texture
-      glGenTextures(1, &texture_depth);
-      glBindTexture(GL_TEXTURE_2D, texture_depth);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_INTENSITY);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-      // NULL means reserve texture memory, but texels are undefined
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, this->width, this->height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, NULL);
-      //-------------------------
       glGenFramebuffers(1, &this->fb);
 
       this->bind();
-      //Attach 2D texture to this FBO
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_color, 0/*mipmap level*/);
-      //Attach depth texture to FBO
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture_depth, 0/*mipmap level*/);
+      this->attachColorTexture();
+      this->attachDepthTexture();
+      
+      GLenum buffers[2] = { GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT };
+      glDrawBuffers(2, buffers);
 
-      GLenum buffers[1] = { GL_COLOR_ATTACHMENT0 };
-      glDrawBuffers(1, buffers);
-
-      //Does the GPU support current FBO configuration?
-      std::cout << "framebuffer status" << std::endl;
-      gl_ok(glCheckFramebufferStatus(GL_FRAMEBUFFER));
+      this->status();
       this->unbind();
+    }
+
+    FBO *status() {
+      gl_ok(glCheckFramebufferStatus(GL_FRAMEBUFFER));
+      return this;
+    }
+
+    FBO *attachColorTexture() {
+      glGenTextures(1, &this->texture_color);
+      glBindTexture(GL_TEXTURE_2D, this->texture_color);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, this->width, this->height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_color, 0/*mipmap level*/);
+      this->status();
+      return this;
+    }
+
+    FBO *attachDepthTexture() {
+      // depth texture
+      glGenTextures(1, &this->texture_depth);
+      glBindTexture(GL_TEXTURE_2D, this->texture_depth);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, this->width, this->height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+      glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_depth, 0/*mipmap level*/);
+      
+      this->status();
+      return this;
     }
 
     void debugRender(int dimensions[2]) {

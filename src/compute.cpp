@@ -113,7 +113,6 @@ uint32_t Compute::opCut(Volume *target, Volume *cutter) {
   };
 
   if (global_threads[0] == 0 || global_threads[1] == 0 || global_threads[2] == 0) {
-    cout << "bail due to global_threads containing 0" << endl;
     return 0;
   }
 

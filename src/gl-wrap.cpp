@@ -66,7 +66,18 @@ GLint gl_ok(GLint error) {
 }
 
 GLint gl_error() {
-  return gl_ok(glGetError());
+  GLint ret = 0;
+  GLint err = 0;
+  do {
+    err = gl_ok(glGetError());
+    if (err) {
+      ret = err;
+    }
+
+  } while (err);
+ 
+
+  return err;
 }
 
 void gl_shader_log(GLuint shader) {
@@ -79,6 +90,22 @@ void gl_shader_log(GLuint shader) {
     char *s = (char *)malloc(m * sizeof(char));
     glGetShaderInfoLog(shader, m, &l, s);
     printf("shader log:\n%s\n", s);
+    free(s);
+  }
+}
+
+
+void gl_program_log(GLuint handle) {
+  GLint error = glGetError();
+  GLint l, m;
+  GLint isLinked = 0;
+  
+  glGetProgramiv(handle, GL_LINK_STATUS, &isLinked);
+  if (isLinked == GL_FALSE) {
+    glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &m);
+    char *s = (char *)malloc(m * sizeof(char));
+    glGetProgramInfoLog(handle, m, &l, s);
+    printf("program log:\n%s\n", s);
     free(s);
   }
 }
