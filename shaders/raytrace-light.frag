@@ -20,7 +20,7 @@ float voxel(vec3 worldPos) {
   return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
 }
 
-float march(in vec3 pos, in vec3 dir) {
+float march(in vec3 pos, in vec3 dir, out float hit) {
   dir = normalize(dir);
   // grid space
   vec3 grid = floor(pos);
@@ -35,7 +35,7 @@ float march(in vec3 pos, in vec3 dir) {
   vec3 ratio_step = grid_step * inv;
 
   // dda
-  float hit = -1.0;
+  hit = -1.0;
 
   for (float i = 0.0; i < ITERATIONS; i++ ) {
     if (hit > 0.0 || voxel( grid ) > 0.0) {
@@ -60,7 +60,7 @@ void main() {
   vec3 voxelCenter;
   float hit;
 
-  float depth = march(pos, dir);
-  gl_FragDepth = depth;
+  float depth = march(pos, dir, hit);
+  gl_FragDepth = hit < 0.0 ? 1.0 : depth;
   outColor = vec4(depth);
 }

@@ -66,15 +66,14 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     0.1f,
     10000.0f
   );
-
+  
   shadowmap->depthProjectionMatrix = glm::perspective(
     45.0f,
     window_aspect(window, &width, &height),
-    0.1f,
+    0.001f,
     10000.0f
   );
-
-
+  
   glViewport(0, 0, width, height);
 }
 
@@ -256,9 +255,9 @@ int main(void) {
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
   float max_distance = 10000.0f;
-  for (float x = 0; x < 8; x++) {
+  for (float x = 0; x < 16; x++) {
     for (float y = 0; y < 1; y++) {
-      for (float z = 0; z < 4; z++) {
+      for (float z = 0; z < 8; z++) {
         raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
       }
     }
@@ -423,7 +422,6 @@ int main(void) {
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
 
-    
     shadowFBO->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -435,15 +433,15 @@ int main(void) {
     glClearDepth(1.0);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    gl_error();
     shadowmap->bindCollect(shadowmap->program, shadowFBO);
     raytracer->render(
-      raytracer->program,
+      shadowmap->program->use(),
       shadowmap->depthMVP,
       shadowmap->eye,
       max_distance
     );
     shadowFBO->unbind();
-    
     
     fbo->bind();
     glEnable(GL_DEPTH_TEST);
@@ -457,6 +455,10 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    raytracer->program->use()
+      ->uniformMat4("depthBiasMVP", shadowmap->depthProjectionMatrix * shadowmap->depthViewMatrix)
+      ->texture2d("shadowMap", shadowFBO->texture_depth);
+
     raytracer->render(
       raytracer->program,
       MVP,
@@ -465,10 +467,11 @@ int main(void) {
     );
     fbo->unbind();
     
+    fullscreen_program->use()->uniformFloat("maxDistance", max_distance);
     if (keys[GLFW_KEY_1]) {
-      fullscreen_program->use()->texture2d("color", shadowFBO->texture_depth);
+      fullscreen_program->texture2d("color", shadowFBO->texture_depth);
     } else {
-      fullscreen_program->use()->texture2d("color", fbo->texture_color);
+      fullscreen_program->texture2d("color", fbo->texture_color);
     }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);

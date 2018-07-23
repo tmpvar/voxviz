@@ -3,8 +3,11 @@
 out vec4 outColor;
 in vec2 uv;
 uniform sampler2D color;
+uniform float maxDistance;
 
 void main() {
   outColor = texture(color, uv);
-  gl_FragDepth = 0.0;
+  if (outColor.r > 1.0) {
+	outColor.r = outColor.r / maxDistance;
+  }
 }

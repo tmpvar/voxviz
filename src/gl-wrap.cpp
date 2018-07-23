@@ -65,7 +65,7 @@ GLint gl_ok(GLint error) {
   return error;
 }
 
-GLint gl_error() {
+GLint GL_ERROR() {
   GLint ret = 0;
   GLint err = 0;
   do {
@@ -77,15 +77,14 @@ GLint gl_error() {
   } while (err);
  
 
-  return err;
+  return ret;
 }
 
 void gl_shader_log(GLuint shader) {
-  GLint error = glGetError();
   GLint l, m;
   GLint isCompiled = 0;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
-  if (error || isCompiled == GL_FALSE) {
+  if (isCompiled == GL_FALSE) {
     glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
     char *s = (char *)malloc(m * sizeof(char));
     glGetShaderInfoLog(shader, m, &l, s);

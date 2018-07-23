@@ -1,18 +1,20 @@
 #version 330 core
 
 in vec3 rayOrigin;
+in vec4 vertPosition;
 
 layout(location = 0) out vec4 outColor;
-layout(location = 1) out vec4 outNormal;
-layout(location = 2) out vec4 outPosition;
 
 uniform sampler3D volume;
+uniform sampler2D shadowMap;
+
 uniform uvec3 dims;
 uniform vec3 eye;
 uniform vec3 center;
 uniform int showHeat;
 uniform float debug;
 uniform float maxDistance;
+uniform mat4 depthBiasMVP;
 
 #define ITERATIONS 768
 
@@ -74,6 +76,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
 }
 
 void main() {
+  vec3 origin = gl_FrontFacing ? rayOrigin : eye;
   vec3 pos = gl_FrontFacing ? rayOrigin : eye;
   vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
   vec3 dir = normalize(eyeToPlane);
@@ -89,7 +92,15 @@ void main() {
   color = normal;
   color = mix(color, vec3(1.0, 0.0, 0.0), debug);
 
-  outNormal = vec4(normal, 1.0);
-  outPosition = vec4(pos, 1.0);
+  vec4 shadowCoord = depthBiasMVP * vec4(origin + dir * depth, 1.0);
+  vec2 shadowUV = shadowCoord.xy / shadowCoord.w;
+  
+  float visibility = 1.0;
+  if (shadowUV.y >= 0.0 && shadowUV.x >= 0.0 && shadowUV.y <= 1.0 && shadowUV.x <= 1.0) {
+    visibility = texture(shadowMap, shadowUV).r < (shadowCoord.z / shadowCoord.w) ? 0.5 : 1.0;
+  }
+
+  //color = vec3((1.0 + shadowUV.yx) * 0.5, texture( shadowMap, shadowUV ).x / maxDistance);//
+  color = color * visibility;
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
 }

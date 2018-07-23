@@ -76,10 +76,7 @@ void Volume::upload(clu_job_t job) {
 }
 
 void Volume::bind(Program *program) {
-  glBindTexture(GL_TEXTURE_3D, this->textureId);
-  glActiveTexture(GL_TEXTURE0);
-
-  program->uniform1i("volume", 0)
+  program->texture3d("volume", this->textureId)
     ->uniformVec3("center", this->center)
     ->uniformVec3ui("dims", this->dims)
     ->uniformFloat("debug", this->debug);

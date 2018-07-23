@@ -17,8 +17,10 @@
 
   using namespace std;
   
+#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__);}
+
   GLint gl_ok(GLint error);
-  GLint gl_error();
+  GLint GL_ERROR();
   void gl_shader_log(GLuint shader);
   void gl_program_log(GLuint handle);
 
@@ -68,6 +70,7 @@
                 << std::endl;
 
       glCompileShader(this->handle);
+      gl_error();
       gl_shader_log(this->handle);
     }
 
@@ -95,6 +98,7 @@
       GLint ret;
       if (this->uniforms.find(name) == this->uniforms.end()) {
         ret = glGetUniformLocation(this->handle, name.c_str());
+        gl_error();
         this->uniforms[name] = ret;
       } else {
         ret = this->uniforms[name];
@@ -189,10 +193,19 @@
       return this;
     }
 
+
     Program *texture2d(string name, GLuint  texture_id) {
       glActiveTexture(GL_TEXTURE0 + this->texture_index);
       glBindTexture(GL_TEXTURE_2D, texture_id);
-      this->use()->uniform1i(name, texture_index);
+      this->uniform1i(name, texture_index);
+      this->texture_index++;
+      return this;
+    }
+
+    Program *texture3d(string name, GLuint  texture_id) {
+      glActiveTexture(GL_TEXTURE0 + this->texture_index);
+      glBindTexture(GL_TEXTURE_3D, texture_id);
+      this->uniform1i(name, texture_index);
       this->texture_index++;
       return this;
     }
@@ -287,18 +300,19 @@
     }
 
     void render (Program *program, const char* attribute) {
-      program->use();
       program->attribute(attribute);
+      gl_error();
       glEnableVertexAttribArray(0);
-
+      gl_error();
       glBindVertexArray(this->vao);
-
+      gl_error();
       glDrawElements(
         GL_TRIANGLES,
         (GLsizei)this->faces.size(),
         GL_UNSIGNED_INT,
         0
       );
+      gl_error();
     }
   };
 
@@ -346,6 +360,7 @@
       //if (!this->isCurrentlyBound()) {
         glBindFramebuffer(GL_FRAMEBUFFER, this->fb);
       //}
+      gl_error();
 
       return this;
     }
@@ -404,8 +419,8 @@
       glGenTextures(1, &this->texture_depth);
       glBindTexture(GL_TEXTURE_2D, this->texture_depth);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, this->width, this->height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 

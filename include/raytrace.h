@@ -90,17 +90,18 @@
       return volume;
     }
 
-    void render (Program *program,  glm::mat4 mvp, glm::vec3 eye, float max_distance) {
-      program->use()
-        ->uniformMat4("MVP", mvp)
-        ->uniformVec3("eye", eye)
-        ->uniform1i("showHeat", this->showHeat)
-        ->uniformFloat("maxDistance", max_distance);
-
+    void render (Program *p,  glm::mat4 mvp, glm::vec3 eye, float max_distance) {
+      p->uniformMat4("MVP", mvp); gl_error();
+      p->uniformVec3("eye", eye); gl_error();
+      p->uniform1i("showHeat", this->showHeat); gl_error();
+      p->uniformFloat("maxDistance", max_distance); gl_error();
+      
       // TODO: batch render
       for (auto& volume: this->volumes) {
-        volume->bind(program);
-        this->mesh->render(program, "position");
+        volume->bind(p);
+        gl_error();
+        this->mesh->render(p, "position");
+        gl_error();
       }
     }
   };
