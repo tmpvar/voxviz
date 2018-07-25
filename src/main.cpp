@@ -73,7 +73,17 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     0.001f,
     10000.0f
   );
-  
+   /*
+  shadowmap->depthProjectionMatrix = glm::ortho(
+    -5000.0f,
+    5000.0f,
+    5000.0f,  
+    -5000.0f,
+    0.001f,
+    10000.0f
+  );*/
+
+
   glViewport(0, 0, width, height);
 }
 
@@ -255,9 +265,9 @@ int main(void) {
 
   Raytracer *raytracer = new Raytracer(dims, compute->job);
   float max_distance = 10000.0f;
-  for (float x = 0; x < 16; x++) {
+  for (float x = 0; x < 8; x++) {
     for (float y = 0; y < 1; y++) {
-      for (float z = 0; z < 8; z++) {
+      for (float z = 0; z < 4; z++) {
         raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
       }
     }
@@ -274,10 +284,10 @@ int main(void) {
   update_volumes(raytracer, compute, time);
 #endif
 
-  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 512, 512, 512);
+  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
   compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
-    "torus",
+    "cylinder",
     compute->job.command_queues[0],
     tool,
     0
@@ -455,8 +465,14 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    glm::mat4 depthInvertedView = glm::inverse(shadowmap->depthViewMatrix);
+    glm::vec3 depthEye(depthInvertedView[3][0], depthInvertedView[3][1], depthInvertedView[3][2]);
+
     raytracer->program->use()
-      ->uniformMat4("depthBiasMVP", shadowmap->depthProjectionMatrix * shadowmap->depthViewMatrix)
+      ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP)
+//      ->uniformMat4("depthViewInverted", glm::inverse(shadowmap->depthViewMatrix))
+//      ->uniformMat4("cameraViewInverted", glm::inverse(viewMatrix))
+      ->uniformVec3("light", depthEye)
       ->texture2d("shadowMap", shadowFBO->texture_depth);
 
     raytracer->render(
@@ -474,7 +490,7 @@ int main(void) {
       fullscreen_program->texture2d("color", fbo->texture_color);
     }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
     
     glfwSwapBuffers(window);

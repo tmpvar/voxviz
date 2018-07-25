@@ -23,6 +23,7 @@ float voxel(vec3 worldPos) {
 float march(in vec3 pos, in vec3 dir, out float hit) {
   dir = normalize(dir);
   // grid space
+  vec3 origin = pos;
   vec3 grid = floor(pos);
   vec3 grid_step = sign( dir );
   vec3 corner = max( grid_step, vec3( 0.0 ) );
@@ -45,10 +46,11 @@ float march(in vec3 pos, in vec3 dir, out float hit) {
 
     mask = lessThanEqual(ratio.xyz, min(ratio.yzx, ratio.zxy));
     grid += ivec3(grid_step) * ivec3(mask);
+	pos += grid_step * ivec3(mask);
     ratio += ratio_step * vec3(mask);
   }
 
-  return distance(eye, pos) / maxDistance;
+  return distance(origin, pos);
 }
 
 void main() {
@@ -60,7 +62,6 @@ void main() {
   vec3 voxelCenter;
   float hit;
 
-  float depth = march(pos, dir, hit);
-  gl_FragDepth = hit < 0.0 ? 1.0 : depth;
-  outColor = vec4(depth);
+  float depth = march(pos, dir, hit) + distance(eye, pos);
+  gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
 }

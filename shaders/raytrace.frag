@@ -1,7 +1,7 @@
 #version 330 core
 
 in vec3 rayOrigin;
-in vec4 vertPosition;
+in vec4 shadowCoord;
 
 layout(location = 0) out vec4 outColor;
 
@@ -9,12 +9,14 @@ uniform sampler3D volume;
 uniform sampler2D shadowMap;
 
 uniform uvec3 dims;
+uniform vec3 light;
 uniform vec3 eye;
 uniform vec3 center;
 uniform int showHeat;
 uniform float debug;
 uniform float maxDistance;
 uniform mat4 depthBiasMVP;
+uniform mat4 MVP;
 
 #define ITERATIONS 768
 
@@ -41,11 +43,11 @@ vec4 heat(float amount, float total) {
 float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float hit, out float iterations) {
   dir = normalize(dir);
   // grid space
+  vec3 origin = pos;
   vec3 grid = floor(pos);
   vec3 grid_step = sign( dir );
   vec3 corner = max( grid_step, vec3( 0.0 ) );
   bvec3 mask;
-  
 
   // ray space
   vec3 inv = vec3( 1.0 ) / dir;
@@ -72,10 +74,14 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
 
   vec3 d = abs(center - pos);
   normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
-  return distance(eye, pos) / maxDistance;
+  return distance(origin, pos) + distance(eye, origin);
 }
 
 void main() {
+	outColor = vec4(rayOrigin, 1.0);
+}
+
+void main1() {
   vec3 origin = gl_FrontFacing ? rayOrigin : eye;
   vec3 pos = gl_FrontFacing ? rayOrigin : eye;
   vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
@@ -86,21 +92,21 @@ void main() {
   float hit, iterations;
 
   float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
-  gl_FragDepth = hit < 0.0 ? 1.0 : depth;
+  gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
 
   vec3 color;
   color = normal;
   color = mix(color, vec3(1.0, 0.0, 0.0), debug);
-
-  vec4 shadowCoord = depthBiasMVP * vec4(origin + dir * depth, 1.0);
-  vec2 shadowUV = shadowCoord.xy / shadowCoord.w;
+  vec3 scoord = shadowCoord.xyz / shadowCoord.w;
+  vec2 uv = scoord.xy;//(1.0 + scoord.xy) / 2.0;
   
   float visibility = 1.0;
-  if (shadowUV.y >= 0.0 && shadowUV.x >= 0.0 && shadowUV.y <= 1.0 && shadowUV.x <= 1.0) {
-    visibility = texture(shadowMap, shadowUV).r < (shadowCoord.z / shadowCoord.w) ? 0.5 : 1.0;
-  }
+  float bias = 0.001;
+  //if (uv.y >= 0.0 && uv.x >= 0.0 && uv.y <= 1.0 && uv.x <= 1.0) {
+    visibility = texture(shadowMap, uv).r < min(scoord.z, distance(pos, light) / maxDistance) ? 0.25 : 1.0;
+  //}
 
-  //color = vec3((1.0 + shadowUV.yx) * 0.5, texture( shadowMap, shadowUV ).x / maxDistance);//
-  color = color * visibility;
+  color = color * vec3(visibility);
+  //color = vec3(uv, 0.0) * visibility;
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
 }

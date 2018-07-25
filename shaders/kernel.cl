@@ -106,7 +106,7 @@ __kernel void fillAll(__write_only image3d_t image, __global float *centerPointe
     get_global_id(2)
   );
 
-  float on = 1.0;
+  float on = get_global_id(1) < get_global_size(1) / 2 ? 1.0 : 0.0;
   write_imagef(image, (int4)(pos, 0.0), (float4)(on, on, on, on));
 }
 
