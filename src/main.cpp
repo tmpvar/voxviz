@@ -239,7 +239,6 @@ int main(void) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwSwapInterval(0);
 
 #ifndef FULLSCREEN
   window = glfwCreateWindow(windowDimensions[0], windowDimensions[1], "voxviz", NULL, NULL);
@@ -259,6 +258,7 @@ int main(void) {
   glfwSetKeyCallback(window, key_callback);
   glfwMakeContextCurrent(window);
   gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+  glfwSwapInterval(0);
 
   Compute *compute = new Compute();
 
@@ -516,8 +516,7 @@ int main(void) {
     {
       static float f = 0.0f;
       static int counter = 0;
-      ImGui::Text("Hello, world!");
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
     }
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
