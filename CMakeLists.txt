@@ -32,6 +32,8 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
   ${GLM_INCLUDE_DIR}
   deps/libuv/include
+  deps/imgui
+  deps/imgui/examples
 )
 
 file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl)
@@ -60,6 +62,13 @@ add_executable(
   include/fullscreen-surface.h
 
   ${SHADER_FILES}
+
+  #imgui
+  deps/imgui/imgui.cpp
+  deps/imgui/imgui_demo.cpp
+  deps/imgui/imgui_draw.cpp
+  deps/imgui/examples/imgui_impl_glfw.cpp
+  deps/imgui/examples/imgui_impl_opengl3.cpp
 )
 
 source_group("shaders" FILES ${SHADER_FILES})

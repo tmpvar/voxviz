@@ -14,6 +14,10 @@
 #include <iostream>
 
 #include <uv.h>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -319,6 +323,22 @@ int main(void) {
   
   uint32_t total_affected = 0;
 
+  // Setup Dear ImGui binding
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  //ImGuiIO& io = ImGui::GetIO(); (void)io;
+  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
+
+  ImGui_ImplGlfw_InitForOpenGL(window, false);
+  ImGui_ImplOpenGL3_Init();
+
+  // Setup style
+  ImGui::StyleColorsDark();
+
+  // Start the ImGui frame
+  ImGui::CreateContext();
+
   while (!glfwWindowShouldClose(window)) {
     if (keys[GLFW_KEY_W]) {
       camera->translate(0.0f, 0.0f, 10.0f);
@@ -489,6 +509,18 @@ int main(void) {
     glEnable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
     
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    
+    {
+      static float f = 0.0f;
+      static int counter = 0;
+      ImGui::Text("Hello, world!");
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    }
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);
 
 #if RENDER_DYNAMIC == 1
