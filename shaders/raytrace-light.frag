@@ -50,7 +50,7 @@ float march(in vec3 pos, in vec3 dir, out float hit) {
     ratio += ratio_step * vec3(mask);
   }
 
-  return distance(origin, pos);
+  return distance(eye, pos);
 }
 
 void main() {
@@ -62,6 +62,6 @@ void main() {
   vec3 voxelCenter;
   float hit;
 
-  float depth = march(pos, dir, hit) + distance(eye, pos);
+  float depth = march(pos, dir, hit);
   gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
 }

@@ -12,6 +12,7 @@ uniform uvec3 dims;
 uniform vec3 light;
 uniform vec3 eye;
 uniform vec3 center;
+uniform vec2 shadowResolution;
 uniform int showHeat;
 uniform float debug;
 uniform float maxDistance;
@@ -74,14 +75,14 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
 
   vec3 d = abs(center - pos);
   normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
-  return distance(origin, pos) + distance(eye, origin);
+  return distance(eye, pos);
+}
+
+float shadow(vec2 uv) {
+  return texture(shadowMap, uv).r;
 }
 
 void main() {
-	outColor = vec4(rayOrigin, 1.0);
-}
-
-void main1() {
   vec3 origin = gl_FrontFacing ? rayOrigin : eye;
   vec3 pos = gl_FrontFacing ? rayOrigin : eye;
   vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
@@ -97,16 +98,17 @@ void main1() {
   vec3 color;
   color = normal;
   color = mix(color, vec3(1.0, 0.0, 0.0), debug);
-  vec3 scoord = shadowCoord.xyz / shadowCoord.w;
-  vec2 uv = scoord.xy;//(1.0 + scoord.xy) / 2.0;
+  vec4 s = depthBiasMVP * vec4(pos, 1.0);
+  vec2 uv = s.xy / s.w;
   
+  vec2 invrez = 1.0 / shadowResolution;
+  vec2 invrezHalf = invrez / 2.0;
+
   float visibility = 1.0;
   float bias = 0.001;
-  //if (uv.y >= 0.0 && uv.x >= 0.0 && uv.y <= 1.0 && uv.x <= 1.0) {
-    visibility = texture(shadowMap, uv).r < min(scoord.z, distance(pos, light) / maxDistance) ? 0.25 : 1.0;
-  //}
 
-  color = color * vec3(visibility);
-  //color = vec3(uv, 0.0) * visibility;
+  visibility = shadow(uv) < distance(pos, light) / maxDistance - bias ? 0.5 : 1.0;
+  
+  color = color * vec3(visibility); 
   outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
 }

@@ -465,15 +465,11 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glm::mat4 depthInvertedView = glm::inverse(shadowmap->depthViewMatrix);
-    glm::vec3 depthEye(depthInvertedView[3][0], depthInvertedView[3][1], depthInvertedView[3][2]);
-
     raytracer->program->use()
       ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP)
-//      ->uniformMat4("depthViewInverted", glm::inverse(shadowmap->depthViewMatrix))
-//      ->uniformMat4("cameraViewInverted", glm::inverse(viewMatrix))
-      ->uniformVec3("light", depthEye)
+      ->uniformVec3("light", shadowmap->eye)
       ->texture2d("shadowMap", shadowFBO->texture_depth);
+    
 
     raytracer->render(
       raytracer->program,
