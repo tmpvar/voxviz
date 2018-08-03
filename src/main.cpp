@@ -29,7 +29,7 @@ bool prevKeys[1024];
 double mouse[2];
 bool fullscreen = 0;
 // int windowDimensions[2] = { 1024, 768 };
-int windowDimensions[2] = { 640, 480 };
+int windowDimensions[2] = { 1280, 480 };
 
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 Shadowmap *shadowmap;
