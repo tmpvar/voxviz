@@ -29,7 +29,7 @@ bool prevKeys[1024];
 double mouse[2];
 bool fullscreen = 0;
 // int windowDimensions[2] = { 1024, 768 };
-int windowDimensions[2] = { 640, 480 };
+int windowDimensions[2] = { 1440, 900 };
 
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 Shadowmap *shadowmap;
@@ -59,6 +59,8 @@ float window_aspect(GLFWwindow *window, int *width, int *height) {
   return fabs(fw / fh);
 }
 
+#define SHADOWMAP_WIDTH 1024
+#define SHADOWMAP_HEIGHT 1024
 void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   int width, height;
 
@@ -71,23 +73,15 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     10000.0f
   );
   
+   
+
   shadowmap->depthProjectionMatrix = glm::perspective(
     45.0f,
-    window_aspect(window, &width, &height),
+    (float)(SHADOWMAP_WIDTH / SHADOWMAP_HEIGHT),
     0.001f,
     10000.0f
   );
-   /*
-  shadowmap->depthProjectionMatrix = glm::ortho(
-    -5000.0f,
-    5000.0f,
-    5000.0f,  
-    -5000.0f,
-    0.001f,
-    10000.0f
-  );*/
-
-
+  
   glViewport(0, 0, width, height);
 }
 
@@ -319,7 +313,7 @@ int main(void) {
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   FBO *fbo = new FBO(windowDimensions[0], windowDimensions[1]);
-  FBO *shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
+  FBO *shadowFBO = new FBO(SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT);
   
   uint32_t total_affected = 0;
 
@@ -392,7 +386,7 @@ int main(void) {
         glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
         glfwSetWindowPos(window, 100, 100);
         glfwSetWindowMonitor(window, NULL, 100, 100, windowDimensions[0], windowDimensions[1], GLFW_DONT_CARE);
-        glViewport(0, 0, windowDimensions[0], windowDimensions[0]);
+        glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
         fullscreen = false;
       }
       prevKeys[GLFW_KEY_ENTER] = false;
@@ -464,12 +458,15 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gl_error();
+    glViewport(0, 0, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT);
     shadowmap->bindCollect(shadowmap->program, shadowFBO);
     raytracer->render(
-      shadowmap->program->use(),
-      shadowmap->depthMVP,
-      shadowmap->eye,
-      max_distance
+      shadowmap->program
+        ->use()
+        ->uniformMat4("MVP", shadowmap->depthMVP)
+        ->uniformVec3("eye", shadowmap->eye)
+        ->uniform1i("showHeat", raytracer->showHeat)
+        ->uniformFloat("maxDistance", max_distance)
     );
     shadowFBO->unbind();
     
@@ -484,29 +481,27 @@ int main(void) {
     glClearDepth(1.0);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
     raytracer->program->use()
-      ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP)
-      ->uniformVec3("light", shadowmap->eye)
-      ->texture2d("shadowMap", shadowFBO->texture_depth);
-    
+      ->uniformMat4("MVP", MVP)
+      ->uniformVec3("eye", currentEye)
+      ->uniform1i("showHeat", raytracer->showHeat)
+      ->uniformFloat("maxDistance", max_distance);
 
-    raytracer->render(
-      raytracer->program,
-      MVP,
-      currentEye,
-      max_distance
-    );
+    raytracer->render(raytracer->program);
     fbo->unbind();
     
-    fullscreen_program->use()->uniformFloat("maxDistance", max_distance);
-    if (keys[GLFW_KEY_1]) {
-      fullscreen_program->texture2d("color", shadowFBO->texture_depth);
-    } else {
-      fullscreen_program->texture2d("color", fbo->texture_color);
-    }
+    fullscreen_program->use()
+      ->uniformFloat("maxDistance", max_distance)
+      ->texture2d("iColor", fbo->texture_color)
+      ->texture2d("iPosition", fbo->texture_position)
+      ->uniformVec3("light", shadowmap->eye)
+      ->texture2d("iShadowMap", shadowFBO->texture_depth)
+      ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP)
+      ->uniformVec2("shadowmapResolution", glm::vec2(SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT));
+    
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
+    //glEnable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
     
     ImGui_ImplOpenGL3_NewFrame();

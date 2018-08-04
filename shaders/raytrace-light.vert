@@ -1,6 +1,7 @@
 #version 330 core
 
 in vec3 position;
+
 uniform mat4 MVP;
 uniform uvec3 dims;
 uniform vec3 center;

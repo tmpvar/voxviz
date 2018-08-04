@@ -90,12 +90,7 @@
       return volume;
     }
 
-    void render (Program *p,  glm::mat4 mvp, glm::vec3 eye, float max_distance) {
-      p->uniformMat4("MVP", mvp); gl_error();
-      p->uniformVec3("eye", eye); gl_error();
-      p->uniform1i("showHeat", this->showHeat); gl_error();
-      p->uniformFloat("maxDistance", max_distance); gl_error();
-      
+    void render (Program *p) {
       // TODO: batch render
       for (auto& volume: this->volumes) {
         volume->bind(p);

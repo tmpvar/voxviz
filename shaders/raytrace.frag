@@ -4,20 +4,19 @@ in vec3 rayOrigin;
 in vec4 shadowCoord;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec3 outPosition;
 
+// volume binds
 uniform sampler3D volume;
-uniform sampler2D shadowMap;
-
-uniform uvec3 dims;
-uniform vec3 light;
-uniform vec3 eye;
 uniform vec3 center;
-uniform vec2 shadowResolution;
-uniform int showHeat;
+uniform uvec3 dims;
 uniform float debug;
-uniform float maxDistance;
-uniform mat4 depthBiasMVP;
+
+// main binds
 uniform mat4 MVP;
+uniform vec3 eye;
+uniform int showHeat;
+uniform float maxDistance;
 
 #define ITERATIONS 768
 
@@ -61,7 +60,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   for (float i = 0.0; i < ITERATIONS; i++ ) {
     if (hit > 0.0 || voxel( grid ) > 0.0) {
       hit = 1.0;
-      continue;
+	  continue;
     }
     iterations++;
 
@@ -70,16 +69,13 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
     pos += grid_step * ivec3(mask);
     ratio += ratio_step * vec3(mask);
   }
-
+  
   center = floor(pos) + vec3( 0.5 );
-
   vec3 d = abs(center - pos);
-  normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
-  return distance(eye, pos);
-}
 
-float shadow(vec2 uv) {
-  return texture(shadowMap, uv).r;
+  normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
+
+  return distance(eye, pos);
 }
 
 void main() {
@@ -94,21 +90,6 @@ void main() {
 
   float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
   gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
-
-  vec3 color;
-  color = normal;
-  color = mix(color, vec3(1.0, 0.0, 0.0), debug);
-  vec4 s = depthBiasMVP * vec4(pos, 1.0);
-  vec2 uv = s.xy / s.w;
-  
-  vec2 invrez = 1.0 / shadowResolution;
-  vec2 invrezHalf = invrez / 2.0;
-
-  float visibility = 1.0;
-  float bias = 0.001;
-
-  visibility = shadow(uv) < distance(pos, light) / maxDistance - bias ? 0.5 : 1.0;
-  
-  color = color * vec3(visibility); 
-  outColor = mix(vec4(color, 1.0), heat(iterations, ITERATIONS), showHeat);
+  outColor = vec4(normal, 1.0);
+  outPosition = pos / maxDistance;
 }

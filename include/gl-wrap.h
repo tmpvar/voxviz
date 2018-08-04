@@ -98,8 +98,8 @@
       GLint ret;
       if (this->uniforms.find(name) == this->uniforms.end()) {
         ret = glGetUniformLocation(this->handle, name.c_str());
-        gl_error();
         this->uniforms[name] = ret;
+        gl_error();
       } else {
         ret = this->uniforms[name];
       }
@@ -121,6 +121,7 @@
 
     Program *use() {
       glUseProgram(this->handle);
+
       this->texture_index = 0;
       return this;
     }
@@ -263,6 +264,8 @@
       gl_error();
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->ebo);
       gl_error();
+
+
       std::cout << "buffering " << this->faces.size() / 3 << " faces" << std::endl;
       glEnableVertexAttribArray(0);
       glVertexAttribPointer(
@@ -324,6 +327,7 @@
     unsigned int height;
 
     GLuint texture_color;
+    GLuint texture_position;
     GLuint texture_depth;
     FBO(unsigned int width, unsigned int height) {
       this->fb = 0;
@@ -346,6 +350,7 @@
 
     void destroy() {
       glDeleteTextures(1, &texture_color);
+      glDeleteTextures(1, &texture_position);
       glDeleteTextures(1, &texture_depth);
  
       // ensure we return the main render target back to 
@@ -376,6 +381,7 @@
       // If another fbo is bound don't unbind it.
       //if (this->isCurrentlyBound()) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        gl_error();
       //}
 
       return this;
@@ -383,16 +389,21 @@
     
     void create() {
       glGenFramebuffers(1, &this->fb);
-
+      gl_error();
       this->bind();
       this->attachColorTexture();
+      gl_error();
+      this->attachPositionTexture();
+      gl_error();
       this->attachDepthTexture();
+      gl_error();
       
-      GLenum buffers[2] = { GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT };
+      GLenum buffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
       glDrawBuffers(2, buffers);
+      gl_error();
 
       this->status();
-      this->unbind();
+      //this->unbind();
     }
 
     FBO *status() {
@@ -407,12 +418,57 @@
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, this->width, this->height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+      glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA8,
+        this->width,
+        this->height,
+        0,
+        GL_BGRA,
+        GL_UNSIGNED_BYTE,
+        NULL
+      );
 
       glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_color, 0/*mipmap level*/);
       this->status();
       return this;
     }
+
+    FBO *attachPositionTexture() {
+      glGenTextures(1, &this->texture_position);
+      glBindTexture(GL_TEXTURE_2D, this->texture_position);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGB16F,
+        this->width,
+        this->height,
+        0,
+        GL_RGB,
+        GL_FLOAT,
+        NULL
+      );
+
+
+
+      glFramebufferTexture2D(
+        GL_FRAMEBUFFER,
+        GL_COLOR_ATTACHMENT1,
+        GL_TEXTURE_2D,
+        this->texture_position,
+        0/*mipmap level*/
+      );
+
+      this->status();
+      
+      return this;
+    }
+
 
     FBO *attachDepthTexture() {
       // depth texture
@@ -421,8 +477,8 @@
       glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, this->width, this->height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 

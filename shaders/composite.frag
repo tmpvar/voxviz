@@ -2,12 +2,30 @@
 
 out vec4 outColor;
 in vec2 uv;
-uniform sampler2D color;
+
 uniform float maxDistance;
 
+uniform sampler2D iColor;
+uniform sampler2D iPosition;
+
+// TODO: make this an array for multiple lights
+uniform vec3 light;
+uniform sampler2D iShadowMap;
+uniform mat4 depthBiasMVP;
+uniform vec2 shadowmapResolution;
+
+float shadow(vec2 uv) {
+  return texture(iShadowMap, uv).r;
+}
+
 void main() {
-  outColor = texture(color, uv);
-  if (outColor.r > 1.0) {
-	outColor.r = outColor.r / maxDistance;
-  }
+  vec3 pos = texture(iPosition, uv).xyz * maxDistance;
+  vec3 normal = texture(iColor, uv).xyz;
+  vec4 s = depthBiasMVP * vec4(pos, 1.0);
+
+  float bias = 0.0005;
+  float distanceToLight = distance(pos, light) / maxDistance;
+  float visibility = shadow(s.xy / s.w) < distanceToLight - bias ? 0.5 : 1.0;
+
+  outColor = vec4(normal * visibility, 1.0);
 }
