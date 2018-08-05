@@ -14,6 +14,7 @@ public:
   glm::mat4 depthMVP;
   glm::mat4 depthBiasMVP;
   glm::vec3 eye;
+  glm::vec3 target;
   Program *program;
   FreeCamera *camera;
 
@@ -27,10 +28,15 @@ public:
     
     this->program->link();
 
-    this->camera = new FreeCamera();
+    this->camera = new FreeCamera(
+      glm::vec3(1024, -2048, -512),
+      glm::vec3(0, 0, 0)
+    );
+    /*
     camera->translate(1024, -2048, -512);
     camera->rotate(1.0f, 0.75f, 1.0f, 0.0f);
     camera->rotate(1.0f, 0.0f, 0.25f, 0.75f);
+    */
   }
 
   ~Shadowmap() {
@@ -38,7 +44,7 @@ public:
 
   void bindCollect(Program *p, FBO *fbo) {
     glm::vec3 target = glm::vec3(0,0,0);
-    this->depthViewMatrix = this->camera->view();
+    this->depthViewMatrix = glm::lookAt(this->eye, this->target, glm::vec3(0.0, 1.0, 0.0));
     this->depthMVP = depthProjectionMatrix * depthViewMatrix * glm::mat4(1.0);
 
     glm::mat4 invertedView = glm::inverse(depthViewMatrix);
@@ -52,5 +58,10 @@ public:
     );
     
     this->depthBiasMVP = biasMatrix * this->depthMVP;
+  }
+
+  void orient(glm::vec3 eye, glm::vec3 target) {
+    this->eye = eye;
+    this->target = target;
   }
 };

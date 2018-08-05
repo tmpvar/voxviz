@@ -24,8 +24,11 @@ void main() {
   vec4 s = depthBiasMVP * vec4(pos, 1.0);
 
   float bias = 0.0005;
+  vec2 shadowUV = s.xy / s.w;
+
   float distanceToLight = distance(pos, light) / maxDistance;
-  float visibility = shadow(s.xy / s.w) < distanceToLight - bias ? 0.5 : 1.0;
+  float intensity = clamp(0.5 - distance(shadowUV, vec2(0.5)), 0.0, 0.5);
+  float visibility = shadow(shadowUV) < distanceToLight - bias ? 0.5*intensity : intensity;
 
   outColor = vec4(normal * visibility, 1.0);
 }

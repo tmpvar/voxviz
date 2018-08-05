@@ -21,6 +21,7 @@ FIND_PACKAGE(OpenCL REQUIRED)
 
 add_subdirectory(deps/glfw)
 add_subdirectory(deps/glm)
+add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1)
 add_subdirectory(deps/libuv)
 add_subdirectory(shaders)
 

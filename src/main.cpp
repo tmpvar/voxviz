@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <glm/glm.hpp>
 
-#include "camera-orbit.h"
 #include "camera-free.h"
 #include "raytrace.h"
 #include "compute.h"
@@ -33,6 +32,8 @@ int windowDimensions[2] = { 1440, 900 };
 
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 Shadowmap *shadowmap;
+FBO *fbo = nullptr;
+FBO *shadowFBO = nullptr;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -59,8 +60,6 @@ float window_aspect(GLFWwindow *window, int *width, int *height) {
   return fabs(fw / fh);
 }
 
-#define SHADOWMAP_WIDTH 1024
-#define SHADOWMAP_HEIGHT 1024
 void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   int width, height;
 
@@ -77,12 +76,20 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 
   shadowmap->depthProjectionMatrix = glm::perspective(
     45.0f,
-    (float)(SHADOWMAP_WIDTH / SHADOWMAP_HEIGHT),
+    (float)(width / height),
     0.001f,
     10000.0f
   );
   
   glViewport(0, 0, width, height);
+  if (fbo != nullptr) {
+    fbo->setDimensions(width, height);
+  }
+
+  if (shadowFBO != nullptr) {
+    shadowFBO->setDimensions(width, height);
+  }
+  
 }
 
 void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
@@ -258,6 +265,9 @@ int main(void) {
 
   Shaders::init();
   shadowmap = new Shadowmap();
+  shadowmap->orient(glm::vec3(-1024, 1024, -512), glm::vec3(1024, 256, 512));
+
+
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
 
@@ -273,9 +283,10 @@ int main(void) {
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
-  FreeCamera *camera = new FreeCamera();
-  camera->translate(-1024, -2048, -2048);
-  camera->rotate(1.0f, 0.75f, 0.0f, 0.0f);
+  FreeCamera *camera = new FreeCamera(
+    glm::vec3(1024, 2048, 2048)
+  );
+
   int time = 0;
 
 #if RENDER_STATIC == 1
@@ -312,8 +323,8 @@ int main(void) {
   
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
-  FBO *fbo = new FBO(windowDimensions[0], windowDimensions[1]);
-  FBO *shadowFBO = new FBO(SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT);
+  fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+  shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
   
   uint32_t total_affected = 0;
 
@@ -335,19 +346,20 @@ int main(void) {
 
   while (!glfwWindowShouldClose(window)) {
     if (keys[GLFW_KEY_W]) {
-      camera->translate(0.0f, 0.0f, 10.0f);
+      camera->ProcessKeyboard(Camera_Movement::FORWARD, 1.0);
+      //camera->translate(0.0f, 0.0f, 10.0f);
     }
 
     if (keys[GLFW_KEY_S]) {
-      camera->translate(0.0f, 0.0f, -10.0f);
+      camera->ProcessKeyboard(Camera_Movement::BACKWARD, 1.0);
     }
 
     if (keys[GLFW_KEY_A]) {
-      camera->translate(5.0f, 0.0f, 0.0f);
+      camera->ProcessKeyboard(Camera_Movement::LEFT, 1.0);
     }
 
     if (keys[GLFW_KEY_D]) {
-      camera->translate(-5.0f, 0.0f, 0.0f);
+      camera->ProcessKeyboard(Camera_Movement::RIGHT, 1.0);
     }
 
     if (keys[GLFW_KEY_H]) {
@@ -357,21 +369,6 @@ int main(void) {
       raytracer->showHeat = 0;
     }
 
-    if (keys[GLFW_KEY_LEFT]) {
-      camera->yaw(-0.02f);
-    }
-
-    if (keys[GLFW_KEY_RIGHT]) {
-      camera->yaw(0.02f);
-    }
-
-    if (keys[GLFW_KEY_UP]) {
-      camera->pitch(-0.02f);
-    }
-
-    if (keys[GLFW_KEY_DOWN]) {
-      camera->pitch(0.02f);
-    }
 
     if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
       if (!fullscreen) {
@@ -407,8 +404,7 @@ int main(void) {
     mouse[0] = xpos;
     mouse[1] = ypos;
 
-    camera->pitch((float)(delta[1] / 500.0));
-    camera->yaw((float)(delta[0] / 500.0));
+    camera->ProcessMouseMovement(delta[0], -delta[1]);
   
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       int axis_count;
@@ -439,12 +435,14 @@ int main(void) {
       );
     }
 
-    viewMatrix = camera->view();
+    viewMatrix = camera->GetViewMatrix();
 
     MVP = perspectiveMatrix * viewMatrix;
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
+
+    glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
 
     shadowFBO->bind();
     glEnable(GL_DEPTH_TEST);
@@ -458,7 +456,7 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gl_error();
-    glViewport(0, 0, SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT);
+
     shadowmap->bindCollect(shadowmap->program, shadowFBO);
     raytracer->render(
       shadowmap->program
@@ -481,7 +479,7 @@ int main(void) {
     glClearDepth(1.0);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
+    
     raytracer->program->use()
       ->uniformMat4("MVP", MVP)
       ->uniformVec3("eye", currentEye)
@@ -497,11 +495,10 @@ int main(void) {
       ->texture2d("iPosition", fbo->texture_position)
       ->uniformVec3("light", shadowmap->eye)
       ->texture2d("iShadowMap", shadowFBO->texture_depth)
-      ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP)
-      ->uniformVec2("shadowmapResolution", glm::vec2(SHADOWMAP_WIDTH, SHADOWMAP_HEIGHT));
+      ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP);
     
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    //glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
     
     ImGui_ImplOpenGL3_NewFrame();
@@ -512,6 +509,7 @@ int main(void) {
       static float f = 0.0f;
       static int counter = 0;
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("camera pos(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
     }
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -535,6 +533,8 @@ int main(void) {
  
     time++;
     
+    shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
+
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       glfwSetJoystickVibration(GLFW_JOYSTICK_1, total_affected, 0);
     }
