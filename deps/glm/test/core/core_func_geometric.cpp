@@ -1,7 +1,14 @@
 #include <glm/geometric.hpp>
+#include <glm/trigonometric.hpp>
 #include <glm/vector_relational.hpp>
-#include <glm/gtc/epsilon.hpp>
-#include <glm/gtc/vec1.hpp>
+#include <glm/ext/vector_relational.hpp>
+#include <glm/ext/fvec1.hpp>
+#include <glm/fvec2.hpp>
+#include <glm/fvec3.hpp>
+#include <glm/fvec4.hpp>
+#include <glm/dvec2.hpp>
+#include <glm/dvec3.hpp>
+#include <glm/dvec4.hpp>
 #include <limits>
 
 namespace length
@@ -130,14 +137,14 @@ namespace reflect
 			glm::vec2 A(1.0f,-1.0f);
 			glm::vec2 B(0.0f, 1.0f);
 			glm::vec2 C = glm::reflect(A, B);
-			Error += C == glm::vec2(1.0, 1.0) ? 0 : 1;
+			Error += glm::all(glm::equal(C, glm::vec2(1.0, 1.0), 0.0001f)) ? 0 : 1;
 		}
 
 		{
 			glm::dvec2 A(1.0f,-1.0f);
 			glm::dvec2 B(0.0f, 1.0f);
 			glm::dvec2 C = glm::reflect(A, B);
-			Error += C == glm::dvec2(1.0, 1.0) ? 0 : 1;
+			Error += glm::all(glm::equal(C, glm::dvec2(1.0, 1.0), 0.0001)) ? 0 : 1;
 		}
 
 		return Error;
@@ -154,21 +161,21 @@ namespace refract
 			float A(-1.0f);
 			float B(1.0f);
 			float C = glm::refract(A, B, 0.5f);
-			Error += C == -1.0f ? 0 : 1;
+			Error += glm::equal(C, -1.0f, 0.0001f) ? 0 : 1;
 		}
 
 		{
 			glm::vec2 A(0.0f,-1.0f);
 			glm::vec2 B(0.0f, 1.0f);
 			glm::vec2 C = glm::refract(A, B, 0.5f);
-			Error += glm::all(glm::epsilonEqual(C, glm::vec2(0.0, -1.0), 0.0001f)) ? 0 : 1;
+			Error += glm::all(glm::equal(C, glm::vec2(0.0, -1.0), 0.0001f)) ? 0 : 1;
 		}
 
 		{
 			glm::dvec2 A(0.0f,-1.0f);
 			glm::dvec2 B(0.0f, 1.0f);
 			glm::dvec2 C = glm::refract(A, B, 0.5);
-			Error += C == glm::dvec2(0.0, -1.0) ? 0 : 1;
+			Error += glm::all(glm::equal(C, glm::dvec2(0.0, -1.0), 0.0001)) ? 0 : 1;
 		}
 
 		return Error;
