@@ -46,6 +46,7 @@ add_executable(
   src/glad.c
   src/volume.cpp
   src/gl-wrap.cpp
+  include/a-buffer.h
   include/raytrace.h
   include/gl-wrap.h
   include/camera-orbit.h
