@@ -45,6 +45,14 @@ void Volume::bind(Program *program) {
   
 }
 
+void Volume::bindProxy(Program *program) {
+  program
+    ->uniformVec3("center", this->center)
+    ->uniformVec3ui("dims", this->dims)
+    ->uniformFloat("debug", this->debug);
+}
+
+
 void Volume::position(float x, float y, float z) {
   this->center.x = floorf(x);
   this->center.y = floorf(y);

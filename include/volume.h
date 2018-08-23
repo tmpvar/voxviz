@@ -20,6 +20,7 @@
     ~Volume();
     void upload();
     void bind(Program * program);
+    void bindProxy(Program * program);
     void position(float x, float y, float z);
     void move(float x, float y, float z);
     aabb_t aabb();
