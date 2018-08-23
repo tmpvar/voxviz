@@ -10,4 +10,6 @@
 
 //#define FULLSCREEN
 
+#define ABUFFER_MAX_DEPTH_COMPLEXITY 16
+
 #endif
