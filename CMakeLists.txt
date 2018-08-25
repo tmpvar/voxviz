@@ -37,7 +37,7 @@ include_directories(
   deps/imgui/examples
 )
 
-file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl)
+file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp)
 
 add_executable(
   voxviz

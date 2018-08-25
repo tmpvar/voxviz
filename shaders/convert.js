@@ -2,14 +2,23 @@ const fs = require('fs')
 const path = require('path')
 const glob = require('glob')
 
-const files = glob.sync(path.join(__dirname, '*.{vert,frag}'))
+const files = glob.sync(path.join(__dirname, '*.{vert,frag,comp}'))
 const out = []
+
+const types = {
+  '.frag': 'GL_FRAGMENT_SHADER',
+  '.vert': 'GL_VERTEX_SHADER',
+  '.comp': 'GL_COMPUTE_SHADER'
+}
 
 const init = files.map((file) => {
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/)
   const relpath = path.relative(__dirname, file)
 
-  const type = file.indexOf('vert') > -1 ? 'GL_VERTEX_SHADER' : 'GL_FRAGMENT_SHADER'
+  const type = types[path.extname(file)]
+  if (!type) {
+    throw new Error(file + " could not be associated with a shader type")
+  }
 
   return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.filter(Boolean).map((line) => {
     return `        "${line.trim()}\\n"`
