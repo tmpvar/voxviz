@@ -1,17 +1,20 @@
 #ifndef _VOLUME_H_
 #define _VOLUME_H_
 
-  #include <glm/glm.hpp>
-  #include "clu.h"
-  #include "aabb.h"
+#include <glm/glm.hpp>
+#include "clu.h"
+#include "aabb.h"
+#include "gl-wrap.h"
 
-class Program;
+  class Program;
 
   class Volume {
   public:
     glm::vec3 center;
     glm::uvec3 dims;
-    unsigned int textureId;
+    // TODO: make this a structure
+    GLuint bufferId;
+    GLuint64 bufferAddress;
     cl_mem computeBuffer;
     cl_mem mem_center;
     cl_mem mem_dims;

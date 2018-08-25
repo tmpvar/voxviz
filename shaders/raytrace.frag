@@ -1,4 +1,5 @@
-#version 330 core
+#version 420 core
+#extension GL_NV_shader_buffer_load: enable
 
 in vec3 rayOrigin;
 in vec4 shadowCoord;
@@ -7,7 +8,7 @@ layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec3 outPosition;
 
 // volume binds
-uniform sampler3D volume;
+uniform float *volume;
 uniform vec3 center;
 uniform uvec3 dims;
 uniform float debug;
@@ -24,8 +25,11 @@ float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);
   vec3 hfdims = fdims * 0.5;
 
-  vec3 pos = round((hfdims + worldPos - center)) / fdims;
-  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
+  uvec3 pos = uvec3(round((hfdims + worldPos - center)) / fdims);
+
+  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.y);
+
+  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : (float)volume[idx];
 }
 
 vec3 hsv2rgb(vec3 c) {

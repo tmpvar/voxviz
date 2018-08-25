@@ -210,6 +210,12 @@
       this->texture_index++;
       return this;
     }
+
+    Program *bufferAddress(string name, GLuint64 val) {
+      GLint loc = this->uniformLocation(name);
+      glProgramUniformui64NV(this->handle, loc, val);
+      return this;
+    }
   };
 
 
