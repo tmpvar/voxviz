@@ -17,7 +17,7 @@
 
   using namespace std;
   
-#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__);}
+#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
 
   GLint gl_ok(GLint error);
   GLint GL_ERROR();
