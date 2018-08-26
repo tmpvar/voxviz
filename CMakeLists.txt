@@ -44,16 +44,12 @@ add_executable(
   src/aabb.cpp
   src/main.cpp
   src/glad.c
-  src/compute.cpp
-  src/clu.cpp
   src/volume.cpp
   src/gl-wrap.cpp
   include/raytrace.h
   include/gl-wrap.h
   include/camera-orbit.h
   include/camera-free.h
-  include/clu.h
-  include/compute.h
   include/core.h
   include/volume.h
   include/aabb.h

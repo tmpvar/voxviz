@@ -10,7 +10,6 @@
   #include <string.h>
 
   #include "volume.h"
-  #include "clu.h"
   #include "core.h"
 
   using namespace std;
@@ -21,13 +20,11 @@
     Program *program;
     int *dims;
     GLuint volumeTexture;
-    clu_job_t job;
     int showHeat;
     vector<Volume *> volumes;
     
 
-    Raytracer(int *dimensions, clu_job_t job) {
-      this->job = job;
+    Raytracer(int *dimensions) {
       this->dims = dimensions;
       this->showHeat = 0;
       glm::vec3 hd(dims[0]/2, dims[1]/2, dims[2]/2);
@@ -82,7 +79,7 @@
 
       Volume *volume = new Volume(pos, dims);
 
-      volume->upload(this->job);
+      volume->upload();
 
       this->volumes.push_back(volume);
       // TODO: add this volume to a spacial hash

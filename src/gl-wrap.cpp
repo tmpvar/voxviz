@@ -84,13 +84,18 @@ void gl_shader_log(GLuint shader) {
   GLint l, m;
   GLint isCompiled = 0;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
-  if (isCompiled == GL_FALSE) {
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
-    char *s = (char *)malloc(m * sizeof(char));
-    glGetShaderInfoLog(shader, m, &l, s);
-    printf("shader log:\n%s\n", s);
-    free(s);
+  if (isCompiled == GL_TRUE) {
+    printf("  compiled\n");
+    return;
   }
+  printf("  failed to compile!\n");
+  return;
+  glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
+  char *s = (char *)malloc(m * sizeof(char));
+  glGetShaderInfoLog(shader, m, &l, s);
+  printf("shader log:\n%s\n", s);
+  free(s);
+  //}
 }
 
 
@@ -100,11 +105,67 @@ void gl_program_log(GLuint handle) {
   GLint isLinked = 0;
   
   glGetProgramiv(handle, GL_LINK_STATUS, &isLinked);
-  if (isLinked == GL_FALSE) {
-    glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &m);
-    char *s = (char *)malloc(m * sizeof(char));
-    glGetProgramInfoLog(handle, m, &l, s);
-    printf("program log:\n%s\n", s);
-    free(s);
+  if (isLinked == GL_TRUE) {
+    printf("  linked\n");
+    return;
   }
+  printf("  failed to link!\n");
+
+  glGetProgramiv(handle, GL_INFO_LOG_LENGTH, &m);
+  char *s = (char *)malloc(m * sizeof(char));
+  glGetProgramInfoLog(handle, m, &l, s);
+  printf("program log:\n%s\n", s);
+  free(s);
+}
+
+void APIENTRY openglCallbackFunction(GLenum source,
+  GLenum type,
+  GLuint id,
+  GLenum severity,
+  GLsizei length,
+  const GLchar* message,
+  const void* userParam) {
+
+  cout << "---------------------opengl-callback-start------------" << endl;
+  cout << "message: " << message << endl;
+  cout << "type: ";
+  switch (type) {
+  case GL_DEBUG_TYPE_ERROR:
+    cout << "ERROR";
+    break;
+  case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+    cout << "DEPRECATED_BEHAVIOR";
+    break;
+  case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+    cout << "UNDEFINED_BEHAVIOR";
+    break;
+  case GL_DEBUG_TYPE_PORTABILITY:
+    cout << "PORTABILITY";
+    break;
+  case GL_DEBUG_TYPE_PERFORMANCE:
+    cout << "PERFORMANCE";
+    break;
+  case GL_DEBUG_TYPE_OTHER:
+    cout << "OTHER";
+    break;
+  }
+  cout << endl;
+
+  cout << "id: " << id << endl;
+  cout << "severity: ";
+  switch (severity) {
+  case GL_DEBUG_SEVERITY_LOW:
+    cout << "LOW";
+    break;
+  case GL_DEBUG_SEVERITY_MEDIUM:
+    cout << "MEDIUM";
+    break;
+  case GL_DEBUG_SEVERITY_HIGH:
+    cout << "HIGH";
+    break;
+  default:
+    cout << "UNKNOWN";
+  }
+  cout << endl;
+  cout << "---------------------opengl-callback-end--------------" << endl;
 }

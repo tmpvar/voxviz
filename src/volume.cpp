@@ -10,11 +10,11 @@ Volume::Volume(glm::vec3 center, glm::uvec3 dims) {
 Volume::~Volume() {
   //CL_CHECK_ERROR(clReleaseMemObject(this->mem_center));
   //CL_CHECK_ERROR(clReleaseMemObject(this->computeBuffer));
-  glad_glMakeBufferNonResidentNV(this->bufferAddress);
+  glMakeBufferNonResidentNV(this->bufferAddress);
   glDeleteBuffers(1, &this->bufferId);
 }
 
-void Volume::upload(clu_job_t job) {
+void Volume::upload() {
   glGenBuffers(1, &bufferId);
   gl_error();
 
@@ -23,9 +23,9 @@ void Volume::upload(clu_job_t job) {
 
   glBufferData(
     GL_TEXTURE_BUFFER,
-    this->dims.x * this->dims.y * this->dims.z * sizeof(GLfloat) * 4.0,
+    this->dims.x * this->dims.y * this->dims.z * sizeof(GLfloat),
     NULL,
-    GL_DYNAMIC_DRAW
+    GL_STATIC_DRAW
   );
   gl_error();
 
@@ -35,8 +35,6 @@ void Volume::upload(clu_job_t job) {
   glGetBufferParameterui64vNV(GL_TEXTURE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &this->bufferAddress);
   gl_error();
 
-  float on = 1.0;
-  glClearBufferData(GL_TEXTURE_BUFFER, GL_R32F, GL_RED, GL_FLOAT, &on);
 
   /*
   glGenTextures(1, &this->);
@@ -102,7 +100,7 @@ void Volume::upload(clu_job_t job) {
 }
 
 void Volume::bind(Program *program) {
-  program//->texture3d("volume", this->textureId)
+  program
     ->uniformVec3("center", this->center)
     ->uniformVec3ui("dims", this->dims)
     ->uniformFloat("debug", this->debug)
@@ -159,4 +157,9 @@ bool Volume::isect(Volume *other, aabb_t *out) {
   out->lower.z = max(a.lower.z, b.lower.z);
 
   return true;
+}
+
+void Volume::fillConst(float val) {
+  glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
+  glClearBufferData(GL_TEXTURE_BUFFER, GL_R32F, GL_RED, GL_FLOAT, &val);
 }

@@ -17,20 +17,28 @@
 
   using namespace std;
   
-#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
+#define gl_error() (void)0
+//if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
 
   GLint gl_ok(GLint error);
   GLint GL_ERROR();
   void gl_shader_log(GLuint shader);
   void gl_program_log(GLuint handle);
+  void APIENTRY openglCallbackFunction(
+    GLenum source,
+    GLenum type,
+    GLuint id,
+    GLenum severity,
+    GLsizei length,
+    const GLchar* message,
+    const void* userParam
+ );
 
   static const char *shader_type(GLuint type) {
     switch (type) {
-#ifdef GL_COMPUTE_SHADER
       case GL_COMPUTE_SHADER:
          return "GL_COMPUTE_SHADER";
       break;
-#endif
       case GL_VERTEX_SHADER:
         return "GL_VERTEX_SHADER";
       break;
@@ -50,19 +58,20 @@
     return "Unknown";
   }
 
- 
-
   class Shader {
   public:
     GLuint handle;
     GLuint type;
+    string name;
 
     Shader(const char *src, const char *name, const GLuint type) {
       // this->src = src;
       this->type = type;
       this->handle = glCreateShader(type);
+      gl_error();
+      this->name = name;
       glShaderSource(this->handle, 1, &src, NULL);
-
+      gl_error();
       std::cout << "Compile "
                 << shader_type(type)
                 << " Shader: "
@@ -83,6 +92,7 @@
     map<string, GLint> uniforms;
     map<string, GLint> attributes;
     GLuint texture_index;
+    string compositeName;
   public:
     GLuint handle;
 
@@ -107,22 +117,24 @@
     }
 
     Program *add(const Shader *shader) {
+      this->compositeName += " " + shader->name;
       glAttachShader(this->handle, shader->handle);
+      gl_error();
       return this;
     }
 
     Program *link() {
+      std::cout << "linking" << this->compositeName << std::endl;
       glLinkProgram(this->handle);
-      std::cout << "linking" << std::endl;
       gl_program_log(this->handle);
-
+      gl_error();
       return this;
     }
 
     Program *use() {
       glUseProgram(this->handle);
-
       this->texture_index = 0;
+      gl_error();
       return this;
     }
 

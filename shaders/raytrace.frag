@@ -2,7 +2,6 @@
 #extension GL_NV_shader_buffer_load: enable
 
 in vec3 rayOrigin;
-in vec4 shadowCoord;
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec3 outPosition;
@@ -19,17 +18,17 @@ uniform vec3 eye;
 uniform int showHeat;
 uniform float maxDistance;
 
-#define ITERATIONS 768
+#define ITERATIONS 128
 
 float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);
   vec3 hfdims = fdims * 0.5;
 
-  uvec3 pos = uvec3(round((hfdims + worldPos - center)) / fdims);
+  uvec3 pos = uvec3(round((hfdims + worldPos - center)));
 
-  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.y);
-
-  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : (float)volume[idx];
+  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
+  bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, dims));
+  return oob ? -1.0 : volume[idx];
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -96,4 +95,8 @@ void main() {
   gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
   outColor = vec4(normal, 1.0);
   outPosition = pos / maxDistance;
+}
+
+void main1() {
+	outColor = vec4(1.0);
 }

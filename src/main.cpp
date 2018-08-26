@@ -3,9 +3,9 @@
 
 #include "camera-free.h"
 #include "raytrace.h"
-#include "compute.h"
+//#include "compute.h"
 #include "core.h"
-#include "clu.h"
+//#include "clu.h"
 #include "fullscreen-surface.h"
 #include "shadowmap.h"
 
@@ -74,12 +74,12 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   
    
 
-  shadowmap->depthProjectionMatrix = glm::perspective(
+  /*shadowmap->depthProjectionMatrix = glm::perspective(
     45.0f,
     (float)(width / height),
     0.001f,
     10000.0f
-  );
+  );*/
   
   glViewport(0, 0, width, height);
   if (fbo != nullptr) {
@@ -92,7 +92,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   
 }
 
-void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
+/*void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
   const cl_uint total = (cl_uint)raytracer->volumes.size();
   cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
   cl_command_queue queue = compute->job.command_queues[0];
@@ -107,16 +107,16 @@ void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
   clReleaseEvent(opengl_get_completion);
 
   for (cl_uint i = 0; i < total; i++) {
-    compute->fill("fillAll", queue, raytracer->volumes[i], time);
+    compute->fill("sphere", queue, raytracer->volumes[i], time);
   }
 
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
-
+  clFinish(queue);
   free(mem);
 }
+*/
 
-
-void apply_tool(Raytracer *raytracer, Compute *compute) {
+/*void apply_tool(Raytracer *raytracer, Compute *compute) {
   const cl_uint total = (cl_uint)raytracer->volumes.size();
   cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
   cl_command_queue queue = compute->job.command_queues[0];
@@ -135,6 +135,7 @@ void apply_tool(Raytracer *raytracer, Compute *compute) {
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
   free(mem);
 }
+*/
 
 /* LIBUV JUNK*/
 typedef struct {
@@ -179,7 +180,6 @@ void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
           char *pch = strtok(parse_pos + strlen(line_prefix), line_splitter);
           glm::vec3 tool_pos;
           tool_pos[0] = 0.0f;
-          float axis[3];
           int axis_loc = 0;
           while (pch != NULL) {
             tool_pos[axis_loc] = atof(pch);
@@ -211,6 +211,21 @@ void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
 }
 /* LIBUV JUNK*/
 
+void fillVolume(Volume *volume, Program *program) {
+  program
+    ->use()
+    ->bufferAddress("volume", volume->bufferAddress)
+    ->uniformVec3ui("dims", volume->dims);
+
+  int workgroupSize = 32;
+  glDispatchCompute(
+    1,
+    volume->dims.y,
+    volume->dims.z
+  );
+  gl_error();
+}
+
 int main(void) {
   memset(keys, 0, sizeof(keys));
 
@@ -230,14 +245,14 @@ int main(void) {
   // libuv junk
 
   GLFWwindow* window;
-  
+
 
   if (!glfwInit()) {
     return -1;
   }
 
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -261,25 +276,37 @@ int main(void) {
   gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
   glfwSwapInterval(0);
 
-  Compute *compute = new Compute();
-
+  //Compute *compute = new Compute();
+  if (false == true && glDebugMessageCallback) {
+    cout << "Register OpenGL debug callback " << endl;
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(openglCallbackFunction, nullptr);
+    GLuint unusedIds = 0;
+    glDebugMessageControl(GL_DONT_CARE,
+      GL_DONT_CARE,
+      GL_DONT_CARE,
+      0,
+      &unusedIds,
+      true);
+  }
+  else {
+    cout << "glDebugMessageCallback not available" << endl;
+  }
   Shaders::init();
-  shadowmap = new Shadowmap();
-  shadowmap->orient(glm::vec3(-1024, 1024, -512), glm::vec3(1024, 256, 512));
-
+  //shadowmap = new Shadowmap();
+  //shadowmap->orient(glm::vec3(-1024, 1024, -512), glm::vec3(1024, 256, 512));
+  
 
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
 
-  Raytracer *raytracer = new Raytracer(dims, compute->job);
+  Program *fillSphereProgram = new Program();
+  fillSphereProgram
+    ->add(Shaders::get("fill-sphere.comp"))
+    ->link();
+ 
+  Raytracer *raytracer = new Raytracer(dims);
   float max_distance = 10000.0f;
-  for (float x = 0; x < 8; x++) {
-    for (float y = 0; y < 1; y++) {
-      for (float z = 0; z < 4; z++) {
-        raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
-      }
-    }
-  }
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
@@ -290,21 +317,23 @@ int main(void) {
   int time = 0;
 
 #if RENDER_STATIC == 1
-  update_volumes(raytracer, compute, time);
+  //update_volumes(raytracer, compute, time);
 #endif
 
   Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
-  compute->lock(compute->job.command_queues[0], tool->computeBuffer);
+  tool->fillConst(1.0);
+  /*compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
-    "cylinder",
+    "fillAll",
     compute->job.command_queues[0],
     tool,
     0
   );
   compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
-  tool->position(0.0, 128, 0.0);
+  */
+  tool->position(0.0, 512, 0.0);
 
-  clFinish(compute->job.command_queues[0]);
+  //clFinish(compute->job.command_queues[0]);
 
   Program *fullscreen_program = new Program();
   fullscreen_program
@@ -320,7 +349,52 @@ int main(void) {
     ->output("outColor")
     ->link();
 
-  
+  { // query up the workgroups
+    int work_grp_size[3], work_grp_inv;
+    // maximum global work group (total work in a dispatch)
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_size[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &work_grp_size[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &work_grp_size[2]);
+    printf("max global (total) work group size x:%i y:%i z:%i\n", work_grp_size[0],
+      work_grp_size[1], work_grp_size[2]);
+    // maximum local work group (one shader's slice)
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &work_grp_size[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &work_grp_size[2]);
+    printf("max local (in one shader) work group sizes x:%i y:%i z:%i\n",
+      work_grp_size[0], work_grp_size[1], work_grp_size[2]);
+    // maximum compute shader invocations (x * y * z)
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
+    printf("max computer shader invocations %i\n", work_grp_inv);
+  }
+
+ 
+  Volume *tmp;
+  for (float x = 0; x < 32; x++) {
+    for (float y = 0; y < 5; y++) {
+      for (float z = 0; z < 16; z++) {
+        tmp = raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
+        printf(
+          "create (%f, %f, %f) of size (%ui, %ui, %ui)\n",
+          x, y, z,
+          VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS
+        );
+      }
+    }
+  }
+
+  for (auto& vol : raytracer->volumes) {
+    fillVolume(vol, fillSphereProgram);
+    printf(
+      "fill (%f, %f, %f)\n",
+      vol->center.x,
+      vol->center.y,
+      vol->center.z
+    );
+  }
+
+  glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+  cout << "DONE FILLING" << endl;
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   fbo = new FBO(windowDimensions[0], windowDimensions[1]);
@@ -443,11 +517,11 @@ int main(void) {
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
 
     glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
-
+    /*
     shadowFBO->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    glDepthMask(GL_TRUE);
+    //glDepthMask(GL_TRUE);
 
     glCullFace(GL_BACK);
     glEnable(GL_CULL_FACE);
@@ -467,8 +541,9 @@ int main(void) {
         ->uniformFloat("maxDistance", max_distance)
     );
     shadowFBO->unbind();
-    
-    fbo->bind();
+    */
+    //fbo->bind();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -487,8 +562,8 @@ int main(void) {
       ->uniformFloat("maxDistance", max_distance);
 
     raytracer->render(raytracer->program);
-    fbo->unbind();
-    
+    //fbo->unbind();
+/*
     fullscreen_program->use()
       ->uniformFloat("maxDistance", max_distance)
       ->texture2d("iColor", fbo->texture_color)
@@ -500,7 +575,7 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
-    
+ */  
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -516,10 +591,9 @@ int main(void) {
     glfwSwapBuffers(window);
 
 #if RENDER_DYNAMIC == 1
-    update_volumes(raytracer, compute, time);
+    //update_volumes(raytracer, compute, time);
 #endif
-    glFlush();
-
+    /*
     size_t total = raytracer->volumes.size();
     total_affected = 0;
     for (unsigned int i = 0; i < total; i++) {
@@ -530,10 +604,10 @@ int main(void) {
       total_affected += compute->opCut(raytracer->volumes[i], tool);
     }
     clFinish(compute->job.command_queues[0]);
- 
+    */
     time++;
     
-    shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
+    //shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
 
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       glfwSetJoystickVibration(GLFW_JOYSTICK_1, total_affected, 0);
@@ -550,6 +624,8 @@ int main(void) {
     uv_run(loop, UV_RUN_NOWAIT);
     glfwPollEvents();
   }
+
+  cout << "SHUTING DOWN" << endl;
 
   delete fullscreen_program;
   delete fullscreen_surface;
