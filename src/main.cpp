@@ -215,6 +215,7 @@ void fillVolume(Volume *volume, Program *program) {
   program
     ->use()
     ->bufferAddress("volume", volume->bufferAddress)
+    ->uniformVec3("center", volume->center)
     ->uniformVec3ui("dims", volume->dims);
 
   int workgroupSize = 32;
@@ -320,8 +321,8 @@ int main(void) {
   //update_volumes(raytracer, compute, time);
 #endif
 
-  Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
-  tool->fillConst(1.0);
+  //Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
+  //tool->fillConst(1.0);
   /*compute->lock(compute->job.command_queues[0], tool->computeBuffer);
   compute->fill(
     "fillAll",
@@ -331,7 +332,7 @@ int main(void) {
   );
   compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
   */
-  tool->position(0.0, 512, 0.0);
+  //tool->position(0.0, 512, 0.0);
 
   //clFinish(compute->job.command_queues[0]);
 
@@ -370,15 +371,16 @@ int main(void) {
 
  
   Volume *tmp;
+  // 32, 5, 16
   for (float x = 0; x < 32; x++) {
-    for (float y = 0; y < 5; y++) {
+    for (float y = 0; y < 2; y++) {
       for (float z = 0; z < 16; z++) {
         tmp = raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
-        printf(
-          "create (%f, %f, %f) of size (%ui, %ui, %ui)\n",
-          x, y, z,
-          VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS
-        );
+        //printf(
+        //  "create (%f, %f, %f) of size (%ui, %ui, %ui)\n",
+        //  x, y, z,
+        //  VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS
+        //);
       }
     }
   }
@@ -479,7 +481,7 @@ int main(void) {
     mouse[1] = ypos;
 
     camera->ProcessMouseMovement(delta[0], -delta[1]);
-  
+    /*
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       int axis_count;
       const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
@@ -508,6 +510,7 @@ int main(void) {
         new_tool_pos.y * 10.0f
       );
     }
+    */
 
     viewMatrix = camera->GetViewMatrix();
 

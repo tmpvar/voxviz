@@ -17,8 +17,7 @@
 
   using namespace std;
   
-#define gl_error() (void)0
-//if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
+#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
 
   GLint gl_ok(GLint error);
   GLint GL_ERROR();
@@ -232,11 +231,10 @@
 
 
   class Mesh {
-  private:
+  public:
     GLuint vao;
     GLuint vbo;
     GLuint ebo;
-  public:
     std::vector<GLfloat> verts;
     std::vector<GLuint> faces;
 
@@ -285,9 +283,9 @@
 
 
       std::cout << "buffering " << this->faces.size() / 3 << " faces" << std::endl;
-      glEnableVertexAttribArray(0);
+      glEnableVertexAttribArray(1);
       glVertexAttribPointer(
-        0,
+        1,
         3,
         GL_FLOAT,
         GL_FALSE,

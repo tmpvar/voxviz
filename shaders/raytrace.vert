@@ -1,19 +1,36 @@
-#version 150 core
+#version 430 core
+#extension GL_NV_gpu_shader5: require
+#extension GL_ARB_bindless_texture : require
 
-in vec3 position;
+layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 iCenter;
+layout (location = 2) in float *iBufferPointer;
+
 uniform mat4 MVP;
 uniform uvec3 dims;
 uniform vec3 eye;
-uniform vec3 center;
 uniform mat4 depthBiasMVP;
+//uniform image1D volumeIndex;
+
 
 out vec3 rayOrigin;
 out vec4 shadowCoord;
+out vec3 npos;
 
+out vec3 center;
+// flat means "do not interpolate"
+flat out float *volumePointer;
+//flat out uint64_t volumeSampler;
+//flat out layout(bindless_sampler) sampler3D volumeSampler;
 
 void main() {
   vec3 pos = position * (vec3(dims) / 2.0);
-  rayOrigin = pos + center;
+  center = iCenter;
+  rayOrigin = pos + iCenter;
   shadowCoord = depthBiasMVP * vec4(eye, 1.0);
+
+
+  volumePointer = iBufferPointer;
+  //volumeSampler = sampler3D(iBufferPointer);
   gl_Position = MVP * vec4(rayOrigin, 1.0);
 }

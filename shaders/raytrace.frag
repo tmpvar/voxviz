@@ -1,23 +1,25 @@
-#version 420 core
-#extension GL_NV_shader_buffer_load: enable
+#version 450 core
+#extension GL_NV_gpu_shader5: require
+#extension GL_ARB_bindless_texture : require
+//#extension GL_EXT_shader_image_load_store : require
 
 in vec3 rayOrigin;
+in vec3 center;
+flat in float *volumePointer;
+//flat in layout(bindless_sampler) sampler3D volumeSampler;
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec3 outPosition;
 
-// volume binds
-uniform float *volume;
-uniform vec3 center;
+// main binds
 uniform uvec3 dims;
 uniform float debug;
-
-// main binds
 uniform mat4 MVP;
 uniform vec3 eye;
 uniform int showHeat;
 uniform float maxDistance;
-
+//uniform uint64_t *uVolumeIndex;
+//uniform uint64_t *uVolume;
 #define ITERATIONS 128
 
 float voxel(vec3 worldPos) {
@@ -25,10 +27,10 @@ float voxel(vec3 worldPos) {
   vec3 hfdims = fdims * 0.5;
 
   uvec3 pos = uvec3(round((hfdims + worldPos - center)));
-
   uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
   bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, dims));
-  return oob ? -1.0 : volume[idx];
+  return oob ? -1.0 : float(volumePointer[idx]);
+  //return 1.0;
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -86,14 +88,14 @@ void main() {
   vec3 pos = gl_FrontFacing ? rayOrigin : eye;
   vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
   vec3 dir = normalize(eyeToPlane);
-
   vec3 normal;
   vec3 voxelCenter;
   float hit, iterations;
 
   float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
+ 
   gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
-  outColor = vec4(normal, 1.0);
+  outColor = hit < 0.0 ? vec4(0.0) : vec4(normal, 1.0);//vec4(normal, 1.0);
   outPosition = pos / maxDistance;
 }
 

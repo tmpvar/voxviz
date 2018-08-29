@@ -12,7 +12,7 @@ const types = {
 }
 
 const init = files.map((file) => {
-  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/)
+  const lines = fs.readFileSync(file, 'utf8').replace(/"/g,'\\"').split(/\r?\n/)
   const relpath = path.relative(__dirname, file)
 
   const type = types[path.extname(file)]

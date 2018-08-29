@@ -5,9 +5,11 @@
 #extension GL_NV_gpu_shader5: enable
 
 uniform uvec3 dims;
+uniform vec3 center;
 uniform float *volume;
 
-layout( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
+
+layout( local_size_x = 32, local_size_y = 1, local_size_z = 1 ) in;
 //layout( local_size_variable ) in;
 
 void main() {
@@ -16,5 +18,9 @@ void main() {
 
 	float hd = float(dims.x) / 2.0;
 	float d = distance(vec3(pos), vec3(hd)) - hd;
+	
+	
+	//d = float(center.y + pos.y) - (sin(center.x + float(pos.x) / 64.0) * 128);
+	
 	volume[idx] = d <= 0.0 ? 1.0 : 0.0;
 }

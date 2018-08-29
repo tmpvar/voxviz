@@ -34,69 +34,6 @@ void Volume::upload() {
 
   glGetBufferParameterui64vNV(GL_TEXTURE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &this->bufferAddress);
   gl_error();
-
-
-  /*
-  glGenTextures(1, &this->);
-  gl_error();
-  glBindTexture(GL_TEXTURE_3D, this->textureId);
-  gl_error();
-
-  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-  glTexImage3D(
-    GL_TEXTURE_3D,
-    0,
-    GL_RED,
-    this->dims.x,
-    this->dims.y,
-    this->dims.z,
-    0,
-    GL_RED,
-    GL_UNSIGNED_BYTE,
-    0
-  );
-
-  gl_error();
-
-  cl_int shared_texture_error;
-
-  // Create clgl shared texture
-  this->computeBuffer = clCreateFromGLTexture(
-    job.context,
-    CL_MEM_READ_WRITE,
-    GL_TEXTURE_3D,
-    0,
-    this->textureId,
-    &shared_texture_error
-  );
-
-  clu_error(shared_texture_error);
-
-  cl_int err;
-  this->mem_center = clCreateBuffer(
-    job.context,
-    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-    sizeof(this->center),
-    &this->center[0],
-    &err
-  );
-
-  CL_CHECK_ERROR(err);
-
-  this->mem_dims = clCreateBuffer(
-    job.context,
-    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-    sizeof(this->dims),
-    &this->dims[0],
-    &err
-  );
-  CL_CHECK_ERROR(err);
-  */
 }
 
 void Volume::bind(Program *program) {
