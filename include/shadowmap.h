@@ -22,30 +22,21 @@ public:
     this->program = new Program();
 
     this->program
-      ->add(Shaders::get("raytrace-light.vert"))
+      ->add(Shaders::get("raytrace.vert"))
       ->add(Shaders::get("raytrace-light.frag"))
-      ->output("outColor");
-    
-    this->program->link();
+      ->output("outColor")
+      ->link();
 
-    this->camera = new FreeCamera(
-      glm::vec3(1024, -2048, -512),
-      glm::vec3(0, 0, 0)
-    );
-    /*
-    camera->translate(1024, -2048, -512);
-    camera->rotate(1.0f, 0.75f, 1.0f, 0.0f);
-    camera->rotate(1.0f, 0.0f, 0.25f, 0.75f);
-    */
+    this->program->use();
   }
 
   ~Shadowmap() {
   }
 
-  void bindCollect(Program *p, FBO *fbo) {
+  void begin() {
     glm::vec3 target = glm::vec3(0,0,0);
     this->depthViewMatrix = glm::lookAt(this->eye, this->target, glm::vec3(0.0, 1.0, 0.0));
-    this->depthMVP = depthProjectionMatrix * depthViewMatrix * glm::mat4(1.0);
+    this->depthMVP = depthProjectionMatrix * depthViewMatrix;
 
     glm::mat4 invertedView = glm::inverse(depthViewMatrix);
     this->eye = glm::vec3(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
@@ -59,6 +50,8 @@ public:
     
     this->depthBiasMVP = biasMatrix * this->depthMVP;
   }
+
+  void end() {}
 
   void orient(glm::vec3 eye, glm::vec3 target) {
     this->eye = eye;

@@ -72,14 +72,12 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     10000.0f
   );
   
-   
-
-  /*shadowmap->depthProjectionMatrix = glm::perspective(
+  shadowmap->depthProjectionMatrix = glm::perspective(
     45.0f,
     (float)(width / height),
     0.001f,
     10000.0f
-  );*/
+  );
   
   glViewport(0, 0, width, height);
   if (fbo != nullptr) {
@@ -294,9 +292,9 @@ int main(void) {
     cout << "glDebugMessageCallback not available" << endl;
   }
   Shaders::init();
-  //shadowmap = new Shadowmap();
-  //shadowmap->orient(glm::vec3(-1024, 1024, -512), glm::vec3(1024, 256, 512));
-  
+  shadowmap = new Shadowmap();
+  shadowmap->orient(glm::vec3(-200, 300, 260), glm::vec3(350, 60, 260));
+
 
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
@@ -387,12 +385,6 @@ int main(void) {
 
   for (auto& vol : raytracer->volumes) {
     fillVolume(vol, fillSphereProgram);
-    printf(
-      "fill (%f, %f, %f)\n",
-      vol->center.x,
-      vol->center.y,
-      vol->center.z
-    );
   }
 
   raytracer->upload();
@@ -520,35 +512,33 @@ int main(void) {
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
-
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
-    /*
+
     shadowFBO->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    //glDepthMask(GL_TRUE);
-
     glCullFace(GL_BACK);
     glEnable(GL_CULL_FACE);
-
     glClearDepth(1.0);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     gl_error();
 
-    shadowmap->bindCollect(shadowmap->program, shadowFBO);
-    raytracer->render(
-      shadowmap->program
-        ->use()
-        ->uniformMat4("MVP", shadowmap->depthMVP)
-        ->uniformVec3("eye", shadowmap->eye)
-        ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformFloat("maxDistance", max_distance)
-    );
+    shadowmap->begin();
+    shadowmap->program
+      ->use()
+      ->uniformMat4("MVP", shadowmap->depthMVP)
+      ->uniformVec3("eye", shadowmap->eye)
+      ->uniform1i("showHeat", raytracer->showHeat)
+      ->uniformFloat("maxDistance", max_distance);
+
+      raytracer->render(shadowmap->program);
+    shadowmap->end();
     shadowFBO->unbind();
-    */
-    //fbo->bind();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    
+    fbo->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -567,8 +557,9 @@ int main(void) {
       ->uniformFloat("maxDistance", max_distance);
 
     raytracer->render(raytracer->program);
-    //fbo->unbind();
-/*
+    
+    fbo->unbind();
+    
     fullscreen_program->use()
       ->uniformFloat("maxDistance", max_distance)
       ->texture2d("iColor", fbo->texture_color)
@@ -580,7 +571,7 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
- */  
+   
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -612,7 +603,7 @@ int main(void) {
     */
     time++;
     
-    //shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
+    shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
 
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       glfwSetJoystickVibration(GLFW_JOYSTICK_1, total_affected, 0);

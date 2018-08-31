@@ -1,23 +1,28 @@
-#version 330 core
+#version 450 core
+#extension GL_NV_gpu_shader5: require
+#extension GL_ARB_bindless_texture : require
 
 in vec3 rayOrigin;
+in vec3 center;
+flat in float *volumePointer;
 
 layout(location = 0) out vec4 outColor;
 
 uniform sampler3D volume;
 uniform uvec3 dims;
 uniform vec3 eye;
-uniform vec3 center;
 uniform float maxDistance;
 
-#define ITERATIONS 768
+#define ITERATIONS 60
 
 float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);
   vec3 hfdims = fdims * 0.5;
 
-  vec3 pos = round((hfdims + worldPos - center)) / fdims;
-  return any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(1.0))) ? -1.0 : texture(volume, pos).r;
+  uvec3 pos = uvec3(round((hfdims + worldPos - center)));
+  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
+  bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, dims));
+  return oob ? -1.0 : float(volumePointer[idx]);
 }
 
 float march(in vec3 pos, in vec3 dir, out float hit) {
@@ -28,7 +33,6 @@ float march(in vec3 pos, in vec3 dir, out float hit) {
   vec3 grid_step = sign( dir );
   vec3 corner = max( grid_step, vec3( 0.0 ) );
   bvec3 mask;
-  
 
   // ray space
   vec3 inv = vec3( 1.0 ) / dir;
@@ -64,4 +68,5 @@ void main() {
 
   float depth = march(pos, dir, hit);
   gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
+  outColor = vec4(normal, 1.0);
 }

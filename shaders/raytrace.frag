@@ -18,9 +18,7 @@ uniform mat4 MVP;
 uniform vec3 eye;
 uniform int showHeat;
 uniform float maxDistance;
-//uniform uint64_t *uVolumeIndex;
-//uniform uint64_t *uVolume;
-#define ITERATIONS 128
+#define ITERATIONS 60
 
 float voxel(vec3 worldPos) {
   vec3 fdims = vec3(dims);

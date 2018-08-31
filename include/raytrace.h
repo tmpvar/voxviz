@@ -63,6 +63,9 @@
     ~Raytracer() {
       delete this->mesh;
       this->reset();
+
+      //glDeleteBuffers(1, &instanceVBO); gl_error();
+      //glDeleteBuffers(1, &pointerVBO); gl_error();
     }
 
 	  void reset() {
@@ -137,10 +140,7 @@
     }
 
     void render (Program *p) {
-      
-      p->uniformVec3ui("dims", glm::uvec3(VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS))
-        // ->uniformVec3("center", this->center)
-        ->bufferAddress("uVolume", this->volumes[0]->bufferAddress);
+      p->uniformVec3ui("dims", glm::uvec3(VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS));
       
       glBindVertexArray(this->mesh->vao);
 
@@ -152,10 +152,6 @@
         this->volumes.size()
       );
        gl_error();
-
-       //glDeleteBuffers(1, &instanceVBO); gl_error();
-      //glDeleteBuffers(1, &pointerVBO); gl_error();
-
     }
   };
 
