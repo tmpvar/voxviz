@@ -87,12 +87,7 @@
       return volume;
     }
 
-    void render (Program *p) {
-      
-      p->uniformVec3ui("dims", glm::uvec3(VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS))
-        // ->uniformVec3("center", this->center)
-        ->bufferAddress("uVolume", this->volumes[0]->bufferAddress);
-      
+    void upload() {
       size_t total_bricks = this->volumes.size();
       if (total_bricks == 0) {
         return;
@@ -137,19 +132,30 @@
       glVertexAttribLPointer(2, 1, GL_UNSIGNED_INT64_ARB, 0, 0); gl_error();
       glVertexAttribDivisor(2, 1); gl_error();
 
+      free(positions);
+      free(pointers);
+    }
+
+    void render (Program *p) {
+      
+      p->uniformVec3ui("dims", glm::uvec3(VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS))
+        // ->uniformVec3("center", this->center)
+        ->bufferAddress("uVolume", this->volumes[0]->bufferAddress);
+      
+      glBindVertexArray(this->mesh->vao);
+
       glDrawElementsInstanced(
         GL_TRIANGLES,
         this->mesh->faces.size(),
         GL_UNSIGNED_INT,
         0,
-        total_bricks
+        this->volumes.size()
       );
        gl_error();
 
        //glDeleteBuffers(1, &instanceVBO); gl_error();
       //glDeleteBuffers(1, &pointerVBO); gl_error();
-      free(positions);
-      free(pointers);
+
     }
   };
 

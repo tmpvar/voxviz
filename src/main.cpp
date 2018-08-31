@@ -395,6 +395,8 @@ int main(void) {
     );
   }
 
+  raytracer->upload();
+
   glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
   cout << "DONE FILLING" << endl;
 
