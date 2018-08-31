@@ -207,17 +207,43 @@
 
 
     Program *texture2d(string name, GLuint  texture_id) {
+      GLint loc = this->uniformLocation(name);
+      if (loc == -1) {
+        cout << "unable to bind 2d texture for uniform:" << name << endl;
+        return this;
+      }
+
       glActiveTexture(GL_TEXTURE0 + this->texture_index);
       glBindTexture(GL_TEXTURE_2D, texture_id);
-      this->uniform1i(name, texture_index);
+      glUniform1i(loc, texture_index);
       this->texture_index++;
       return this;
     }
 
-    Program *texture3d(string name, GLuint  texture_id) {
+    Program *texture2dArray(string name, GLuint texture_id) {
+      GLint loc = this->uniformLocation(name);
+      if (loc == -1) {
+        cout << "unable to bind 2d texture array for uniform:" << name << endl;
+        return this;
+      }
+
+      glActiveTexture(GL_TEXTURE0 + this->texture_index);
+      glBindTexture(GL_TEXTURE_2D_ARRAY, texture_id);
+      glUniform1i(loc, texture_index);
+      this->texture_index++;
+      return this;
+    }
+
+    Program *texture3d(string name, GLuint texture_id) {
+      GLint loc = this->uniformLocation(name);
+      if (loc == -1) {
+        cout << "unable to bind 3d texture for uniform:" << name << endl;
+        return this;
+      }
+
       glActiveTexture(GL_TEXTURE0 + this->texture_index);
       glBindTexture(GL_TEXTURE_3D, texture_id);
-      this->uniform1i(name, texture_index);
+      glUniform1i(loc, texture_index);
       this->texture_index++;
       return this;
     }

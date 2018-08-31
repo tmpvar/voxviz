@@ -3,16 +3,20 @@
 #include "core.h"
 #include "gl-wrap.h"
 #include "shaders/built.h"
+#include "fullscreen-surface.h"
+
+#include "glm/glm.hpp"
 
 class ABuffer {
 public:
   Program *program = nullptr;
   Program *debugProgram = nullptr;
-  int width = 0;
-  int height = 0;
+  Program *clearProgram = nullptr;
+  glm::ivec2 texture_dims;
   int depth_complexity = 0;
   GLuint aBufferIndexTexture;
   GLuint aBufferTexture;
+  FullscreenSurface *fsSurface;
 
   ABuffer(int width, int height, int depth_complexity) {
     this->resize(width, height);
@@ -25,12 +29,20 @@ public:
       ->output("outColor")
       ->link();
 
+    this->clearProgram = new Program();
+    this->clearProgram
+      ->add(Shaders::get("basic.vert"))
+      ->add(Shaders::get("a-buffer-clear.frag"))
+      ->link();
+
     this->debugProgram = new Program();
     this->debugProgram
       ->add(Shaders::get("basic.vert"))
       ->add(Shaders::get("a-buffer-debug.frag"))
       ->output("outColor")
       ->link();
+
+    this->fsSurface = new FullscreenSurface();
   }
 
   ~ABuffer() {
@@ -39,9 +51,14 @@ public:
   }
 
   void resize(int width, int height) {
-    if (width != this->width || height != this->height) {
-      this->width = width;
-      this->height = height;
+    cout << "abuffer.resize" << endl;
+    if (width != this->texture_dims.x || height != this->texture_dims.y) {
+      cout << "rebuild abuffer" << endl;
+      this->texture_dims.x = width;
+      this->texture_dims.y = height;
+
+      glDeleteBuffers(1, &this->aBufferIndexTexture);
+      glDeleteBuffers(1, &this->aBufferTexture);
 
       // build textures
       // TODO: consider using bindless global buffers
@@ -77,7 +94,7 @@ public:
       glTexStorage2D(
         GL_TEXTURE_2D,
         1,
-        GL_R32F,
+        GL_R32UI,
         width,
         height
       );
@@ -88,23 +105,22 @@ public:
   }
 
   Program *begin() {
-    this->program
-      ->use();
-      //->texture2dArray("aBuffer", this->aBufferTexture);
-    
-    //this->program->texture2d("aBufferIndex", this->aBufferIndexTexture);
+    glBindImageTexture(3, this->aBufferTexture, 0, GL_TRUE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(4, this->aBufferIndexTexture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
+   
+    this->fsSurface->render(this->clearProgram->use());
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-     return this->program;
+    return this->program->use();
   }
 
   void end() {
     //Ensure that all global memory write are done before resolving
-    //glMemoryBarrierEXT(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrierEXT(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
   }
 
-  Program *debug() {
-    return this->debugProgram
-      ->use()
-      ->texture2dArray("aBuffer", this->aBufferTexture);
+  Program *debug(int slice) {
+    glBindImageTexture(3, this->aBufferTexture, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA32F);
+    return this->debugProgram->use()->uniform1i("slice", slice);
   }
 };

@@ -1,13 +1,15 @@
-#version 330 core
+#version 420 core
 #extension GL_EXT_shader_image_load_store : enable
 
-uniform layout(size4x32) image2DArray aBuffer;
+coherent uniform layout(size4x32,binding=3) image2DArray aBuffer;
 
-uniform float id;
+uniform int slice;
 in vec2 uv;
 out vec4 outColor;
 
 void main() {
-	vec4 val = imageLoad(aBuffer, ivec3(gl_FragCoord.xy, 0));
+	memoryBarrier();
+	vec4 val = imageLoad(aBuffer, ivec3(gl_FragCoord.xy, slice));
+	
 	outColor = val;
 }

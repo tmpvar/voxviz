@@ -8,6 +8,7 @@
 //#include "clu.h"
 #include "fullscreen-surface.h"
 #include "shadowmap.h"
+#include "a-buffer.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -25,6 +26,7 @@
 
 bool keys[1024];
 bool prevKeys[1024];
+bool cursorLocked = true;
 double mouse[2];
 bool fullscreen = 0;
 // int windowDimensions[2] = { 1024, 768 };
@@ -32,6 +34,7 @@ int windowDimensions[2] = { 1440, 900 };
 
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 Shadowmap *shadowmap;
+ABuffer *abuffer = nullptr;
 FBO *fbo = nullptr;
 FBO *shadowFBO = nullptr;
 
@@ -88,6 +91,17 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 
   if (shadowFBO != nullptr) {
     shadowFBO->setDimensions(width, height);
+  }
+
+  if (abuffer != nullptr) {
+    abuffer->resize(width, height);
+  }
+  else {
+    abuffer = new ABuffer(
+      width,
+      height,
+      ABUFFER_MAX_DEPTH_COMPLEXITY
+    );
   }
   
 }
@@ -264,8 +278,9 @@ int main(void) {
   GLFWmonitor* primary = glfwGetPrimaryMonitor();
   const GLFWvidmode* mode = glfwGetVideoMode(primary);
   window = glfwCreateWindow(mode->width, mode->height, "voxviz", glfwGetPrimaryMonitor(), NULL);
-  glfwSetWindowSizeCallback(window, window_resize);
 #endif
+
+  glfwSetWindowSizeCallback(window, window_resize);
 
   if (!window) {
     glfwTerminate();
@@ -422,6 +437,8 @@ int main(void) {
   // Start the ImGui frame
   ImGui::CreateContext();
 
+  int aBufferSlice = 0;
+
   while (!glfwWindowShouldClose(window)) {
     if (keys[GLFW_KEY_W]) {
       camera->ProcessKeyboard(Camera_Movement::FORWARD, 1.0);
@@ -520,8 +537,9 @@ int main(void) {
 
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
-
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
+
     /*
     shadowFBO->bind();
     glEnable(GL_DEPTH_TEST);
@@ -548,7 +566,9 @@ int main(void) {
     shadowFBO->unbind();
     */
     //fbo->bind();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    /*
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -564,11 +584,36 @@ int main(void) {
       ->uniformMat4("MVP", MVP)
       ->uniformVec3("eye", currentEye)
       ->uniform1i("showHeat", raytracer->showHeat)
-      ->uniformFloat("maxDistance", max_distance);
+      ->uniformFloat("maxDistance", max_distance); 
 
     raytracer->render(raytracer->program);
+    */
     //fbo->unbind();
-/*
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    
+    glEnable(GL_DEPTH_TEST);
+
+    glCullFace(GL_BACK);
+    glEnable(GL_CULL_FACE);
+
+    glClearDepth(1.0);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    gl_error();
+    Program *aBufferProgram = abuffer->begin()
+      ->uniformMat4("MVP", MVP)
+      ->uniformVec3("eye", currentEye)
+      ->uniform1i("showHeat", raytracer->showHeat)
+      ->uniformFloat("maxDistance", max_distance);
+    raytracer->render(aBufferProgram);
+    abuffer->end();
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    fullscreen_surface->render(abuffer->debug(aBufferSlice));
+    
+    /*
     fullscreen_program->use()
       ->uniformFloat("maxDistance", max_distance)
       ->texture2d("iColor", fbo->texture_color)
@@ -580,7 +625,16 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     fullscreen_surface->render(fullscreen_program);
- */  
+    */
+
+    if (time % 100 == 0 && keys[GLFW_KEY_N]) {
+      aBufferSlice++;
+      if (aBufferSlice >= ABUFFER_MAX_DEPTH_COMPLEXITY) {
+        aBufferSlice = 0;
+      }
+    }
+    
+   
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -590,9 +644,11 @@ int main(void) {
       static int counter = 0;
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGui::Text("camera pos(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
+      ImGui::Text("abuffer slice %i", aBufferSlice);
     }
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    
     glfwSwapBuffers(window);
 
 #if RENDER_DYNAMIC == 1
