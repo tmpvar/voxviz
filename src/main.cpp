@@ -560,16 +560,23 @@ int main(void) {
     
     fbo->unbind();
     
+    glBindTexture(GL_TEXTURE_2D, shadowFBO->texture_depth);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_DEPTH_TO_TEXTURE_EXT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
     fullscreen_program->use()
       ->uniformFloat("maxDistance", max_distance)
       ->texture2d("iColor", fbo->texture_color)
       ->texture2d("iPosition", fbo->texture_position)
       ->uniformVec3("light", shadowmap->eye)
+      ->uniformVec3("eye", currentEye)
       ->texture2d("iShadowMap", shadowFBO->texture_depth)
       ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP);
     
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
+
     fullscreen_surface->render(fullscreen_program);
    
     ImGui_ImplOpenGL3_NewFrame();

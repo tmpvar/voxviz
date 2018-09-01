@@ -20,7 +20,7 @@ void Volume::upload() {
 
   glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
   gl_error();
-
+  // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
     GL_TEXTURE_BUFFER,
     this->dims.x * this->dims.y * this->dims.z * sizeof(GLfloat),
