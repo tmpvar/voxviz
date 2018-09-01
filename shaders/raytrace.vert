@@ -10,14 +10,17 @@ uniform mat4 MVP;
 uniform uvec3 dims;
 
 out vec3 rayOrigin;
+out vec3 localRayOrigin;
 out vec3 center;
 // flat means "do not interpolate"
 flat out float *volumePointer;
 
 void main() {
-  vec3 pos = position * (vec3(dims) / 2.0);
+  vec3 hd = vec3(dims) / 2.0;
+  vec3 pos = position * hd;
   center = iCenter;
   rayOrigin = pos + iCenter;
+  localRayOrigin = pos + hd;
 
   volumePointer = iBufferPointer;
   gl_Position = MVP * vec4(rayOrigin, 1.0);

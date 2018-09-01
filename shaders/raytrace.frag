@@ -4,6 +4,7 @@
 //#extension GL_EXT_shader_image_load_store : require
 
 in vec3 rayOrigin;
+in vec3 localRayOrigin;
 in vec3 center;
 flat in float *volumePointer;
 //flat in layout(bindless_sampler) sampler3D volumeSampler;
@@ -20,15 +21,11 @@ uniform int showHeat;
 uniform float maxDistance;
 #define ITERATIONS 60
 
-float voxel(vec3 worldPos) {
-  vec3 fdims = vec3(dims);
-  vec3 hfdims = fdims * 0.5;
-
-  uvec3 pos = uvec3(round((hfdims + worldPos - center)));
+float voxel(vec3 brickPos) {
+  uvec3 pos = uvec3(brickPos);
   uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
   bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, dims));
   return oob ? -1.0 : float(volumePointer[idx]);
-  //return 1.0;
 }
 
 vec3 hsv2rgb(vec3 c) {
@@ -43,8 +40,7 @@ vec4 heat(float amount, float total) {
   return vec4(hsv2rgb(hsv), 1.0);
 }
 
-float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float hit, out float iterations) {
-  dir = normalize(dir);
+float march(in out vec3 pos, vec3 dir, out vec3 normal, out float iterations) {
   // grid space
   vec3 origin = pos;
   vec3 grid = floor(pos);
@@ -58,12 +54,12 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   vec3 ratio_step = grid_step * inv;
 
   // dda
-  hit = -1.0;
+  float hit = -1.0;
   iterations = 0.0;
   for (float i = 0.0; i < ITERATIONS; i++ ) {
     if (hit > 0.0 || voxel( grid ) > 0.0) {
       hit = 1.0;
-	  continue;
+	  break;
     }
     iterations++;
 
@@ -73,12 +69,10 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
     ratio += ratio_step * vec3(mask);
   }
   
-  center = floor(pos) + vec3( 0.5 );
-  vec3 d = abs(center - pos);
+  vec3 d = abs(vec3((grid) + 0.5) - pos);
 
   normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
-
-  return distance(eye, pos);
+  return hit;
 }
 
 void main() {
@@ -88,13 +82,16 @@ void main() {
   vec3 dir = normalize(eyeToPlane);
   vec3 normal;
   vec3 voxelCenter;
-  float hit, iterations;
+  float iterations;
 
-  float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
- 
-  gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
+  vec3 brickPos = localRayOrigin;
+  float hit = march(brickPos, dir, normal, iterations);
+  
+  vec3 worldPos = origin + brickPos;
+
+  gl_FragDepth = hit < 0.0 ? 1.0 : distance(worldPos, eye) / maxDistance;
   outColor = hit < 0.0 ? vec4(0.0) : vec4(normal, 1.0);//vec4(normal, 1.0);
-  outPosition = pos / maxDistance;
+  outPosition = worldPos / maxDistance;
 }
 
 void main1() {
