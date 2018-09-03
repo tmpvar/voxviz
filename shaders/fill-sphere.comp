@@ -22,5 +22,5 @@ void main() {
 	
 	//d = float(center.y + pos.y) - (sin(center.x + float(pos.x) / 64.0) * 128);
 	
-	volume[idx] = d <= 0.0 ? 1.0 : 0.0;
+	volume[idx] = d < 0.0 ? 1.0 : 0.0;
 }

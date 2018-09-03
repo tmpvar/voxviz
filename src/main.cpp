@@ -218,7 +218,7 @@ void fillVolume(Volume *volume, Program *program) {
 
   int workgroupSize = 32;
   glDispatchCompute(
-    1,
+    16,
     volume->dims.y,
     volume->dims.z
   );
@@ -310,7 +310,7 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera(
-    glm::vec3(1024, 2048, 2048)
+    glm::vec3(0, 2048, 2048)
   );
 
   int time = 0;
@@ -370,9 +370,9 @@ int main(void) {
  
   Volume *tmp;
   // 32, 5, 16
-  for (float x = 0; x < 32; x++) {
-    for (float y = 0; y < 2; y++) {
-      for (float z = 0; z < 16; z++) {
+  for (float x = 0; x < 1; x++) {
+    for (float y = 0; y < 1; y++) {
+      for (float z = 0; z < 1; z++) {
         tmp = raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
         //printf(
         //  "create (%f, %f, %f) of size (%ui, %ui, %ui)\n",
@@ -439,6 +439,7 @@ int main(void) {
       raytracer->showHeat = 0;
     }
 
+    float debug = keys[GLFW_KEY_1] ? 1.0 : 0.0;
 
     if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
       if (!fullscreen) {
@@ -515,6 +516,7 @@ int main(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
 
+    /*
     shadowFBO->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -536,9 +538,9 @@ int main(void) {
       raytracer->render(shadowmap->program);
     shadowmap->end();
     shadowFBO->unbind();
+    */
     
-    
-    fbo->bind();
+    //fbo->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -550,15 +552,25 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
+
+    glm::vec4 invEye = glm::inverse(raytracer->volumes[0]->getModelMatrix()) * glm::vec4(currentEye, 1.0);
+
     raytracer->program->use()
-      ->uniformMat4("MVP", MVP)
+      ->uniformMat4("MVP", perspectiveMatrix * viewMatrix *raytracer->volumes[0]->getModelMatrix())
       ->uniformVec3("eye", currentEye)
+      ->uniformVec3("invEye", glm::vec3(
+        invEye.x / invEye.w,
+        invEye.y / invEye.w,
+        invEye.z / invEye.w
+      ))
+      ->uniformMat4("invModel", glm::inverse(raytracer->volumes[0]->getModelMatrix()))
+      ->uniformFloat("maxDistance", max_distance)
       ->uniform1i("showHeat", raytracer->showHeat)
-      ->uniformFloat("maxDistance", max_distance);
+      ->uniformFloat("debug", debug);
 
     raytracer->render(raytracer->program);
     
-    fbo->unbind();
+    /*fbo->unbind();
     
     glBindTexture(GL_TEXTURE_2D, shadowFBO->texture_depth);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_DEPTH_TO_TEXTURE_EXT);
@@ -578,7 +590,7 @@ int main(void) {
     glEnable(GL_DEPTH_TEST);
 
     fullscreen_surface->render(fullscreen_program);
-   
+   */
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -623,6 +635,11 @@ int main(void) {
       total_affected -= 1000;
     }
 
+    raytracer->volumes[0]->rotate(0.001f, 0.0f, 0.0f);
+    cout << "ROTATION "
+      << raytracer->volumes[0]->rotation.x << ","
+      << raytracer->volumes[0]->rotation.y << ","
+      << raytracer->volumes[0]->rotation.z << endl;
 
     uv_run(loop, UV_RUN_NOWAIT);
     glfwPollEvents();

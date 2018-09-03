@@ -8,20 +8,26 @@ layout (location = 2) in float *iBufferPointer;
 
 uniform mat4 MVP;
 uniform uvec3 dims;
+uniform mat4 model;
+uniform vec3 eye;
+
+uniform vec3 tmpCenter;
 
 out vec3 rayOrigin;
-out vec3 localRayOrigin;
+out vec3 brickOrigin;
 out vec3 center;
+out vec3 invEye;
+out vec3 rayDir;
 // flat means "do not interpolate"
 flat out float *volumePointer;
 
 void main() {
   vec3 hd = vec3(dims) / 2.0;
   vec3 pos = position * hd;
-  center = iCenter;
-  rayOrigin = pos + iCenter;
-  localRayOrigin = pos + hd;
+
+  rayOrigin = pos;
+  brickOrigin = pos + hd;
 
   volumePointer = iBufferPointer;
-  gl_Position = MVP * vec4(rayOrigin, 1.0);
+  gl_Position = MVP * vec4(pos, 1.0);
 }

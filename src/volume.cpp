@@ -1,8 +1,11 @@
 #include "volume.h"
 #include "gl-wrap.h"
 
+#include "glm/gtc/matrix_transform.hpp"
+
 Volume::Volume(glm::vec3 center, glm::uvec3 dims) {
   this->center = center;
+  this->rotation = glm::vec3();
   this->dims = dims;
   this->debug = 0.0f;
 }
@@ -41,8 +44,21 @@ void Volume::bind(Program *program) {
     ->uniformVec3("center", this->center)
     ->uniformVec3ui("dims", this->dims)
     ->uniformFloat("debug", this->debug)
+    ->uniformMat4("model", this->getModelMatrix())
     ->bufferAddress("volume", this->bufferAddress);
+}
+
+glm::mat4 Volume::getModelMatrix() {
+  glm::mat4 model = glm::mat4(1.0f);
+   
+  model = glm::translate(model, glm::vec3(1000.0));
+
+  model = glm::rotate(model, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
+  model = glm::rotate(model, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
+  model = glm::rotate(model, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
   
+  model = glm::scale(model, glm::vec3(4.0, 4.0, 0.5));
+  return model;
 }
 
 void Volume::position(float x, float y, float z) {
@@ -55,6 +71,11 @@ void Volume::move(float x, float y, float z) {
   this->center.x += floorf(x);
   this->center.y += floorf(y);
   this->center.z += floorf(z);
+}
+void Volume::rotate(float x, float y, float z) {
+  this->rotation.x += x;
+  this->rotation.y += y;
+  this->rotation.z += z;
 }
 
 aabb_t Volume::aabb() {

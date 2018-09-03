@@ -1,7 +1,7 @@
 #ifndef __CORE_H
 #define __CORE_H
 
-#define VOLUME_DIMS 32
+#define VOLUME_DIMS 512
 
 #define TOTAL_COMMAND_QUEUES 16
 
