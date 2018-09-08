@@ -17,6 +17,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <q3.h>
 
 
 #define _USE_MATH_DEFINES
@@ -228,7 +229,8 @@ int main(void) {
   // libuv junk
 
   GLFWwindow* window;
-
+  float dt = 1.0f / 60.0f;
+  q3Scene scene(dt);
 
   if (!glfwInit()) {
     return -1;

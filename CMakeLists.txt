@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 project(VoxelViz)
 
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 find_package(OpenGL REQUIRED)
 
@@ -19,10 +16,18 @@ ENDIF()
 
 FIND_PACKAGE(OpenCL REQUIRED)
 
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glfw)
+
 add_subdirectory(deps/glm)
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1)
 add_subdirectory(deps/libuv)
+
+SET(qu3e_build_demo OFF CACHE BOOL "" FORCE)
+add_subdirectory(deps/qu3e)
+
 add_subdirectory(shaders)
 
 include_directories(
@@ -32,6 +37,7 @@ include_directories(
   ${OpenCL_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}
   ${GLM_INCLUDE_DIR}
+	deps/qu3e/src
   deps/libuv/include
   deps/imgui
   deps/imgui/examples
@@ -55,7 +61,7 @@ add_executable(
   include/aabb.h
   include/shadowmap.h
 	include/volume.h
-	
+
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
 
@@ -78,6 +84,7 @@ target_link_libraries(
   glfw
   glm
   uv_a
+	qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
   ${OpenCL_LIBRARIES}
