@@ -8,13 +8,13 @@
 
 uniform float *volume;
 
-layout( local_size_x = 32, local_size_y = 1, local_size_z = 1 ) in;
+layout( local_size_x = BRICK_DIAMETER, local_size_y = 1, local_size_z = 1 ) in;
 
 void main() {
 	uvec3 pos = gl_GlobalInvocationID;
 	uint idx = pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER;
 
-	float hd = float(VOLUME_RADIUS);
+	float hd = float(BRICK_RADIUS);
 	float d = distance(vec3(pos), vec3(hd)) - hd;
 	volume[idx] = d < 0.0 ? 1.0 : 0.0;
 }

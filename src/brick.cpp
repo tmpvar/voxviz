@@ -3,11 +3,11 @@
 #include "core.h"
 #include "glm/gtc/matrix_transform.hpp"
 
-Brick::Brick(glm::vec3 center, glm::uvec3 dims) {
+Brick::Brick(glm::vec3 center) {
   this->center = center;
-  this->rotation = glm::vec3();
-  this->dims = dims;
+  this->dims = glm::uvec3(BRICK_DIAMETER);
   this->debug = 0.0f;
+  this->upload();
 }
 
 Brick::~Brick() {
@@ -51,18 +51,6 @@ void Brick::fill(Program *program) {
 void Brick::bind(Program *program) {
 }
 
-glm::mat4 Brick::getModelMatrix() {
-  glm::mat4 model = glm::mat4(1.0f);
-   
-  model = glm::translate(model, glm::vec3(1000.0));
-
-  model = glm::rotate(model, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
-  model = glm::rotate(model, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
-  model = glm::rotate(model, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
-  
-  model = glm::scale(model, glm::vec3(4.0, 4.0, 0.5));
-  return model;
-}
 
 void Brick::position(float x, float y, float z) {
   this->center.x = floorf(x);
@@ -74,11 +62,6 @@ void Brick::move(float x, float y, float z) {
   this->center.x += floorf(x);
   this->center.y += floorf(y);
   this->center.z += floorf(z);
-}
-void Brick::rotate(float x, float y, float z) {
-  this->rotation.x += x;
-  this->rotation.y += y;
-  this->rotation.z += z;
 }
 
 aabb_t Brick::aabb() {
