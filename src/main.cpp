@@ -91,12 +91,12 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 }
 
 /*void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
-  const cl_uint total = (cl_uint)raytracer->volumes.size();
+  const cl_uint total = (cl_uint)raytracer->bricks.size();
   cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
   cl_command_queue queue = compute->job.command_queues[0];
 
   for (cl_uint i = 0; i < total; i++) {
-    mem[i] = raytracer->volumes[i]->computeBuffer;
+    mem[i] = raytracer->bricks[i]->computeBuffer;
   }
 
   cl_event opengl_get_completion;
@@ -105,7 +105,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   clReleaseEvent(opengl_get_completion);
 
   for (cl_uint i = 0; i < total; i++) {
-    compute->fill("sphere", queue, raytracer->volumes[i], time);
+    compute->fill("sphere", queue, raytracer->bricks[i], time);
   }
 
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
@@ -115,12 +115,12 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 */
 
 /*void apply_tool(Raytracer *raytracer, Compute *compute) {
-  const cl_uint total = (cl_uint)raytracer->volumes.size();
+  const cl_uint total = (cl_uint)raytracer->bricks.size();
   cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
   cl_command_queue queue = compute->job.command_queues[0];
 
   for (cl_uint i = 0; i < total; i++) {
-    mem[i] = raytracer->volumes[i]->computeBuffer;
+    mem[i] = raytracer->bricks[i]->computeBuffer;
   }
 
   cl_event opengl_get_completion;
@@ -128,7 +128,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   clWaitForEvents(1, &opengl_get_completion);
   clReleaseEvent(opengl_get_completion);
  
-  compute->opCut(raytracer->volumes[0], raytracer->volumes[1]);
+  compute->opCut(raytracer->bricks[0], raytracer->bricks[1]);
 
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
   free(mem);
@@ -209,7 +209,7 @@ void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
 }
 /* LIBUV JUNK*/
 
-void fillVolume(Volume *volume, Program *program) {
+void fillVolume(Brick *volume, Program *program) {
   program
     ->use()
     ->bufferAddress("volume", volume->bufferAddress)
@@ -368,12 +368,12 @@ int main(void) {
   }
 
  
-  Volume *tmp;
+  Brick *tmp;
   // 32, 5, 16
   for (float x = 0; x < 1; x++) {
     for (float y = 0; y < 1; y++) {
       for (float z = 0; z < 1; z++) {
-        tmp = raytracer->addVolumeAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
+        tmp = raytracer->addBrickAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
         //printf(
         //  "create (%f, %f, %f) of size (%ui, %ui, %ui)\n",
         //  x, y, z,
@@ -383,7 +383,7 @@ int main(void) {
     }
   }
 
-  for (auto& vol : raytracer->volumes) {
+  for (auto& vol : raytracer->bricks) {
     fillVolume(vol, fillSphereProgram);
   }
 
@@ -553,17 +553,15 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
 
-    glm::vec4 invEye = glm::inverse(raytracer->volumes[0]->getModelMatrix()) * glm::vec4(currentEye, 1.0);
+    glm::vec4 invEye = glm::inverse(raytracer->bricks[0]->getModelMatrix()) * glm::vec4(currentEye, 1.0);
 
     raytracer->program->use()
-      ->uniformMat4("MVP", perspectiveMatrix * viewMatrix *raytracer->volumes[0]->getModelMatrix())
-      ->uniformVec3("eye", currentEye)
+      ->uniformMat4("MVP", perspectiveMatrix * viewMatrix *raytracer->bricks[0]->getModelMatrix())
       ->uniformVec3("invEye", glm::vec3(
         invEye.x / invEye.w,
         invEye.y / invEye.w,
         invEye.z / invEye.w
       ))
-      ->uniformMat4("invModel", glm::inverse(raytracer->volumes[0]->getModelMatrix()))
       ->uniformFloat("maxDistance", max_distance)
       ->uniform1i("showHeat", raytracer->showHeat)
       ->uniformFloat("debug", debug);
@@ -609,14 +607,14 @@ int main(void) {
     //update_volumes(raytracer, compute, time);
 #endif
     /*
-    size_t total = raytracer->volumes.size();
+    size_t total = raytracer->bricks.size();
     total_affected = 0;
     for (unsigned int i = 0; i < total; i++) {
-      if (raytracer->volumes[i] == tool) {
+      if (raytracer->bricks[i] == tool) {
         continue;
       }
 
-      total_affected += compute->opCut(raytracer->volumes[i], tool);
+      total_affected += compute->opCut(raytracer->bricks[i], tool);
     }
     clFinish(compute->job.command_queues[0]);
     */
@@ -635,12 +633,8 @@ int main(void) {
       total_affected -= 1000;
     }
 
-    raytracer->volumes[0]->rotate(0.001f, 0.0f, 0.0f);
-    cout << "ROTATION "
-      << raytracer->volumes[0]->rotation.x << ","
-      << raytracer->volumes[0]->rotation.y << ","
-      << raytracer->volumes[0]->rotation.z << endl;
-
+    raytracer->bricks[0]->rotate(0.001f, 0.0f, 0.0f);
+   
     uv_run(loop, UV_RUN_NOWAIT);
     glfwPollEvents();
   }

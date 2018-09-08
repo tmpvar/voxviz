@@ -3,6 +3,8 @@
 #extension GL_ARB_bindless_texture : require
 //#extension GL_EXT_shader_image_load_store : require
 
+#include "../include/core.h"
+
 in vec3 rayOrigin;
 in vec3 brickOrigin;
 
@@ -13,21 +15,19 @@ layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec3 outPosition;
 
 // main binds
-uniform uvec3 dims;
+
 uniform float debug;
 uniform vec3 eye;
 uniform vec3 invEye;
 uniform int showHeat;
 uniform float maxDistance;
 uniform mat4 model;
-uniform mat4 invModel;
-uniform mat4 view;
 #define ITERATIONS 1024
 
 float voxel(vec3 gridPos) {
   uvec3 pos = uvec3(round(gridPos));
-  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
-  bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, dims));
+  uint idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
+  bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, vec3(BRICK_DIAMETER)));
   return oob ? -1.0 : float(volumePointer[idx]);
 }
 
@@ -81,6 +81,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
 }
 
 void main() {
+  // TODO: handle the case where the camera is inside of a volume
   vec3 eyeToPlane = rayOrigin - invEye;
   vec3 dir = normalize(eyeToPlane);
   vec3 normal;
@@ -93,7 +94,7 @@ void main() {
   float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
  
   gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
-  outColor = mix(vec4(normal, 1.0), vec4(brickOrigin / dims, 1.0), hit < 0.0);
+  outColor = mix(vec4(normal, 1.0), vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
   outPosition = rayOrigin / maxDistance;
 }
 

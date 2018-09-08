@@ -44,14 +44,14 @@ add_executable(
   src/aabb.cpp
   src/main.cpp
   src/glad.c
-  src/volume.cpp
+  src/brick.cpp
   src/gl-wrap.cpp
   include/raytrace.h
   include/gl-wrap.h
   include/camera-orbit.h
   include/camera-free.h
   include/core.h
-  include/volume.h
+  include/brick.h
   include/aabb.h
   include/shadowmap.h
 

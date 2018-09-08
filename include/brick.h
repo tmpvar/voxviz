@@ -7,7 +7,7 @@
 
   class Program;
 
-  class Volume {
+  class Brick {
   public:
     glm::vec3 center;
     glm::uvec3 dims;
@@ -17,8 +17,8 @@
     GLuint64 bufferAddress;
     float debug;
 
-    Volume(glm::vec3 center, glm::uvec3 dims);
-    ~Volume();
+    Brick(glm::vec3 center, glm::uvec3 dims);
+    ~Brick();
     void upload();
     void bind(Program * program);
     glm::mat4 getModelMatrix();
@@ -26,7 +26,7 @@
     void move(float x, float y, float z);
     void rotate(float x, float y, float z);
     aabb_t aabb();
-    bool isect(Volume *other, aabb_t *out);
+    bool isect(Brick *other, aabb_t *out);
 
     void fillConst(float val);
   };

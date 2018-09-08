@@ -1,23 +1,23 @@
-#include "volume.h"
+#include "brick.h"
 #include "gl-wrap.h"
-
+#include "core.h"
 #include "glm/gtc/matrix_transform.hpp"
 
-Volume::Volume(glm::vec3 center, glm::uvec3 dims) {
+Brick::Brick(glm::vec3 center, glm::uvec3 dims) {
   this->center = center;
   this->rotation = glm::vec3();
   this->dims = dims;
   this->debug = 0.0f;
 }
 
-Volume::~Volume() {
+Brick::~Brick() {
   //CL_CHECK_ERROR(clReleaseMemObject(this->mem_center));
   //CL_CHECK_ERROR(clReleaseMemObject(this->computeBuffer));
   glMakeBufferNonResidentNV(this->bufferAddress);
   glDeleteBuffers(1, &this->bufferId);
 }
 
-void Volume::upload() {
+void Brick::upload() {
   glGenBuffers(1, &bufferId);
   gl_error();
 
@@ -26,7 +26,7 @@ void Volume::upload() {
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
     GL_TEXTURE_BUFFER,
-    this->dims.x * this->dims.y * this->dims.z * sizeof(GLfloat),
+    BRICK_VOXEL_COUNT * sizeof(GLfloat),
     NULL,
     GL_STATIC_DRAW
   );
@@ -39,16 +39,10 @@ void Volume::upload() {
   gl_error();
 }
 
-void Volume::bind(Program *program) {
-  program
-    ->uniformVec3("center", this->center)
-    ->uniformVec3ui("dims", this->dims)
-    ->uniformFloat("debug", this->debug)
-    ->uniformMat4("model", this->getModelMatrix())
-    ->bufferAddress("volume", this->bufferAddress);
+void Brick::bind(Program *program) {
 }
 
-glm::mat4 Volume::getModelMatrix() {
+glm::mat4 Brick::getModelMatrix() {
   glm::mat4 model = glm::mat4(1.0f);
    
   model = glm::translate(model, glm::vec3(1000.0));
@@ -61,24 +55,24 @@ glm::mat4 Volume::getModelMatrix() {
   return model;
 }
 
-void Volume::position(float x, float y, float z) {
+void Brick::position(float x, float y, float z) {
   this->center.x = floorf(x);
   this->center.y = floorf(y);
   this->center.z = floorf(z);
 }
 
-void Volume::move(float x, float y, float z) {
+void Brick::move(float x, float y, float z) {
   this->center.x += floorf(x);
   this->center.y += floorf(y);
   this->center.z += floorf(z);
 }
-void Volume::rotate(float x, float y, float z) {
+void Brick::rotate(float x, float y, float z) {
   this->rotation.x += x;
   this->rotation.y += y;
   this->rotation.z += z;
 }
 
-aabb_t Volume::aabb() {
+aabb_t Brick::aabb() {
   // TODO: cache aabb and recompute on reposition
   aabb_t ret;
 
@@ -91,7 +85,7 @@ aabb_t Volume::aabb() {
   return ret;
 }
 
-bool Volume::isect(Volume *other, aabb_t *out) {
+bool Brick::isect(Brick *other, aabb_t *out) {
   aabb_t a = this->aabb();
   aabb_t b = other->aabb();
 
@@ -117,7 +111,7 @@ bool Volume::isect(Volume *other, aabb_t *out) {
   return true;
 }
 
-void Volume::fillConst(float val) {
+void Brick::fillConst(float val) {
   glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
   glClearBufferData(GL_TEXTURE_BUFFER, GL_R32F, GL_RED, GL_FLOAT, &val);
 }
