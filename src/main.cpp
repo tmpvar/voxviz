@@ -209,30 +209,13 @@ void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
 }
 /* LIBUV JUNK*/
 
-void fillVolume(Brick *volume, Program *program) {
-  program
-    ->use()
-    ->bufferAddress("volume", volume->bufferAddress)
-    ->uniformVec3("center", volume->center)
-    ->uniformVec3ui("dims", volume->dims);
-
-  int workgroupSize = 32;
-  glDispatchCompute(
-    16,
-    volume->dims.y,
-    volume->dims.z
-  );
-  gl_error();
-}
-
 int main(void) {
   memset(keys, 0, sizeof(keys));
 
-  int d = VOLUME_DIMS;
+  int d = BRICK_DIAMETER;
   float fd = (float)d;
-  int hd = d / 2;
+  int hd = BRICK_RADIUS;
   int dims[3] = { d, d, d };
-  size_t total_voxels = dims[0] * dims[1] * dims[2];
   float dsquare = (float)d*(float)d;
   float camera_z = sqrtf(dsquare * 3.0f) * 1.5f;
 
@@ -373,7 +356,7 @@ int main(void) {
   for (float x = 0; x < 1; x++) {
     for (float y = 0; y < 1; y++) {
       for (float z = 0; z < 1; z++) {
-        tmp = raytracer->addBrickAtIndex(x, y, z, VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS);
+        tmp = raytracer->addBrickAtIndex(x, y, z, BRICK_DIAMETER, BRICK_DIAMETER, BRICK_DIAMETER);
         //printf(
         //  "create (%f, %f, %f) of size (%ui, %ui, %ui)\n",
         //  x, y, z,
@@ -384,7 +367,7 @@ int main(void) {
   }
 
   for (auto& vol : raytracer->bricks) {
-    fillVolume(vol, fillSphereProgram);
+    vol->fill(fillSphereProgram);
   }
 
   raytracer->upload();

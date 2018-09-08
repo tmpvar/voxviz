@@ -11,8 +11,6 @@ Brick::Brick(glm::vec3 center, glm::uvec3 dims) {
 }
 
 Brick::~Brick() {
-  //CL_CHECK_ERROR(clReleaseMemObject(this->mem_center));
-  //CL_CHECK_ERROR(clReleaseMemObject(this->computeBuffer));
   glMakeBufferNonResidentNV(this->bufferAddress);
   glDeleteBuffers(1, &this->bufferId);
 }
@@ -36,6 +34,17 @@ void Brick::upload() {
   gl_error();
 
   glGetBufferParameterui64vNV(GL_TEXTURE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &this->bufferAddress);
+  gl_error();
+}
+
+void Brick::fill(Program *program) {
+  program->use()->bufferAddress("volume", this->bufferAddress);
+
+  glDispatchCompute(
+    1,
+    BRICK_DIAMETER,
+    BRICK_DIAMETER
+  );
   gl_error();
 }
 
@@ -78,7 +87,6 @@ aabb_t Brick::aabb() {
 
   glm::vec3 hd = (glm::vec3)this->dims / glm::vec3(2.0, 2.0, 2.0);
   glm::vec3 lower = center - hd;
-
 
   ret.lower = lower;
   ret.upper = lower + (glm::vec3)this->dims;

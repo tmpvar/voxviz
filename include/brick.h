@@ -20,6 +20,7 @@
     Brick(glm::vec3 center, glm::uvec3 dims);
     ~Brick();
     void upload();
+    void fill(Program * program);
     void bind(Program * program);
     glm::mat4 getModelMatrix();
     void position(float x, float y, float z);
