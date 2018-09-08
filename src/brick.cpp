@@ -7,7 +7,6 @@ Brick::Brick(glm::vec3 center) {
   this->center = center;
   this->dims = glm::uvec3(BRICK_DIAMETER);
   this->debug = 0.0f;
-  this->upload();
 }
 
 Brick::~Brick() {
@@ -38,6 +37,7 @@ void Brick::upload() {
 }
 
 void Brick::fill(Program *program) {
+  // TODO: ensure the brick has been uploaded prior to filling.
   program->use()->bufferAddress("volume", this->bufferAddress);
 
   glDispatchCompute(
@@ -50,7 +50,6 @@ void Brick::fill(Program *program) {
 
 void Brick::bind(Program *program) {
 }
-
 
 void Brick::position(float x, float y, float z) {
   this->center.x = floorf(x);

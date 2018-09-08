@@ -17,15 +17,13 @@
     GLuint64 bufferAddress;
     float debug;
 
-    Brick(glm::vec3 center, glm::uvec3 dims);
+    Brick(glm::vec3 center);
     ~Brick();
     void upload();
     void fill(Program * program);
     void bind(Program * program);
-    glm::mat4 getModelMatrix();
     void position(float x, float y, float z);
     void move(float x, float y, float z);
-    void rotate(float x, float y, float z);
     aabb_t aabb();
     bool isect(Brick *other, aabb_t *out);
 

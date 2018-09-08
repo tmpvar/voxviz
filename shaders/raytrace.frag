@@ -21,8 +21,7 @@ uniform vec3 eye;
 uniform vec3 invEye;
 uniform int showHeat;
 uniform float maxDistance;
-uniform mat4 model;
-#define ITERATIONS 1024
+#define ITERATIONS BRICK_DIAMETER*3
 
 float voxel(vec3 gridPos) {
   uvec3 pos = uvec3(round(gridPos));
@@ -43,14 +42,14 @@ vec4 heat(float amount, float total) {
   return vec4(hsv2rgb(hsv), 1.0);
 }
 
-float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float hit, out float iterations) {
+float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
   // grid space
   vec3 origin = pos;
   vec3 grid = floor(pos);
   vec3 grid_step = sign( dir );
   vec3 corner = max( grid_step, vec3( 0.0 ) );
   bvec3 mask;
-
+  float hit = 0.0;
   // ray space
   vec3 inv = vec3( 1.0 ) / dir;
   vec3 ratio = ( grid + corner - pos ) * inv;
@@ -76,8 +75,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   vec3 d = abs(center - pos);
 
   normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
-
-  return distance(eye, pos);
+  return hit;
 }
 
 void main() {
@@ -86,14 +84,14 @@ void main() {
   vec3 dir = normalize(eyeToPlane);
   vec3 normal;
   vec3 voxelCenter;
-  float hit, iterations;
+  float iterations;
   
   // move the location to positive space to better align with the underlying grid
   vec3 pos = brickOrigin;
 
-  float depth = march(pos, dir, voxelCenter, normal, hit, iterations);
+  float hit = march(pos, dir, voxelCenter, normal, iterations);
  
-  gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
+  gl_FragDepth = hit < 0.0 ? 1.0 : distance(rayOrigin + (pos - brickOrigin), invEye) / maxDistance;
   outColor = mix(vec4(normal, 1.0), vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
   outPosition = rayOrigin / maxDistance;
 }

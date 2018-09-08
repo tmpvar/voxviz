@@ -144,7 +144,6 @@
 
     Program *attribute(string name) {
       GLint posAttrib;
-      glUseProgram(this->handle);
       if (attributes.find(name) == this->attributes.end()) {
         posAttrib = glGetAttribLocation(this->handle, name.c_str());
         this->attributes[name] = posAttrib;

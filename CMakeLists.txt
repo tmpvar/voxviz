@@ -54,7 +54,8 @@ add_executable(
   include/brick.h
   include/aabb.h
   include/shadowmap.h
-
+	include/volume.h
+	
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
 

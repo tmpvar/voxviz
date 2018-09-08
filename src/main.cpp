@@ -8,6 +8,7 @@
 //#include "clu.h"
 #include "fullscreen-surface.h"
 #include "shadowmap.h"
+#include "volume.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -259,7 +260,7 @@ int main(void) {
   glfwSwapInterval(0);
 
   //Compute *compute = new Compute();
-  if (false == true && glDebugMessageCallback) {
+  if (false && glDebugMessageCallback) {
     cout << "Register OpenGL debug callback " << endl;
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(openglCallbackFunction, nullptr);
@@ -350,27 +351,33 @@ int main(void) {
     printf("max computer shader invocations %i\n", work_grp_inv);
   }
 
+  Volume *volume = new Volume(glm::vec3(0.0, 100.0, 0.0));
+  volume->AddBrick(glm::vec3(100.0, 0.0, 200.0))->upload();
+  volume->AddBrick(glm::vec3(0.0, 0.0, 0.0))->upload();
  
-  Brick *tmp;
+  for (auto& brick : volume->bricks) {
+    brick->fill(fillSphereProgram);
+  }
+
+
   // 32, 5, 16
-  for (float x = 0; x < 1; x++) {
+  Volume *floor = new Volume(glm::vec3(0.0));
+  for (float x = 0; x < 8; x++) {
     for (float y = 0; y < 1; y++) {
-      for (float z = 0; z < 1; z++) {
-        tmp = raytracer->addBrickAtIndex(x, y, z, BRICK_DIAMETER, BRICK_DIAMETER, BRICK_DIAMETER);
-        //printf(
-        //  "create (%f, %f, %f) of size (%ui, %ui, %ui)\n",
-        //  x, y, z,
-        //  VOLUME_DIMS, VOLUME_DIMS, VOLUME_DIMS
-        //);
+      for (float z = 0; z < 8; z++) {
+        floor->AddBrick(glm::vec3(
+          x * BRICK_DIAMETER * 1.0,
+          y * BRICK_DIAMETER * 1.0,
+          z * BRICK_DIAMETER * 1.0
+        ))->upload();
       }
     }
   }
 
-  for (auto& vol : raytracer->bricks) {
-    vol->fill(fillSphereProgram);
+  for (auto& brick : floor->bricks) {
+    brick->fillConst(1.0);
   }
-
-  raytracer->upload();
+  
 
   glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
   cout << "DONE FILLING" << endl;
@@ -536,20 +543,45 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
 
-    glm::vec4 invEye = glm::inverse(raytracer->bricks[0]->getModelMatrix()) * glm::vec4(currentEye, 1.0);
+    glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    raytracer->program->use()
-      ->uniformMat4("MVP", perspectiveMatrix * viewMatrix *raytracer->bricks[0]->getModelMatrix())
-      ->uniformVec3("invEye", glm::vec3(
-        invEye.x / invEye.w,
-        invEye.y / invEye.w,
-        invEye.z / invEye.w
-      ))
-      ->uniformFloat("maxDistance", max_distance)
-      ->uniform1i("showHeat", raytracer->showHeat)
-      ->uniformFloat("debug", debug);
+    {
+      glm::mat4 volumeModel = volume->getModelMatrix();
+      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
+      raytracer->program->use()
+        ->uniformMat4("MVP", VP * volumeModel)
+        ->uniformVec3("invEye", glm::vec3(
+          invEye.x / invEye.w,
+          invEye.y / invEye.w,
+          invEye.z / invEye.w
+        ))
+        ->uniformFloat("maxDistance", max_distance)
+        ->uniform1i("showHeat", raytracer->showHeat)
+        ->uniformFloat("debug", debug);
 
-    raytracer->render(raytracer->program);
+      volume->bind();
+      raytracer->render(volume, raytracer->program);
+    }
+
+    {
+      glm::mat4 volumeModel = floor->getModelMatrix();
+      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
+      raytracer->program->use()
+        ->uniformMat4("MVP", VP * volumeModel)
+        ->uniformVec3("invEye", glm::vec3(
+          invEye.x / invEye.w,
+          invEye.y / invEye.w,
+          invEye.z / invEye.w
+        ))
+        ->uniformFloat("maxDistance", max_distance)
+        ->uniform1i("showHeat", raytracer->showHeat)
+        ->uniformFloat("6debug", debug);
+
+      floor->bind();
+      raytracer->render(floor, raytracer->program);
+    }
+
+
     
     /*fbo->unbind();
     
@@ -616,7 +648,7 @@ int main(void) {
       total_affected -= 1000;
     }
 
-    raytracer->bricks[0]->rotate(0.001f, 0.0f, 0.0f);
+    volume->rotation.x += 0.001f;
    
     uv_run(loop, UV_RUN_NOWAIT);
     glfwPollEvents();
