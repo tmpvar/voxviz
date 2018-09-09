@@ -186,7 +186,7 @@
       return this;
     }
 
-    Program *uniformVec4(string name, glm::vec3 v) {
+    Program *uniformVec4(string name, glm::vec4 v) {
       GLint loc = this->uniformLocation(name);
       glUniform4f(loc, v[0], v[1], v[2], v[3]);
       return this;

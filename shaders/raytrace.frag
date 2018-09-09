@@ -21,6 +21,7 @@ uniform vec3 eye;
 uniform vec3 invEye;
 uniform int showHeat;
 uniform float maxDistance;
+uniform vec4 material;
 #define ITERATIONS BRICK_DIAMETER*3
 
 float voxel(vec3 gridPos) {
@@ -92,8 +93,9 @@ void main() {
   float hit = march(pos, dir, voxelCenter, normal, iterations);
  
   gl_FragDepth = hit < 0.0 ? 1.0 : distance(rayOrigin + (pos - brickOrigin), invEye) / maxDistance;
-  outColor = mix(vec4(normal, 1.0), vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
+  outColor = mix(material, vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
   outPosition = rayOrigin / maxDistance;
+
 }
 
 void main1() {

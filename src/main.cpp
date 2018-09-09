@@ -362,7 +362,7 @@ int main(void) {
   boxDef.SetRestitution(0.5);
   bodyDef.bodyType = eStaticBody;
   Volume *floor = new Volume(glm::vec3(0.0), physicsScene, bodyDef);
-  
+  floor->material = glm::vec4(0.67, 0.71, 0.78, 1.0);
   boxDef.Set(tx, q3Vec3(
     BRICK_DIAMETER,
     BRICK_DIAMETER,
@@ -391,7 +391,7 @@ int main(void) {
   volume->AddBrick(glm::vec3(0.0, 0.0, 0.0), boxDef)->upload();
   volume->AddBrick(glm::vec3(100.0, 100.0, 0.0), boxDef)->upload();
   volume->AddBrick(glm::vec3(100.0, 100.0, 200.0), boxDef)->upload();
-
+  volume->material = glm::vec4(1.0, 0.0, 1.0, 1.0);
 
   for (auto& brick : volume->bricks) {
     brick->fill(fillSphereProgram);
@@ -575,7 +575,8 @@ int main(void) {
         ))
         ->uniformFloat("maxDistance", max_distance)
         ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformFloat("debug", debug);
+        ->uniformFloat("debug", debug)
+        ->uniformVec4("material", volume->material);
 
       volume->bind();
       raytracer->render(volume, raytracer->program);
@@ -593,7 +594,8 @@ int main(void) {
         ))
         ->uniformFloat("maxDistance", max_distance)
         ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformFloat("6debug", debug);
+        ->uniformFloat("debug", debug)
+        ->uniformVec4("material", floor->material);
 
       floor->bind();
       raytracer->render(floor, raytracer->program);
