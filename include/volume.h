@@ -2,6 +2,7 @@
 #include "core.h"
 #include "brick.h"
 #include "gl-wrap.h"
+#include <q3.h>
 
 #include "glm/gtc/matrix_transform.hpp"
 #include <vector>
@@ -16,7 +17,8 @@ public:
   glm::vec3 scale;
   Mesh *mesh;
 
-  Volume(glm::vec3 pos) {
+  q3Body* physicsBody;
+  Volume(glm::vec3 pos, q3Scene *scene, q3BodyDef bodyDef) {
     this->position = pos;
     this->rotation = glm::vec3(0.0);
     this->scale = glm::vec3(1.0);
@@ -62,6 +64,10 @@ public:
       ->vert(1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
       ->vert(-1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
       ->upload();
+
+    bodyDef.position.Set(pos.x, pos.y, pos.z);
+    this->physicsBody = scene->CreateBody(bodyDef);
+    
   }
 
   ~Volume() {
@@ -74,11 +80,21 @@ public:
   }
 
   // TODO: consider denoting this as relative
-  Brick *AddBrick(glm::vec3 center) {
+  Brick *AddBrick(glm::vec3 center, q3BoxDef boxDef) {
     Brick *brick = new Brick(center);
     this->bricks.push_back(brick);
 
     this->dirty = true;
+    q3Transform tx;
+    q3Identity(tx);
+    tx.position.Set(
+      center.x,
+      center.y,
+      center.z
+    );
+
+    // TODO: associate this box w/ the brick
+    this->physicsBody->AddBox(boxDef);
 
     return brick;
   }
@@ -140,14 +156,20 @@ public:
   }
 
   glm::mat4 getModelMatrix() {
+    q3Transform tx = this->physicsBody->GetTransform();
+
     glm::mat4 model = glm::mat4(1.0f);
 
-    model = glm::translate(model, this->position);
+    model = glm::translate(model, glm::vec3(
+      tx.position.x,
+      tx.position.y,
+      tx.position.z
+    ));
 
-    model = glm::rotate(model, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
-    model = glm::rotate(model, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
-    model = glm::rotate(model, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
-    model = glm::scale(model, scale);
+//    model = glm::rotate(model, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
+//    model = glm::rotate(model, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
+//    model = glm::rotate(model, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
+//    model = glm::scale(model, scale);
 
     return model;
   }

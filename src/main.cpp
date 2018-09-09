@@ -229,8 +229,6 @@ int main(void) {
   // libuv junk
 
   GLFWwindow* window;
-  float dt = 1.0f / 60.0f;
-  q3Scene scene(dt);
 
   if (!glfwInit()) {
     return -1;
@@ -353,25 +351,33 @@ int main(void) {
     printf("max computer shader invocations %i\n", work_grp_inv);
   }
 
-  Volume *volume = new Volume(glm::vec3(0.0, 100.0, 0.0));
-  volume->AddBrick(glm::vec3(100.0, 0.0, 200.0))->upload();
-  volume->AddBrick(glm::vec3(0.0, 0.0, 0.0))->upload();
- 
-  for (auto& brick : volume->bricks) {
-    brick->fill(fillSphereProgram);
-  }
-
+  float dt = 1.0f / 60.0f;
+  q3Scene *physicsScene = new q3Scene(dt);
 
   // 32, 5, 16
-  Volume *floor = new Volume(glm::vec3(0.0));
+  q3BodyDef bodyDef;
+  q3BoxDef boxDef;
+  q3Transform tx;
+  q3Identity(tx);
+  boxDef.SetRestitution(0.5);
+  bodyDef.bodyType = eStaticBody;
+  Volume *floor = new Volume(glm::vec3(0.0), physicsScene, bodyDef);
+  
+  boxDef.Set(tx, q3Vec3(
+    BRICK_DIAMETER,
+    BRICK_DIAMETER,
+    BRICK_DIAMETER
+  ));
+
   for (float x = 0; x < 8; x++) {
     for (float y = 0; y < 1; y++) {
       for (float z = 0; z < 8; z++) {
+
         floor->AddBrick(glm::vec3(
-          x * BRICK_DIAMETER * 1.0,
-          y * BRICK_DIAMETER * 1.0,
-          z * BRICK_DIAMETER * 1.0
-        ))->upload();
+          x * BRICK_DIAMETER,
+          y * BRICK_DIAMETER,
+          z * BRICK_DIAMETER
+        ), boxDef)->upload();
       }
     }
   }
@@ -379,7 +385,17 @@ int main(void) {
   for (auto& brick : floor->bricks) {
     brick->fillConst(1.0);
   }
-  
+  bodyDef.bodyType = eDynamicBody;
+  Volume *volume = new Volume(glm::vec3(0.0, 500.0, 0.0), physicsScene, bodyDef);
+
+  volume->AddBrick(glm::vec3(0.0, 0.0, 0.0), boxDef)->upload();
+  volume->AddBrick(glm::vec3(100.0, 100.0, 0.0), boxDef)->upload();
+  volume->AddBrick(glm::vec3(100.0, 100.0, 200.0), boxDef)->upload();
+
+
+  for (auto& brick : volume->bricks) {
+    brick->fill(fillSphereProgram);
+  }
 
   glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
   cout << "DONE FILLING" << endl;
@@ -583,6 +599,7 @@ int main(void) {
       raytracer->render(floor, raytracer->program);
     }
 
+    physicsScene->Step();
 
     
     /*fbo->unbind();
