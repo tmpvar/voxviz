@@ -362,7 +362,8 @@ int main(void) {
   // TODO: if we want to enable multiple space overlapping volumes,
   //       we will need to group them together as far as physics is
   //       concerned.
-  //bodyDef.bodyType = eDynamicBody;
+  //       big volumes also cause this to halt the program.
+  // bodyDef.bodyType = eDynamicBody;
   VZDParser::parse(
     "D:\\work\\voxviz\\include\\parser\\vzd\\out.vzd",
     volumeManager,

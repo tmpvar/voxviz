@@ -79,10 +79,10 @@ string('VZD', out)
 
 // begin volume
 // specify volume dimensions 3x32bit uint
-const dim = 64
+const dim = 512
 const dims = [dim, dim, dim]
 const hd = [dims[0] / 2, dims[1] / 2, dims[2] / 2]
-
+const brickDims = [BRICK_DIAMETER, BRICK_DIAMETER, BRICK_DIAMETER]
 
 // volume transform
 const tx = [
@@ -107,15 +107,17 @@ const volumes = [
 {
 	dims: [dim, dim, dim],
 	hd: [dim/2, dim/2, dim/2],
-	material:[255, 0, 0],
+	material:[255, 255, 0],
 	fillFn: function (x, y, z) {
 		const dx = x - this.hd[0]
 		const dy = y - this.hd[1]
 		const dz = z - this.hd[1]
+
 		const d = Math.sqrt(dx*dx + dy*dy + dz*dz) - this.hd[0]
 		return d <= 0 ? 1 : 0;
 	}
-}]
+}
+]
 
 uint32(volumes.length, out)
 
@@ -141,21 +143,12 @@ function dumpVolume(vol, out) {
 
 	// write the volume contents
 	const length = vol.dims[0] * vol.dims[1] * vol.dims[2]
-	const voxels = ndarray(new Uint8Array(length), vol.dims)
-	fill(voxels, vol.fillFn.bind(vol))
 
-	dumpBricks(voxels, out)
-
-
-}
-
-function dumpBricks(array, out) {
-	var dims = array.shape
 	// TODO: handle negative
 	const brickIndices = [
-		dims[0] / BRICK_DIAMETER|0,
-		dims[1] / BRICK_DIAMETER|0,
-		dims[2] / BRICK_DIAMETER|0
+		vol.dims[0] / BRICK_DIAMETER|0,
+		vol.dims[1] / BRICK_DIAMETER|0,
+		vol.dims[2] / BRICK_DIAMETER|0
 	]
 
 	// output brick count
@@ -165,29 +158,24 @@ function dumpBricks(array, out) {
 	for (var x = 0; x < brickIndices[0]; x++) {
 		for (var y = 0; y < brickIndices[1]; y++) {
 			for (var z = 0; z < brickIndices[2]; z++) {
-				var slice = array.lo(
-					x * BRICK_DIAMETER,
-					y * BRICK_DIAMETER,
-					z * BRICK_DIAMETER
-				).hi(
-					BRICK_DIAMETER,
-					BRICK_DIAMETER,
-					BRICK_DIAMETER
-				)
-
 				// output the brick index
 				console.log("brick index", x, y, z)
 				int32(x, out)
 				int32(y, out)
 				int32(z, out)
 
-				for (var i=0; i<slice.shape[0]; i++) {
-					for (var j=0; j<slice.shape[1]; j++) {
-						for (var k=0; k<slice.shape[2]; k++) {
-							uint8(slice.get(k, j, i), out)
-						}
-					}
-				}
+				var data = Buffer.alloc(Math.pow(BRICK_DIAMETER, 3))
+				var brick = ndarray(data, brickDims).transpose(2, 1, 0)
+
+				fill(brick, (lx, ly, lz) => {
+					return vol.fillFn(
+						lx + x * BRICK_DIAMETER,
+						ly + y * BRICK_DIAMETER,
+						lz + z * BRICK_DIAMETER
+					)
+				})
+
+				out.write(data)
 			}
 		}
 	}

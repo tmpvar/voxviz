@@ -58,7 +58,7 @@ public:
       cout << "  " << xt[2][0] << " " << xt[2][1] << " " << xt[2][2] << " " << xt[2][3] << " " << endl;
 
       // TODO: this should not live here
-      Volume *volume = new Volume(glm::vec3(0.0, 1600, 0), scene, bodyDef);
+      Volume *volume = new Volume(glm::vec3(0.0, 600, 0), scene, bodyDef);
       volumeManager->addVolume(volume);
 
 
@@ -98,11 +98,11 @@ public:
 
         glm::ivec3 brickIndex;
         ifs.read((char *)&brickIndex, 12);
-        cout << "Create Bricks ("
-          << brickIndex.x << ", "
-          << brickIndex.y << ", "
-          << brickIndex.z << ")"
-          << endl;
+//        cout << "Create Bricks ("
+//          << brickIndex.x << ", "
+//          << brickIndex.y << ", "
+//          << brickIndex.z << ")"
+//          << endl;
 
         ifs.read((char *)brickData, BRICK_VOXEL_COUNT);
 
@@ -112,8 +112,6 @@ public:
           brick->data[j] = float(brickData[j]);
         }
         brick->createGPUMemory();
-
-
       }
 
 
