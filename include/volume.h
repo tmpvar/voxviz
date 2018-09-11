@@ -5,13 +5,15 @@
 #include <q3.h>
 
 #include "glm/gtc/matrix_transform.hpp"
-#include <vector>
+#include "glm/gtc/integer.hpp"
+#include "glm/gtx/hash.hpp"
+#include <unordered_map>
 
 class Volume {
 protected:
   bool dirty;
 public:
-  vector <Brick *>bricks;
+  unordered_map <glm::ivec3, Brick *>bricks;
   glm::vec3 rotation;
   glm::vec3 position;
   glm::vec3 scale;
@@ -40,30 +42,30 @@ public:
     // TODO: we can reuse the mesh data (vbo) but we probably need a
     //       volume specific vao.
     this->mesh
-      ->vert(-1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, 1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, 1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, 1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, 1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, -1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, -1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, -1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, 1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, 1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, -1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, 1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, 1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, 1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, 1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, 1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, 1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, -1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, -1 * BRICK_RADIUS, -1 * BRICK_RADIUS)
-      ->vert(1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
-      ->vert(-1 * BRICK_RADIUS, -1 * BRICK_RADIUS, 1 * BRICK_RADIUS)
+      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
+      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
       ->upload();
 
     bodyDef.position.Set(pos.x, pos.y, pos.z);
@@ -72,27 +74,29 @@ public:
   }
 
   ~Volume() {
-    size_t total = this->bricks.size();
-    for (size_t v = 0; v < total; v++) {
-      delete this->bricks[v];
+    for (auto& it : this->bricks) {
+      Brick *brick = it.second;
+      delete brick;
     }
     this->bricks.clear();
     delete this->mesh;
   }
 
   // TODO: consider denoting this as relative
-  Brick *AddBrick(glm::vec3 center, q3BoxDef boxDef) {
-    Brick *brick = new Brick(center);
-    this->bricks.push_back(brick);
+  Brick *AddBrick(glm::ivec3 index, q3BoxDef boxDef) {
+    Brick *brick = new Brick(index);
+    this->bricks.emplace(index, brick);
 
     this->dirty = true;
     q3Transform tx;
     q3Identity(tx);
     tx.position.Set(
-      center.x,
-      center.y,
-      center.z
+      float(index.x * BRICK_DIAMETER),
+      float(index.y * BRICK_DIAMETER),
+      float(index.z * BRICK_DIAMETER)
     );
+    q3Vec3 extents(BRICK_DIAMETER, BRICK_DIAMETER, BRICK_DIAMETER);
+    boxDef.Set(tx, extents);
 
     // TODO: associate this box w/ the brick
     this->physicsBody->AddBox(boxDef);
@@ -100,20 +104,47 @@ public:
     return brick;
   }
 
+  void setVoxel(glm::ivec3 coord, float val) {
+
+    glm::ivec3 index = glm::ivec3(
+      floor(coord.x / BRICK_DIAMETER),
+      floor(coord.y / BRICK_DIAMETER),
+      floor(coord.z / BRICK_DIAMETER)
+    );
+
+    // find the brick that contains this voxel
+    // if no brick, create one
+    Brick *found = nullptr;
+
+    auto it = this->bricks.find(index);
+    if (it != this->bricks.end()) {
+      found = it->second;
+    }
+    else {
+      q3BoxDef boxDef;
+      q3Transform tx;
+      q3Identity(tx);
+      boxDef.SetRestitution(0.5);
+      found = this->AddBrick(index, boxDef);
+    }
+    found->setVoxel(mod(glm::vec3(coord), glm::vec3(BRICK_DIAMETER)), val);
+  }
+
   void bind() {
     // Mesh data
-    glBindVertexArray(this->mesh->vao);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, this->mesh->vbo);
-    
-
     if (!this->dirty) {
+      glBindVertexArray(this->mesh->vao);
+      glEnableVertexAttribArray(0);
       glEnableVertexAttribArray(1);
       glEnableVertexAttribArray(2);
       return;
     }
     this->dirty = false;
-    cout << "DIRTY" << endl;
+    //this->mesh->upload();
+
+    glBindVertexArray(this->mesh->vao);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, this->mesh->vbo);
 
     size_t total_bricks = this->bricks.size();
     if (total_bricks == 0) {
@@ -125,10 +156,11 @@ public:
     float *positions = (float *)malloc(total_position_mem);
     GLuint64 *pointers = (GLuint64 *)malloc(total_brick_pointer_mem);
     size_t loc = 0;
-    for (auto& brick : this->bricks) {
-      positions[loc * 3 + 0] = brick->center.x;
-      positions[loc * 3 + 1] = brick->center.y;
-      positions[loc * 3 + 2] = brick->center.z;
+    for (auto& it : this->bricks) {
+      Brick *brick = it.second;
+      positions[loc * 3 + 0] = float(brick->index.x * BRICK_DIAMETER);
+      positions[loc * 3 + 1] = float(brick->index.y * BRICK_DIAMETER);
+      positions[loc * 3 + 2] = float(brick->index.z * BRICK_DIAMETER);
 
       pointers[loc] = brick->bufferAddress;
       loc++;

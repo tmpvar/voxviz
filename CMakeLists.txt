@@ -61,6 +61,9 @@ add_executable(
   include/aabb.h
   include/shadowmap.h
 	include/volume.h
+  include/volume-manager.h
+
+  include/parser/vzd/vzd.h
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h

@@ -132,7 +132,7 @@
      unsigned char* pixels = NULL;
      int width, height;
      io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-     // At this point you've got the texture data and you need to upload that your your graphic system:
+     // At this point you've got the texture data and you need to createGPUMemory that your your graphic system:
      MyTexture* texture = MyEngine::CreateTextureFromMemoryPixels(pixels, width, height, TEXTURE_TYPE_RGBA32)
      // Store your texture pointer/identifier (in whatever formatyour engine uses) in 'io.Fonts->TexID'. 
      // This will be passed back to your via the renderer. Read FAQ for details about ImTextureID.

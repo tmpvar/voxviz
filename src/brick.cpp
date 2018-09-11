@@ -3,10 +3,12 @@
 #include "core.h"
 #include "glm/gtc/matrix_transform.hpp"
 
-Brick::Brick(glm::vec3 center) {
-  this->center = center;
-  this->dims = glm::uvec3(BRICK_DIAMETER);
+Brick::Brick(glm::ivec3 index) {
+  this->index = index;
   this->debug = 0.0f;
+  // TODO: we probably only need to malloc this if the data for
+  // this brick originates at the HOST
+  this->data = (float *)malloc(BRICK_VOXEL_COUNT * sizeof(GLfloat));
 }
 
 Brick::~Brick() {
@@ -14,7 +16,7 @@ Brick::~Brick() {
   glDeleteBuffers(1, &this->bufferId);
 }
 
-void Brick::upload() {
+void Brick::createGPUMemory() {
   glGenBuffers(1, &bufferId);
   gl_error();
 
@@ -24,7 +26,7 @@ void Brick::upload() {
   glBufferData(
     GL_TEXTURE_BUFFER,
     BRICK_VOXEL_COUNT * sizeof(GLfloat),
-    NULL,
+    this->data,
     GL_STATIC_DRAW
   );
   gl_error();
@@ -34,6 +36,19 @@ void Brick::upload() {
 
   glGetBufferParameterui64vNV(GL_TEXTURE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &this->bufferAddress);
   gl_error();
+}
+
+void Brick::upload() {
+  // TODO: I believe this is causing an exception to be thrown further down the line..
+  glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
+  gl_error();
+  // TODO: consider breaking each voxel into 64 bits (4x4x4)
+  glBufferData(
+    GL_TEXTURE_BUFFER,
+    BRICK_VOXEL_COUNT * sizeof(GLfloat),
+    this->data,
+    GL_STATIC_DRAW
+  );
 }
 
 void Brick::fill(Program *program) {
@@ -51,27 +66,14 @@ void Brick::fill(Program *program) {
 void Brick::bind(Program *program) {
 }
 
-void Brick::position(float x, float y, float z) {
-  this->center.x = floorf(x);
-  this->center.y = floorf(y);
-  this->center.z = floorf(z);
-}
-
-void Brick::move(float x, float y, float z) {
-  this->center.x += floorf(x);
-  this->center.y += floorf(y);
-  this->center.z += floorf(z);
-}
-
 aabb_t Brick::aabb() {
   // TODO: cache aabb and recompute on reposition
   aabb_t ret;
-
-  glm::vec3 hd = (glm::vec3)this->dims / glm::vec3(2.0, 2.0, 2.0);
-  glm::vec3 lower = center - hd;
+    
+  glm::vec3 lower = this->index * BRICK_DIAMETER;
 
   ret.lower = lower;
-  ret.upper = lower + (glm::vec3)this->dims;
+  ret.upper = lower + glm::vec3(BRICK_DIAMETER);
   return ret;
 }
 
@@ -99,6 +101,24 @@ bool Brick::isect(Brick *other, aabb_t *out) {
   out->lower.z = max(a.lower.z, b.lower.z);
 
   return true;
+}
+
+void Brick::setVoxel(glm::uvec3 pos, float val) {
+  if (
+    pos.x > BRICK_DIAMETER ||
+    pos.y > BRICK_DIAMETER ||
+    pos.z > BRICK_DIAMETER
+  ) {
+    return;
+  }
+
+  uint32_t idx = pos.x;
+  idx += pos.y * BRICK_DIAMETER;
+  idx += pos.z * BRICK_DIAMETER * BRICK_DIAMETER;
+
+  this->data[idx] = val;
+  // TODO: maybe only upload the single value that was changed?
+  //this->upload();
 }
 
 void Brick::fillConst(float val) {

@@ -5,7 +5,7 @@
 #include "../include/core.h"
 
 layout (location = 0) in vec3 position;
-layout (location = 1) in vec3 center;
+layout (location = 1) in vec3 corner;
 layout (location = 2) in float *iBufferPointer;
 
 uniform mat4 MVP;
@@ -20,9 +20,9 @@ void main() {
   vec3 hd = vec3(BRICK_RADIUS);
   vec3 pos = position;
 
-  rayOrigin = pos + center;
-  brickOrigin = pos + BRICK_RADIUS;
+  rayOrigin = pos + corner;
+  brickOrigin = pos;
 
   volumePointer = iBufferPointer;
-  gl_Position = MVP * vec4(pos + center, 1.0);
+  gl_Position = MVP * vec4(rayOrigin, 1.0);
 }

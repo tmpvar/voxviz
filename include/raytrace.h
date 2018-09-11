@@ -39,6 +39,10 @@
     }
     
     void render(Volume *volume, Program *p) {
+      if (volume->bricks.size() == 0) {
+        return;
+      }
+
       glDrawElementsInstanced(
         GL_TRIANGLES,
         volume->mesh->faces.size(),

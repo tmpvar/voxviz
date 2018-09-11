@@ -91,7 +91,12 @@ void main() {
   vec3 pos = brickOrigin;
 
   float hit = march(pos, dir, voxelCenter, normal, iterations);
- 
+  if (hit < 0.0) {
+	outColor = vec4(1.0);
+	gl_FragDepth = 1.0;
+	return;
+  }
+
   gl_FragDepth = hit < 0.0 ? 1.0 : distance(rayOrigin + (pos - brickOrigin), invEye) / maxDistance;
   outColor = mix(material, vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
   outPosition = rayOrigin / maxDistance;

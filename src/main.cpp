@@ -9,6 +9,7 @@
 #include "fullscreen-surface.h"
 #include "shadowmap.h"
 #include "volume.h"
+#include "volume-manager.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -19,6 +20,7 @@
 #include <imgui_impl_opengl3.h>
 #include <q3.h>
 
+#include "parser/vzd/vzd.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -212,11 +214,17 @@ void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
 /* LIBUV JUNK*/
 
 int main(void) {
+  VolumeManager *volumeManager = new VolumeManager();
+  float dt = 1.0f / 60.0f;
+  q3Scene *physicsScene = new q3Scene(dt);
+  // 32, 5, 16
+  q3BodyDef bodyDef;
+  q3BoxDef boxDef;
+
   memset(keys, 0, sizeof(keys));
 
   int d = BRICK_DIAMETER;
   float fd = (float)d;
-  int hd = BRICK_RADIUS;
   int dims[3] = { d, d, d };
   float dsquare = (float)d*(float)d;
   float camera_z = sqrtf(dsquare * 3.0f) * 1.5f;
@@ -350,13 +358,19 @@ int main(void) {
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     printf("max computer shader invocations %i\n", work_grp_inv);
   }
+  
+  // TODO: if we want to enable multiple space overlapping volumes,
+  //       we will need to group them together as far as physics is
+  //       concerned.
+  //bodyDef.bodyType = eDynamicBody;
+  VZDParser::parse(
+    "D:\\work\\voxviz\\include\\parser\\vzd\\out.vzd",
+    volumeManager,
+    physicsScene,
+    bodyDef
+  );
 
-  float dt = 1.0f / 60.0f;
-  q3Scene *physicsScene = new q3Scene(dt);
 
-  // 32, 5, 16
-  q3BodyDef bodyDef;
-  q3BoxDef boxDef;
   q3Transform tx;
   q3Identity(tx);
   boxDef.SetRestitution(0.5);
@@ -369,36 +383,37 @@ int main(void) {
     BRICK_DIAMETER
   ));
 
-  for (float x = 0; x < 8; x++) {
-    for (float y = 0; y < 1; y++) {
-      for (float z = 0; z < 8; z++) {
+  volumeManager->addVolume(floor);
 
-        floor->AddBrick(glm::vec3(
-          x * BRICK_DIAMETER,
-          y * BRICK_DIAMETER,
-          z * BRICK_DIAMETER
-        ), boxDef)->upload();
+  for (int x = -16; x < 16; x++) {
+    for (int y = 0; y < 1; y++) {
+      for (int z = -16; z < 16; z++) {
+        floor->AddBrick(glm::ivec3(x, y, z), boxDef)->createGPUMemory();
       }
     }
   }
 
-  for (auto& brick : floor->bricks) {
+  for (auto& it : floor->bricks) {
+    Brick *brick = it.second;
     brick->fillConst(1.0);
   }
+
   bodyDef.bodyType = eDynamicBody;
-  Volume *volume = new Volume(glm::vec3(0.0, 500.0, 0.0), physicsScene, bodyDef);
 
-  volume->AddBrick(glm::vec3(0.0, 0.0, 0.0), boxDef)->upload();
-  volume->AddBrick(glm::vec3(100.0, 100.0, 0.0), boxDef)->upload();
-  volume->AddBrick(glm::vec3(100.0, 100.0, 200.0), boxDef)->upload();
+  Volume *volume = new Volume(glm::vec3(0.0, 800.0, 0.0), physicsScene, bodyDef);
+  volumeManager->addVolume(volume);
+  volume->AddBrick(glm::ivec3(0, 0, 0), boxDef);
+  volume->AddBrick(glm::ivec3(2, 2, 0.0), boxDef);
+  volume->AddBrick(glm::ivec3(3, 1, 0), boxDef);
   volume->material = glm::vec4(1.0, 0.0, 1.0, 1.0);
-
-  for (auto& brick : volume->bricks) {
+   
+  for (auto& it : volume->bricks) {
+    Brick *brick = it.second;
+    brick->createGPUMemory();
     brick->fill(fillSphereProgram);
   }
-
+  
   glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-  cout << "DONE FILLING" << endl;
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   fbo = new FBO(windowDimensions[0], windowDimensions[1]);
@@ -563,7 +578,11 @@ int main(void) {
 
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    {
+    for (auto& volume : volumeManager->volumes) {
+      if (volume->bricks.size() == 0) {
+        continue;
+      }
+
       glm::mat4 volumeModel = volume->getModelMatrix();
       glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
       raytracer->program->use()
@@ -577,11 +596,11 @@ int main(void) {
         ->uniform1i("showHeat", raytracer->showHeat)
         ->uniformFloat("debug", debug)
         ->uniformVec4("material", volume->material);
-
+      gl_error();
       volume->bind();
       raytracer->render(volume, raytracer->program);
     }
-
+/*
     {
       glm::mat4 volumeModel = floor->getModelMatrix();
       glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
@@ -600,7 +619,8 @@ int main(void) {
       floor->bind();
       raytracer->render(floor, raytracer->program);
     }
-
+*/
+    
     physicsScene->Step();
 
     

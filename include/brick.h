@@ -9,24 +9,23 @@
 
   class Brick {
   public:
-    glm::vec3 center;
-    glm::uvec3 dims;
-    glm::vec3 rotation;
+    glm::ivec3 index;
     // TODO: make this a structure
     GLuint bufferId;
     GLuint64 bufferAddress;
     float debug;
+    float *data;
 
-    Brick(glm::vec3 center);
+    Brick(glm::ivec3 index);
     ~Brick();
+    void createGPUMemory();
     void upload();
     void fill(Program * program);
     void bind(Program * program);
-    void position(float x, float y, float z);
-    void move(float x, float y, float z);
     aabb_t aabb();
     bool isect(Brick *other, aabb_t *out);
 
+    void setVoxel(glm::uvec3 pos, float val);
     void fillConst(float val);
   };
 #endif
