@@ -93,6 +93,7 @@ const tx = [
 ]
 
 const volumes = [
+// cylinder
 {
 	dims: [dim/2, dim * 2, dim/2],
 	hd: [dim/4, dim, dim/4],
@@ -101,9 +102,10 @@ const volumes = [
 		const dx = x - this.hd[0]
 		const dz = z - this.hd[2]
 		const d = Math.sqrt(dx*dx + dz*dz) - this.hd[0]
-		return d <= 0 ? 1 : 0;
+		return d;
 	}
 },
+// sphere
 {
 	dims: [dim, dim, dim],
 	hd: [dim/2, dim/2, dim/2],
@@ -114,7 +116,7 @@ const volumes = [
 		const dz = z - this.hd[1]
 
 		const d = Math.sqrt(dx*dx + dy*dy + dz*dz) - this.hd[0]
-		return d <= 0 ? 1 : 0;
+		return d;
 	}
 }
 ]
@@ -125,7 +127,7 @@ volumes.forEach((v) => {
 	dumpVolume(v, out)
 })
 out.end()
-console.log('done')
+console.log('\ndone')
 
 function dumpVolume(vol, out) {
 	mat4(tx, out)
@@ -141,9 +143,6 @@ function dumpVolume(vol, out) {
 	// write out the size of a voxel, in bytes
 	uint32(1, out);
 
-	// write the volume contents
-	const length = vol.dims[0] * vol.dims[1] * vol.dims[2]
-
 	// TODO: handle negative
 	const brickIndices = [
 		vol.dims[0] / BRICK_DIAMETER|0,
@@ -151,32 +150,55 @@ function dumpVolume(vol, out) {
 		vol.dims[2] / BRICK_DIAMETER|0
 	]
 
-	// output brick count
-	console.log("brick count:", brickIndices[0] * brickIndices[1] * brickIndices[2])
-	uint32(brickIndices[0] * brickIndices[1] * brickIndices[2], out)
+	var bricks = []
 
 	for (var x = 0; x < brickIndices[0]; x++) {
+		process.stdout.write('.')
 		for (var y = 0; y < brickIndices[1]; y++) {
 			for (var z = 0; z < brickIndices[2]; z++) {
 				// output the brick index
-				console.log("brick index", x, y, z)
-				int32(x, out)
-				int32(y, out)
-				int32(z, out)
-
 				var data = Buffer.alloc(Math.pow(BRICK_DIAMETER, 3))
 				var brick = ndarray(data, brickDims).transpose(2, 1, 0)
-
+				var completelyInside = true
+				var completelyEmpty = true
 				fill(brick, (lx, ly, lz) => {
-					return vol.fillFn(
+					 var val = vol.fillFn(
 						lx + x * BRICK_DIAMETER,
 						ly + y * BRICK_DIAMETER,
 						lz + z * BRICK_DIAMETER
 					)
+
+					if (val > -BRICK_DIAMETER/2.0) {
+						completelyInside = false
+					}
+
+					var ret = val <= 0 ? 1 : 0;
+
+					if (ret) {
+						completelyEmpty = false
+					}
+					return ret
 				})
 
-				out.write(data)
+				if (!completelyInside && !completelyEmpty) {
+					bricks.push({
+						x: x,
+						y: y,
+						z: z,
+						data: data
+					})
+				}
 			}
 		}
 	}
+
+	// output brick count
+	console.log("brick count:", bricks.length)
+	uint32(bricks.length, out)
+	bricks.forEach((b) => {
+		int32(b.x, out)
+		int32(b.y, out)
+		int32(b.z, out)
+		console.log("wrote", out.write(b.data), b.data.length)
+	})
 }

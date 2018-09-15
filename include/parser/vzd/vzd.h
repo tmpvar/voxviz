@@ -58,7 +58,7 @@ public:
       cout << "  " << xt[2][0] << " " << xt[2][1] << " " << xt[2][2] << " " << xt[2][3] << " " << endl;
 
       // TODO: this should not live here
-      Volume *volume = new Volume(glm::vec3(0.0, 600, 0), scene, bodyDef);
+      Volume *volume = new Volume(glm::vec3(0.0, 100, 0), scene, bodyDef);
       volumeManager->addVolume(volume);
 
 
@@ -98,56 +98,19 @@ public:
 
         glm::ivec3 brickIndex;
         ifs.read((char *)&brickIndex, 12);
-//        cout << "Create Bricks ("
-//          << brickIndex.x << ", "
-//          << brickIndex.y << ", "
-//          << brickIndex.z << ")"
-//          << endl;
-
         ifs.read((char *)brickData, BRICK_VOXEL_COUNT);
-
+        //cout << "brick index: " << i << " of " << totalBricks << endl;
         Brick *brick = volume->AddBrick(brickIndex, boxDef);
         
         for (uint32_t j = 0; j < BRICK_VOXEL_COUNT; j++) {
           brick->data[j] = float(brickData[j]);
-        }
-        brick->createGPUMemory();
-      }
-
-
-      /*
-      // Volume Dimensions
-      glm::uvec3 dims;
-      ifs.read((char *)&dims, sizeof(glm::uvec3));
-      cout << "Volume Dimensions: " << dims.x << " " << dims.y << " " << dims.z << endl;
-      
-      // Volume Data
-      size_t totalVolumeBytes = dims.x * dims.y * dims.z * voxelSize;
-      void *volumeData = malloc(totalVolumeBytes);
-      ifs.read((char*)volumeData, totalVolumeBytes);
-
-      glm::ivec3 voxelPos;
-      for (int32_t x = 0; x < dims.x; x++) {
-        cout << "processing x: " << x << endl;
-        voxelPos.x = x;
-        for (int32_t y = 0; y < dims.y; y++) {
-          //cout << "processing y: " << y << " brick len: " << volume->bricks.size() << endl;
-          voxelPos.y = y + 1000;
-          for (int32_t z = 0; z < dims.z; z++) {
-            voxelPos.z = z;
-            uint32_t idx = x + y * dims.x + z * dims.x * dims.y;
-            float v = float(((uint8_t*)volumeData)[idx]);
-            if (v > 0.0) {
-              volume->setVoxel(voxelPos, v);
-            }
-          }
         }
       }
 
       for (auto& it : volume->bricks) {
         Brick *brick = it.second;
         brick->createGPUMemory();
-      }*/
+      }
     }
   }
 };
