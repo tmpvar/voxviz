@@ -302,7 +302,7 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera(
-    glm::vec3(0, 2048, 2048)
+    glm::vec3(0, 8, 8)
   );
 
   int time = 0;

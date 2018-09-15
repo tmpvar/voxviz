@@ -21,7 +21,7 @@ void main() {
   vec3 pos = position;
 
   rayOrigin = pos + corner;
-  brickOrigin = pos;
+  brickOrigin = pos * BRICK_DIAMETER;
 
   volumePointer = iBufferPointer;
   gl_Position = MVP * vec4(rayOrigin, 1.0);

@@ -42,30 +42,30 @@ public:
     // TODO: we can reuse the mesh data (vbo) but we probably need a
     //       volume specific vao.
     this->mesh
-      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER)
-      ->vert(1 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
-      ->vert(0 * BRICK_DIAMETER, 0 * BRICK_DIAMETER, 1 * BRICK_DIAMETER)
+      ->vert(0, 0, 1)
+      ->vert(1, 0, 1)
+      ->vert(1, 1, 1)
+      ->vert(0, 1, 1)
+      ->vert(1, 1, 1)
+      ->vert(1, 1, 0)
+      ->vert(1, 0, 0)
+      ->vert(1, 0, 1)
+      ->vert(0, 0, 0)
+      ->vert(1, 0, 0)
+      ->vert(1, 1, 0)
+      ->vert(0, 1, 0)
+      ->vert(0, 0, 0)
+      ->vert(0, 0, 1)
+      ->vert(0, 1, 1)
+      ->vert(0, 1, 0)
+      ->vert(1, 1, 1)
+      ->vert(0, 1, 1)
+      ->vert(0, 1, 0)
+      ->vert(1, 1, 0)
+      ->vert(0, 0, 0)
+      ->vert(1, 0, 0)
+      ->vert(1, 0, 1)
+      ->vert(0, 0, 1)
       ->upload();
 
     bodyDef.position.Set(pos.x, pos.y, pos.z);
@@ -88,19 +88,20 @@ public:
     this->bricks.emplace(index, brick);
 
     this->dirty = true;
+    /*
     q3Transform tx;
     q3Identity(tx);
     tx.position.Set(
-      float(index.x * BRICK_DIAMETER),
-      float(index.y * BRICK_DIAMETER),
-      float(index.z * BRICK_DIAMETER)
+      float(index.x),
+      float(index.y),
+      float(index.z)
     );
     q3Vec3 extents(BRICK_DIAMETER, BRICK_DIAMETER, BRICK_DIAMETER);
     boxDef.Set(tx, extents);
 
     // TODO: associate this box w/ the brick
     this->physicsBody->AddBox(boxDef);
-
+    */
     return brick;
   }
 
@@ -158,9 +159,9 @@ public:
     size_t loc = 0;
     for (auto& it : this->bricks) {
       Brick *brick = it.second;
-      positions[loc * 3 + 0] = float(brick->index.x * BRICK_DIAMETER);
-      positions[loc * 3 + 1] = float(brick->index.y * BRICK_DIAMETER);
-      positions[loc * 3 + 2] = float(brick->index.z * BRICK_DIAMETER);
+      positions[loc * 3 + 0] = float(brick->index.x);
+      positions[loc * 3 + 1] = float(brick->index.y);
+      positions[loc * 3 + 2] = float(brick->index.z);
 
       pointers[loc] = brick->bufferAddress;
       loc++;
