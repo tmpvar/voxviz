@@ -437,23 +437,25 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-
+  const float movementSpeed = 0.01;
+  
   while (!glfwWindowShouldClose(window)) {
+    float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
     if (keys[GLFW_KEY_W]) {
-      camera->ProcessKeyboard(Camera_Movement::FORWARD, 1.0);
+      camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
       //camera->translate(0.0f, 0.0f, 10.0f);
     }
 
     if (keys[GLFW_KEY_S]) {
-      camera->ProcessKeyboard(Camera_Movement::BACKWARD, 1.0);
+      camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed);
     }
 
     if (keys[GLFW_KEY_A]) {
-      camera->ProcessKeyboard(Camera_Movement::LEFT, 1.0);
+      camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
     }
 
     if (keys[GLFW_KEY_D]) {
-      camera->ProcessKeyboard(Camera_Movement::RIGHT, 1.0);
+      camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
     }
 
     if (keys[GLFW_KEY_H]) {
