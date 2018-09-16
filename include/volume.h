@@ -190,20 +190,21 @@ public:
   }
 
   glm::mat4 getModelMatrix() {
-    q3Transform tx = this->physicsBody->GetTransform();
+//    q3Transform tx = this->physicsBody->GetTransform();
 
     glm::mat4 model = glm::mat4(1.0f);
 
-    model = glm::translate(model, glm::vec3(
-      tx.position.x,
-      tx.position.y,
-      tx.position.z
-    ));
+//    model = glm::translate(model, glm::vec3(
+//      tx.position.x,
+//      tx.position.y,
+//      tx.position.z
+//    ));
+    model = glm::translate(model, this->position);
 
-//    model = glm::rotate(model, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
-//    model = glm::rotate(model, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
-//    model = glm::rotate(model, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
-//    model = glm::scale(model, scale);
+    model = glm::rotate(model, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
+    model = glm::rotate(model, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
+    model = glm::rotate(model, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
+    model = glm::scale(model, scale);
 
     return model;
   }
