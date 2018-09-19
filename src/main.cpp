@@ -401,14 +401,7 @@ int main(void) {
 
   bodyDef.bodyType = eDynamicBody;
 
-  Volume *volume = new Volume(glm::vec3(0.0, 800.0, 0.0), physicsScene, bodyDef);
-  volumeManager->addVolume(volume);
-  volume->AddBrick(glm::ivec3(0, 0, 0), boxDef);
-  volume->AddBrick(glm::ivec3(2, 2, 0.0), boxDef);
-  volume->AddBrick(glm::ivec3(3, 1, 0), boxDef);
-  volume->material = glm::vec4(1.0, 0.0, 1.0, 1.0);
-   
-  for (auto& it : volume->bricks) {
+  for (auto& it : floor->bricks) {
     Brick *brick = it.second;
     brick->createGPUMemory();
     brick->fill(fillSphereProgram);
@@ -437,7 +430,7 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.01;
+  const float movementSpeed = 0.001;
   
   while (!glfwWindowShouldClose(window)) {
     float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
@@ -692,8 +685,6 @@ int main(void) {
       total_affected -= 1000;
     }
 
-    volume->rotation.x += 0.001f;
-   
     uv_run(loop, UV_RUN_NOWAIT);
     glfwPollEvents();
   }

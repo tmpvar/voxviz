@@ -5,9 +5,8 @@
 
 #include "../include/core.h"
 
-in vec3 rayOrigin;
-in vec3 brickOrigin;
-
+in vec3 brickSurfacePos; 
+flat in vec3 brickTranslation; 
 flat in float *volumePointer;
 //flat in layout(bindless_sampler) sampler3D volumeSampler;
 
@@ -22,13 +21,19 @@ uniform vec3 invEye;
 uniform int showHeat;
 uniform float maxDistance;
 uniform vec4 material;
-#define ITERATIONS BRICK_DIAMETER*3
+#define ITERATIONS BRICK_DIAMETER*10
 
 float voxel(vec3 gridPos) {
-  uvec3 pos = uvec3(round(gridPos));
+  uvec3 pos = uvec3(floor(gridPos));
   uint idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
-  bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, vec3(BRICK_DIAMETER)));
-  return oob ? -1.0 : float(volumePointer[idx]);
+  if (any(lessThan(pos, vec3(0.0))) || any(greaterThan(pos, vec3(BRICK_DIAMETER)))) {
+	return -1.0;
+  }
+
+
+  
+  //bool oob = any(any(lessThan(pos, vec3(0.0))), any(greaterThanEqual(pos, vec3(BRICK_DIAMETER)));
+  return float(volumePointer[idx]);
 }
 
 vec3 hsv2rgb(vec3 c) {

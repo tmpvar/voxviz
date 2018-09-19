@@ -5,24 +5,21 @@
 #include "../include/core.h"
 
 layout (location = 0) in vec3 position;
-layout (location = 1) in vec3 corner;
+layout (location = 1) in vec3 translation;
 layout (location = 2) in float *iBufferPointer;
 
 uniform mat4 MVP;
+uniform vec3 invEye;
 
-out vec3 rayOrigin;
-out vec3 brickOrigin;
+out vec3 brickSurfacePos;
+flat out vec3 brickTranslation;
 
 // flat means "do not interpolate"
 flat out float *volumePointer;
 
 void main() {
-  vec3 hd = vec3(BRICK_RADIUS);
-  vec3 pos = position;
-
-  rayOrigin = pos + corner;
-  brickOrigin = pos * BRICK_DIAMETER;
-
+  brickTranslation = translation;
+  brickSurfacePos = position;
   volumePointer = iBufferPointer;
-  gl_Position = MVP * vec4(rayOrigin, 1.0);
+  gl_Position = MVP * vec4(position + translation, 1.0);
 }
