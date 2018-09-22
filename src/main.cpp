@@ -396,17 +396,13 @@ int main(void) {
 
   for (auto& it : floor->bricks) {
     Brick *brick = it.second;
-    brick->fillConst(1.0);
+    //brick->fillConst(1.0);
+    brick->fill(fillSphereProgram);
   }
+
 
   bodyDef.bodyType = eDynamicBody;
 
-  for (auto& it : floor->bricks) {
-    Brick *brick = it.second;
-    brick->createGPUMemory();
-    brick->fill(fillSphereProgram);
-  }
-  
   glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
@@ -430,7 +426,7 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.001;
+  const float movementSpeed = 0.01;
   
   while (!glfwWindowShouldClose(window)) {
     float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);

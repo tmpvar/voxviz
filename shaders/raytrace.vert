@@ -9,7 +9,6 @@ layout (location = 1) in vec3 translation;
 layout (location = 2) in float *iBufferPointer;
 
 uniform mat4 MVP;
-uniform vec3 invEye;
 
 out vec3 brickSurfacePos;
 flat out vec3 brickTranslation;

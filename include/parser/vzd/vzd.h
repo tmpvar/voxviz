@@ -58,7 +58,7 @@ public:
       cout << "  " << xt[2][0] << " " << xt[2][1] << " " << xt[2][2] << " " << xt[2][3] << " " << endl;
 
       // TODO: this should not live here
-      Volume *volume = new Volume(glm::vec3(0.0, 100, 0), scene, bodyDef);
+      Volume *volume = new Volume(glm::vec3(0.0, 0, 0), scene, bodyDef);
       volumeManager->addVolume(volume);
 
 
