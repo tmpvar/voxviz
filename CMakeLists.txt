@@ -14,8 +14,6 @@ IF(WINDOWS)
 	set_target_properties(voxviz PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS /EHsc")
 ENDIF()
 
-FIND_PACKAGE(OpenCL REQUIRED)
-
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -41,6 +39,7 @@ include_directories(
   deps/libuv/include
   deps/imgui
   deps/imgui/examples
+  deps/catch2/include
 )
 
 file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp)
@@ -92,4 +91,23 @@ target_link_libraries(
   ${OPENCL_LIBRARIES}
   ${OpenCL_LIBRARIES}
 )
-target_link_libraries(voxviz )
+
+file(GLOB TEST_FILES test/*)
+
+add_executable(
+  voxviz_test
+  ${TEST_FILES}
+)
+
+add_dependencies(voxviz_test voxviz)
+
+target_link_libraries(
+  voxviz_test
+  glfw
+  glm
+  uv_a
+  qu3e
+  ${OPENGL_gl_LIBRARY}
+  ${OPENCL_LIBRARIES}
+  ${OpenCL_LIBRARIES}
+)
