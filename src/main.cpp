@@ -462,7 +462,7 @@ int main(void) {
   // Start the ImGui frame
   ImGui::CreateContext();
   const float movementSpeed = 0.01;
- 
+  GLFWgamepadstate state;
   while (!glfwWindowShouldClose(window)) {
     float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
     if (keys[GLFW_KEY_W]) {
@@ -527,14 +527,16 @@ int main(void) {
 
     camera->ProcessMouseMovement(delta[0], -delta[1]);
     
-    if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
+    if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
       int axis_count;
       const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
-
+      const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+      const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+      const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
       tool->move(
-        axis[2] * movementSpeed,
-        axis[1] * movementSpeed,
-        axis[3] * -movementSpeed
+        fabs(x) > 0.1 ? x * movementSpeed : 0,
+        fabs(y) > 0.1 ? -y * movementSpeed : 0,
+        fabs(z) > 0.1 ? z * movementSpeed : 0
       );
     }
 
@@ -678,15 +680,17 @@ int main(void) {
 
     // Tool based boolean operations
     // opCut
-    /*for (auto& volume : volumeManager->volumes) {
-      if (volume == tool) {
-        continue;
+    if (state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER] > 0.1) {
+      for (auto& volume : volumeManager->volumes) {
+        if (volume == tool) {
+          continue;
+        }
+        
+        volume->opCut(tool, brickCutProgram);
       }
+    }
 
-      volume->cut(tool, brickCutProgram);
-    }*/
-
-    if (keys[GLFW_KEY_SPACE]) {
+    if (state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER]) {
       floor->opAdd(tool, brickAddProgram);
     }
 
@@ -723,9 +727,10 @@ int main(void) {
     
     shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
 
-    if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
+    // TODO: not in glfw 3.3
+    /*if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       glfwSetJoystickVibration(GLFW_JOYSTICK_1, total_affected, 0);
-    }
+    }*/
     
     if (total_affected <= 1000) {
       total_affected = 0;
