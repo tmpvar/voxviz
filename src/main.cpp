@@ -303,6 +303,11 @@ int main(void) {
     ->add(Shaders::get("brick-cut.comp"))
     ->link();
 
+  Program *brickAddProgram = new Program();
+  brickAddProgram
+    ->add(Shaders::get("brick-add.comp"))
+    ->link();
+
 
   Raytracer *raytracer = new Raytracer(dims);
   float max_distance = 10000.0f;
@@ -417,8 +422,8 @@ int main(void) {
   volumeManager->addVolume(floor);
 
   for (int x = 0; x < 32; x++) {
-    for (int y = 0; y < 4; y++) {
-      for (int z = 0; z < 32; z++) {
+    for (int y = 0; y < 1; y++) {
+      for (int z = 0; z < 4; z++) {
         floor->AddBrick(glm::ivec3(x, y, z))->createGPUMemory();
       }
     }
@@ -672,16 +677,18 @@ int main(void) {
    */
 
     // Tool based boolean operations
-    
-    for (auto& volume : volumeManager->volumes) {
+    // opCut
+    /*for (auto& volume : volumeManager->volumes) {
       if (volume == tool) {
         continue;
       }
 
       volume->cut(tool, brickCutProgram);
+    }*/
+
+    if (keys[GLFW_KEY_SPACE]) {
+      floor->opAdd(tool, brickAddProgram);
     }
-
-
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();

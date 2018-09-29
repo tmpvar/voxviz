@@ -45,6 +45,8 @@ void Brick::createGPUMemory() {
 
   glGetBufferParameterui64vNV(GL_TEXTURE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &this->bufferAddress);
   gl_error();
+
+  glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 void Brick::upload() {
