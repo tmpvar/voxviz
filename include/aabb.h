@@ -8,6 +8,15 @@ typedef struct {
   glm::vec3 upper;
 } aabb_t;
 
-void aabb_print(aabb_t v);
+void aabb_print(aabb_t *v);
+aabb_t * aabb_create();
+void aabb_free(aabb_t *a);
+
+void aabb_grow(aabb_t * dst, const aabb_t * src);
+bool aabb_isect(const aabb_t *a, const aabb_t *b, aabb_t *out);
+
+bool aabb_contains(const aabb_t * box, const glm::vec3 v);
+
+bool aabb_overlaps(const aabb_t * a, const aabb_t * b);
 
 #endif

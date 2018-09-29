@@ -21,6 +21,8 @@ uniform vec3 invEye;
 uniform int showHeat;
 uniform float maxDistance;
 uniform vec4 material;
+uniform mat4 model;
+uniform vec3 eye;
 //#define ITERATIONS BRICK_DIAMETER*2
 #define ITERATIONS BRICK_DIAMETER*2 + BRICK_RADIUS
 
@@ -31,42 +33,6 @@ float voxel(ivec3 pos) {
 
 	uint idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
 	return volumePointer[idx];
-}
-
-float march1(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
-  // grid space
-  vec3 origin = pos;
-  //vec3 grid = vec3(floor(pos));
-  vec3 grid_step = sign(dir);
-
-  bvec3 mask;
-  float hit = -1.0;
-  // ray space
-  vec3 inv = vec3( 1.0 ) / dir;
-  vec3 ratio = inv;
-  //vec3 ratio = (1.0-fract(pos)) * inv;
-  vec3 ratio_step = grid_step * inv;
-
-  // dda
-  iterations = 0.0;
-  for (float i = 0.0; i < ITERATIONS; i++ ) {
-	float v = voxel(ivec3(pos));
-    if (hit > 0.0 || v > 0.0) {
-      hit = 1.0;
-	  break;
-    }
-    iterations++;
-
-    mask = lessThanEqual(ratio.xyz, min(ratio.yzx, ratio.zxy));
-    //grid += uvec3(grid_step) * uvec3(mask);
-    pos += grid_step * vec3(mask);
-    ratio += ratio_step * vec3(mask);
-  }
-  
-  center = floor(pos) + vec3( 0.5 );
-  vec3 d = abs(center - pos);
-  normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
-  return hit;
 }
 
 float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
@@ -83,7 +49,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   vec3 ratio_step = grid_step * inv;
 
   // dda
-  hit = -1.0;
+  hit = 0.0;
   iterations = 0.0;
   for (float i = 0.0; i < ITERATIONS; i++ ) {
     if (hit > 0.0 || voxel( ivec3(floor(pos)) ) > 0.0) {
@@ -107,7 +73,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
 
 float march_groundtruth(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
 	vec3 invDir = 1.0 / dir;
-	float hit = -1.0;
+	float hit = 0.0;
 	for (iterations = 0; iterations < ITERATIONS*20; iterations++) {
 		float v = voxel(ivec3(floor(pos)));
 		if (v > 0.0) {
@@ -121,9 +87,12 @@ float march_groundtruth(in out vec3 pos, vec3 dir, out vec3 center, out vec3 nor
 	vec3 d = sign(fract(pos));
 
 	normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
-	
-
 	return hit;
+}
+
+vec3 tx(mat4 m, vec3 v) {
+  vec4 tmp = m * vec4(v, 1.0);
+  return tmp.xyz / tmp.w;
 }
 
 void main() {
@@ -138,17 +107,27 @@ void main() {
   // move the location to positive space to better align with the underlying grid
   vec3 pos = brickSurfacePos * BRICK_DIAMETER;
 
-  //float hit = march(pos, dir, voxelCenter, normal, iterations);
   float hit = march(pos, dir, voxelCenter, normal, iterations);
-  
+  //float hit = march_groundtruth(pos, dir, voxelCenter, normal, iterations);
+  if (hit < 0.0) {
+	discard;
+  }
   pos = pos / BRICK_DIAMETER;
   //gl_FragDepth = hit < 0.0 ? 1.0 : distance(rayOrigin + (pos - brickOrigin) / BRICK_DIAMETER, invEye) / maxDistance;
-  outColor = material; //vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
+  outColor = mix(material, vec4(1.0, 0.0, 0.0, 1.0), debug); //vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
   //outPosition = rayOrigin / maxDistance;
-  gl_FragDepth = hit > 0.0 ? distance(brickTranslation + pos, invEye) / maxDistance : 1.0;
-  outColor = vec4(pos, 1.0);
+
+
+  gl_FragDepth = mix(
+	1.0,
+	distance(tx(model, brickTranslation + pos), eye) / maxDistance,
+	hit
+  );
+
+  //outColor = vec4(pos, 1.0);
   //outColor = vec4(0.5 * dir + 0.5, 1.0);
-  //outColor = vec4(normal, 1.0);
+  outColor = vec4(normal, 1.0);
+  outColor = mix(vec4(normal, 1.0), vec4(1.0, 0.0, 0.0, 1.0), debug);
   //outColor = vec4(brickSurfacePos, 1.0);
   //outColor = material;
 }

@@ -58,7 +58,7 @@ public:
       cout << "  " << xt[2][0] << " " << xt[2][1] << " " << xt[2][2] << " " << xt[2][3] << " " << endl;
 
       // TODO: this should not live here
-      Volume *volume = new Volume(glm::vec3(0.0, 0, 0), scene, bodyDef);
+      Volume *volume = new Volume(glm::vec3(0.0, 0, 0));
       volumeManager->addVolume(volume);
 
 
@@ -100,7 +100,7 @@ public:
         ifs.read((char *)&brickIndex, 12);
         ifs.read((char *)brickData, BRICK_VOXEL_COUNT);
         //cout << "brick index: " << i << " of " << totalBricks << endl;
-        Brick *brick = volume->AddBrick(brickIndex, boxDef);
+        Brick *brick = volume->AddBrick(brickIndex);
         
         for (uint32_t j = 0; j < BRICK_VOXEL_COUNT; j++) {
           brick->data[j] = float(brickData[j]);

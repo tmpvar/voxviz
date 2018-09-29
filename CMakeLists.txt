@@ -89,17 +89,44 @@ target_link_libraries(
 	qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
-  ${OpenCL_LIBRARIES}
-)
+ )
 
 file(GLOB TEST_FILES test/*)
 
 add_executable(
   voxviz_test
   ${TEST_FILES}
+  src/aabb.cpp
+  src/glad.c
+  src/brick.cpp
+  src/gl-wrap.cpp
+  include/raytrace.h
+  include/gl-wrap.h
+  include/camera-orbit.h
+  include/camera-free.h
+  include/core.h
+  include/brick.h
+  include/aabb.h
+  include/shadowmap.h
+  include/volume.h
+  include/volume-manager.h
+
+  include/parser/vzd/vzd.h
+
+  src/fullscreen-surface.cpp
+  include/fullscreen-surface.h
+
+  ${SHADER_FILES}
+
+  #imgui
+  deps/imgui/imgui.cpp
+  deps/imgui/imgui_demo.cpp
+  deps/imgui/imgui_draw.cpp
+  deps/imgui/examples/imgui_impl_glfw.cpp
+  deps/imgui/examples/imgui_impl_opengl3.cpp
 )
 
-add_dependencies(voxviz_test voxviz)
+target_compile_definitions(voxviz_test PRIVATE "TESTING=1")
 
 target_link_libraries(
   voxviz_test
@@ -109,5 +136,4 @@ target_link_libraries(
   qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
-  ${OpenCL_LIBRARIES}
 )

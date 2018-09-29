@@ -2,18 +2,27 @@
 #include "gl-wrap.h"
 #include "core.h"
 #include "glm/gtc/matrix_transform.hpp"
+#include "volume.h"
 
 Brick::Brick(glm::ivec3 index) {
   this->index = index;
   this->debug = 0.0f;
+  this->bufferAddress = 0;
+  this->bufferId = 0;
+  this->aabb = aabb_create();
+  this->aabb->lower = glm::vec3(index);
+  this->aabb->upper = glm::vec3(index) + glm::vec3(1.0);
   // TODO: we probably only need to malloc this if the data for
   // this brick originates at the HOST
   this->data = (float *)malloc(BRICK_VOXEL_COUNT * sizeof(GLfloat));
 }
 
 Brick::~Brick() {
-  glMakeBufferNonResidentNV(this->bufferAddress);
-  glDeleteBuffers(1, &this->bufferId);
+  if (this->bufferAddress != 0) {
+    glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
+    glMakeBufferNonResidentNV(GL_TEXTURE_BUFFER);
+    glDeleteBuffers(1, &this->bufferId);
+  }
 }
 
 void Brick::createGPUMemory() {
@@ -66,41 +75,8 @@ void Brick::fill(Program *program) {
 void Brick::bind(Program *program) {
 }
 
-aabb_t Brick::aabb() {
-  // TODO: cache aabb and recompute on reposition
-  aabb_t ret;
-    
-  glm::vec3 lower = this->index * BRICK_DIAMETER;
-
-  ret.lower = lower;
-  ret.upper = lower + glm::vec3(BRICK_DIAMETER);
-  return ret;
-}
-
 bool Brick::isect(Brick *other, aabb_t *out) {
-  aabb_t a = this->aabb();
-  aabb_t b = other->aabb();
-
-  if (
-    !(
-      (a.lower.x <= b.upper.x && a.upper.x >= b.lower.x) &&
-      (a.lower.y <= b.upper.y && a.upper.y >= b.lower.y) &&
-      (a.lower.z <= b.upper.z && a.upper.z >= b.lower.z)
-     )
-  )
-  {
-    return false;
-  }
-
-  out->upper.x = min(a.upper.x, b.upper.x);
-  out->upper.y = min(a.upper.y, b.upper.y);
-  out->upper.z = min(a.upper.z, b.upper.z);
-
-  out->lower.x = max(a.lower.x, b.lower.x);
-  out->lower.y = max(a.lower.y, b.lower.y);
-  out->lower.z = max(a.lower.z, b.lower.z);
-
-  return true;
+  return aabb_isect(this->aabb, other->aabb, out);
 }
 
 void Brick::setVoxel(glm::uvec3 pos, float val) {
@@ -124,4 +100,49 @@ void Brick::setVoxel(glm::uvec3 pos, float val) {
 void Brick::fillConst(float val) {
   glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
   glClearBufferData(GL_TEXTURE_BUFFER, GL_R32F, GL_RED, GL_FLOAT, &val);
+}
+
+
+void Brick::cut(Brick *cutter, Program *program) {
+  // compute overlapping aabb
+  // kick off a compute job
+  glm::vec3 volumeOffset;
+  glm::vec3 cutterOffset;
+  glm::ivec3 sliceDims;
+
+  this->volume->computeBrickOffset(
+    this,
+    cutter,
+    &volumeOffset,
+    &cutterOffset,
+    &sliceDims
+  );
+
+  if (program != nullptr) {
+    program->use()
+      ->bufferAddress("volume", this->bufferAddress)
+      ->bufferAddress("cutter", cutter->bufferAddress)
+      ->uniformVec3ui("volumeOffset", glm::uvec3(volumeOffset))
+      ->uniformVec3ui("cutterOffset", glm::uvec3(cutterOffset));
+
+    /*
+    // this is currently triggering a gl error which causes the process to die
+    sliceDims = glm::clamp(sliceDims, glm::uvec3(1), glm::uvec3(BRICK_DIAMETER - 1));
+    glDispatchComputeGroupSizeARB(
+      1,
+      1,
+      1,
+      sliceDims.x,
+      sliceDims.y,
+      sliceDims.z
+    );*/
+
+    glDispatchCompute(
+      1,
+      BRICK_DIAMETER,
+      BRICK_DIAMETER
+    );
+ 
+    gl_error();
+  }
 }

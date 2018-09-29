@@ -19,7 +19,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <q3.h>
-
+#include <glm/glm.hpp>
 #include "parser/vzd/vzd.h"
 
 #define _USE_MATH_DEFINES
@@ -283,6 +283,7 @@ int main(void) {
   else {
     cout << "glDebugMessageCallback not available" << endl;
   }
+
   Shaders::init();
   shadowmap = new Shadowmap();
   shadowmap->orient(glm::vec3(-200, 300, 260), glm::vec3(350, 60, 260));
@@ -296,6 +297,13 @@ int main(void) {
     ->add(Shaders::get("fill-sphere.comp"))
     ->link();
  
+
+  Program *brickCutProgram = new Program();
+  brickCutProgram
+    ->add(Shaders::get("brick-cut.comp"))
+    ->link();
+
+
   Raytracer *raytracer = new Raytracer(dims);
   float max_distance = 10000.0f;
 
@@ -364,40 +372,62 @@ int main(void) {
   //       concerned.
   //       big volumes also cause this to halt the program.
   // bodyDef.bodyType = eDynamicBody;
-  VZDParser::parse(
+
+  /*VZDParser::parse(
     "D:\\work\\voxviz\\include\\parser\\vzd\\out.vzd",
     volumeManager,
     physicsScene,
     bodyDef
-  );
+  );*/
+
+  Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0));
+  Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
+  toolBrick->createGPUMemory();
+  toolBrick->fill(fillSphereProgram);
+  
+  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(0, 0, 0), &boxDef);
+  toolBrick2->createGPUMemory();
+  toolBrick2->fillConst(1.0);
+  
+  volumeManager->addVolume(tool);
+
+  
 
 
   q3Transform tx;
   q3Identity(tx);
   boxDef.SetRestitution(0.5);
   bodyDef.bodyType = eStaticBody;
-  Volume *floor = new Volume(glm::vec3(0.0), physicsScene, bodyDef);
-  floor->material = glm::vec4(0.67, 0.71, 0.78, 1.0);
+
   boxDef.Set(tx, q3Vec3(
     BRICK_DIAMETER,
     BRICK_DIAMETER,
     BRICK_DIAMETER
   ));
 
+  Volume *floor = new Volume(glm::vec3(0.0));
+  floor->material = glm::vec4(0.67, 0.71, 0.78, 1.0);
+  //Brick *floorBrick = floor->AddBrick(glm::ivec3(1, 0, 0));
+  //floorBrick->createGPUMemory();
+  //floorBrick->fillConst(1.0);
+  //floor->cut(tool);
+  //return 1;
+  
+
   volumeManager->addVolume(floor);
 
-  for (int x = -16; x < 16; x++) {
-    for (int y = 0; y < 1; y++) {
-      for (int z = -16; z < 16; z++) {
-        floor->AddBrick(glm::ivec3(x, y, z), boxDef)->createGPUMemory();
+  for (int x = 0; x < 32; x++) {
+    for (int y = 0; y < 4; y++) {
+      for (int z = 0; z < 32; z++) {
+        floor->AddBrick(glm::ivec3(x, y, z))->createGPUMemory();
       }
     }
   }
 
   for (auto& it : floor->bricks) {
     Brick *brick = it.second;
-    //brick->fillConst(1.0);
-    brick->fill(fillSphereProgram);
+    brick->fillConst(1.0);
+    //brick->fill(fillSphereProgram);
   }
 
 
@@ -427,7 +457,7 @@ int main(void) {
   // Start the ImGui frame
   ImGui::CreateContext();
   const float movementSpeed = 0.01;
-  
+ 
   while (!glfwWindowShouldClose(window)) {
     float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
     if (keys[GLFW_KEY_W]) {
@@ -491,36 +521,28 @@ int main(void) {
     mouse[1] = ypos;
 
     camera->ProcessMouseMovement(delta[0], -delta[1]);
-    /*
+    
     if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       int axis_count;
       const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
 
       tool->move(
-        axis[2] * 5.0f,
-        axis[1] * 5.0f,
-        axis[3] * -5.0f
-      );
-    }
-
-    else if (false) {
-      tool->position(
-        256.0f * 2.0f + sinf((float)time / 50.0f) * fmod(time, 3000.0f) / 5.0f,
-        512.0f - time / 100.0f,
-        256.0f * 2.0f + cosf((float)time / 50.0f) * fmod(time, 3000.0f) / 5.0f
+        axis[2] * movementSpeed,
+        axis[1] * movementSpeed,
+        axis[3] * -movementSpeed
       );
     }
 
     if (tool_position_queue.size() > 0) {
       glm::vec3 new_tool_pos = glm::abs(tool_position_queue.front());
       tool_position_queue.pop();
-      tool->position(
+      tool->position = glm::vec3(
         new_tool_pos.x * 10.0f,
         new_tool_pos.z * 10.0f,
         new_tool_pos.y * 10.0f
       );
     }
-    */
+    
 
     viewMatrix = camera->GetViewMatrix();
 
@@ -584,14 +606,25 @@ int main(void) {
           invEye.y / invEye.w,
           invEye.z / invEye.w
         ))
+        ->uniformMat4("model", volumeModel)
+        ->uniformVec3("eye", currentEye)
         ->uniformFloat("maxDistance", max_distance)
         ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformFloat("debug", debug)
         ->uniformVec4("material", volume->material);
+
+      /*raytracer->program->uniformFloat(
+        "debug",
+        volume != tool && tool->overlaps(volume) ? 1.0 : 0.0
+      );*/
+
       gl_error();
       volume->bind();
       raytracer->render(volume, raytracer->program);
     }
+
+    //volumeManager->volumes[0]->rotation.x += 0.0001;
+    //volumeManager->volumes[1]->scale.z = 1.0 + abs(sin(time / 1000.0)) * 10.0;
+    //volumeManager->volumes[1]->rotation.y += 0.001;
 /*
     {
       glm::mat4 volumeModel = floor->getModelMatrix();
@@ -637,6 +670,19 @@ int main(void) {
 
     fullscreen_surface->render(fullscreen_program);
    */
+
+    // Tool based boolean operations
+    
+    for (auto& volume : volumeManager->volumes) {
+      if (volume == tool) {
+        continue;
+      }
+
+      volume->cut(tool, brickCutProgram);
+    }
+
+
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();

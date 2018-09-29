@@ -4,8 +4,10 @@
 #include <glm/glm.hpp>
 #include "aabb.h"
 #include "gl-wrap.h"
+  
 
   class Program;
+  class Volume;
 
   class Brick {
   public:
@@ -15,6 +17,8 @@
     GLuint64 bufferAddress;
     float debug;
     float *data;
+    aabb_t *aabb;
+    Volume *volume;
 
     Brick(glm::ivec3 index);
     ~Brick();
@@ -22,10 +26,10 @@
     void upload();
     void fill(Program * program);
     void bind(Program * program);
-    aabb_t aabb();
     bool isect(Brick *other, aabb_t *out);
 
     void setVoxel(glm::uvec3 pos, float val);
     void fillConst(float val);
+    void cut(Brick *cutter, Program *program);
   };
 #endif

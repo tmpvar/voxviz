@@ -18,13 +18,19 @@ public:
   glm::vec3 position;
   glm::vec3 scale;
   glm::vec4 material;
+
+  aabb_t *aabb;
+
   Mesh *mesh;
 
   q3Body* physicsBody;
-  Volume(glm::vec3 pos, q3Scene *scene, q3BodyDef bodyDef) {
+  Volume(glm::vec3 pos, q3Scene *scene = nullptr, q3BodyDef *bodyDef = nullptr) {
     this->position = pos;
     this->rotation = glm::vec3(0.0);
     this->scale = glm::vec3(1.0);
+    this->aabb = aabb_create();
+    this->aabb->lower = glm::vec3(FLT_MAX);
+    this->aabb->upper = glm::vec3(-FLT_MAX);
 
     this->dirty = false;
 
@@ -65,12 +71,16 @@ public:
       ->vert(0, 0, 0)
       ->vert(1, 0, 0)
       ->vert(1, 0, 1)
-      ->vert(0, 0, 1)
-      ->upload();
+      ->vert(0, 0, 1);
 
-    bodyDef.position.Set(pos.x, pos.y, pos.z);
-    this->physicsBody = scene->CreateBody(bodyDef);
-    
+    #ifndef TESTING
+      mesh->upload();
+    #endif
+
+    if (bodyDef != nullptr && scene != nullptr) {
+      bodyDef->position.Set(pos.x, pos.y, pos.z);
+      this->physicsBody = scene->CreateBody(*bodyDef);
+    }
   }
 
   ~Volume() {
@@ -80,10 +90,11 @@ public:
     }
     this->bricks.clear();
     delete this->mesh;
+    aabb_free(this->aabb);
   }
 
   // TODO: consider denoting this as relative
-  Brick *AddBrick(glm::ivec3 index, q3BoxDef boxDef) {
+  Brick *AddBrick(glm::ivec3 index, q3BoxDef *boxDef = nullptr) {
     Brick *brick = new Brick(index);
     this->bricks.emplace(index, brick);
 
@@ -102,33 +113,33 @@ public:
     // TODO: associate this box w/ the brick
     this->physicsBody->AddBox(boxDef);
     */
+    brick->volume = this;
+    aabb_grow(this->aabb, brick->aabb);
+
     return brick;
   }
 
-  void setVoxel(glm::ivec3 coord, float val) {
-
-    glm::ivec3 index = glm::ivec3(
-      floor(coord.x / BRICK_DIAMETER),
-      floor(coord.y / BRICK_DIAMETER),
-      floor(coord.z / BRICK_DIAMETER)
-    );
-
-    // find the brick that contains this voxel
-    // if no brick, create one
+  Brick *getBrick(glm::ivec3 index) {
+    auto it = this->bricks.find(index);
     Brick *found = nullptr;
 
-    auto it = this->bricks.find(index);
     if (it != this->bricks.end()) {
       found = it->second;
     }
-    else {
-      q3BoxDef boxDef;
-      q3Transform tx;
-      q3Identity(tx);
-      boxDef.SetRestitution(0.5);
-      found = this->AddBrick(index, boxDef);
-    }
-    found->setVoxel(mod(glm::vec3(coord), glm::vec3(BRICK_DIAMETER)), val);
+
+    return found;
+  }
+
+
+  Brick *getBrickFromWorldPos(glm::vec3 pos) {
+    glm::ivec3 local = glm::ivec3(glm::floor(pos - this->position));
+    return this->getBrick(local);
+  }
+
+  void move(float x, float y, float z) {
+    this->position.x += x;
+    this->position.y += y;
+    this->position.z += z;
   }
 
   void bind() {
@@ -190,15 +201,15 @@ public:
   }
 
   glm::mat4 getModelMatrix() {
-//    q3Transform tx = this->physicsBody->GetTransform();
+    //    q3Transform tx = this->physicsBody->GetTransform();
 
     glm::mat4 model = glm::mat4(1.0f);
 
-//    model = glm::translate(model, glm::vec3(
-//      tx.position.x,
-//      tx.position.y,
-//      tx.position.z
-//    ));
+    //    model = glm::translate(model, glm::vec3(
+    //      tx.position.x,
+    //      tx.position.y,
+    //      tx.position.z
+    //    ));
     model = glm::translate(model, this->position);
 
     model = glm::rotate(model, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
@@ -207,5 +218,135 @@ public:
     model = glm::scale(model, scale);
 
     return model;
+  }
+
+  bool overlaps(Volume *v) {
+    glm::vec3 mylower = this->aabb->lower + this->position;
+    glm::vec3 myupper = this->aabb->upper + this->position;
+
+    glm::vec3 otherlower = v->aabb->lower + v->position;
+    glm::vec3 otherupper = v->aabb->upper + v->position;
+
+    // TODO: move this into aabb
+
+    return (
+      glm::all(glm::lessThanEqual(mylower, otherupper)) &&
+      glm::all(glm::greaterThanEqual(myupper, otherlower))
+      );
+  }
+
+  bool intersect(Volume *v, aabb_t *out) {
+    aabb_t *mine = aabb_create();
+    mine->lower = this->aabb->lower + this->position;
+    mine->upper = this->aabb->upper + this->position;
+
+    aabb_t *other = aabb_create();
+    other->lower = v->aabb->lower + v->position;
+    other->upper = v->aabb->upper + v->position;
+
+    return aabb_isect(mine, other, out);
+  }
+
+  void computeBrickOffset(
+    Brick *myBrick,
+    Brick *otherBrick,
+    glm::vec3 *myOffset,
+    glm::vec3 *otherOffset,
+    glm::ivec3 *sliceDims
+  ) {
+    Volume *otherVolume = otherBrick->volume;
+    aabb_t *mine = aabb_create();
+    aabb_t *other = aabb_create();
+    aabb_t *overlap = aabb_create();
+  
+    mine->lower = this->position + glm::vec3(myBrick->index);
+    mine->upper = mine->lower + glm::vec3(1.0);
+
+    other->lower = otherVolume->position + glm::vec3(otherBrick->index);
+    other->upper = other->lower + glm::vec3(1.0);
+
+    aabb_isect(mine, other, overlap);
+    
+    glm::vec3 slice = overlap->upper - overlap->lower;
+
+    sliceDims->x = int32_t(fabs(slice.x) * BRICK_DIAMETER);
+    sliceDims->y = int32_t(fabs(slice.y) * BRICK_DIAMETER);
+    sliceDims->z = int32_t(fabs(slice.z) * BRICK_DIAMETER);
+
+    myOffset->x = floorf((overlap->lower.x - mine->lower.x) * (BRICK_DIAMETER));
+    myOffset->y = floorf((overlap->lower.y - mine->lower.y) * (BRICK_DIAMETER));
+    myOffset->z = floorf((overlap->lower.z - mine->lower.z) * (BRICK_DIAMETER));
+
+    otherOffset->x = ceilf((overlap->lower.x - other->lower.x) * BRICK_DIAMETER);
+    otherOffset->y = ceilf((overlap->lower.y - other->lower.y) * BRICK_DIAMETER);
+    otherOffset->z = ceilf((overlap->lower.z - other->lower.z) * BRICK_DIAMETER);
+  }
+
+  void cut(Volume *tool, Program *program = nullptr) {
+    // TODO: return the number of affected voxels
+    // TODO: add the bricks into a queue that we can process over a few
+    //       frames so we don't jank on the current frame when the 
+    //       complexity explodes.
+    // check aabb intersection
+    // check brick intersection
+    // for every intersecting brick
+    //   brick->cut(cutter.bricks[intersectingBrick])
+    // TODO: get rid of this allocation
+    aabb_t tmpAABB;
+    bool overlaps = this->intersect(tool, &tmpAABB);
+    if (!overlaps) {
+      return;
+    }
+
+    glm::vec3 lower = tmpAABB.lower;
+    glm::vec3 upper = tmpAABB.upper;
+    // TODO: support for volume groups
+    glm::vec3 pos;
+    for (int x = lower.x; x <= upper.x; x++) {
+      pos.x = x;
+      for (int y = lower.y; y <= upper.y; y++) {
+        pos.y = y;
+        for (int z = lower.z; z <= upper.z; z++) {
+          pos.z = z;
+          /*Brick *toolBrick = tool->getBrickFromWorldPos(index);
+          Brick *volumeBrick = this->getBrickFromWorldPos(index);
+          if (toolBrick == nullptr || volumeBrick == nullptr) {
+            continue;
+          }*/
+          //volumeBrick->cut(toolBrick, program);
+
+          glm::vec3 volumeBrickPos = glm::vec3(pos + this->position);
+          glm::vec3 toolBrickPos = glm::vec3(pos + tool->position);
+          
+          Brick *toolBrick = tool->getBrick(pos - tool->position);
+          Brick *volumeBrick = this->getBrick(pos - this->position);
+
+          if (toolBrick == nullptr || volumeBrick == nullptr) {
+            continue;
+          }
+
+          glm::vec3 lo = glm::vec3(
+            max(volumeBrickPos.x, toolBrickPos.x),
+            max(volumeBrickPos.y, toolBrickPos.y),
+            max(volumeBrickPos.z, toolBrickPos.z)
+          );
+
+          glm::vec3 cutterOffset = ((this->position + glm::vec3(volumeBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
+          glm::vec3 volumeOffset = ((tool->position + glm::vec3(toolBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
+
+          program->use()
+            ->bufferAddress("volume", volumeBrick->bufferAddress)
+            ->bufferAddress("cutter", toolBrick->bufferAddress)
+            ->uniformVec3i("volumeOffset", glm::ivec3(volumeOffset))
+            ->uniformVec3i("cutterOffset", glm::ivec3(cutterOffset));
+
+          glDispatchCompute(
+            1,
+            BRICK_DIAMETER,
+            BRICK_DIAMETER
+          );
+        }
+      }
+    }
   }
 };
