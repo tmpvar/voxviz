@@ -356,8 +356,8 @@ public:
     glm::vec3 upper = tmpAABB.upper;
 
     if (!overlaps) {
-      lower = tool->aabb->lower + tool->position;
-      upper = tool->aabb->upper + tool->position;
+      lower = floor(tool->aabb->lower + tool->position);
+      upper = ceil(tool->aabb->upper + tool->position);
     }
 
 
@@ -376,18 +376,20 @@ public:
           }
 
           Brick *volumeBrick = this->getBrick(pos - this->position);
+
           if (volumeBrick == nullptr) {
             volumeBrick = this->AddBrick(pos - this->position);
             volumeBrick->createGPUMemory();
           }
-          glm::vec3 cutterOffset = ((this->position + glm::vec3(volumeBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
+
+          glm::vec3 toolOffset = ((this->position + glm::vec3(volumeBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
           glm::vec3 volumeOffset = ((tool->position + glm::vec3(toolBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
 
           program->use()
             ->bufferAddress("volumeBuffer", volumeBrick->bufferAddress)
             ->bufferAddress("toolBuffer", toolBrick->bufferAddress)
             ->uniformVec3i("volumeOffset", glm::ivec3(volumeOffset))
-            ->uniformVec3i("toolOffset", glm::ivec3(cutterOffset));
+            ->uniformVec3i("toolOffset", glm::ivec3(toolOffset));
 
           glDispatchCompute(
             1,
