@@ -63,6 +63,7 @@ add_executable(
   include/volume-manager.h
 
   include/parser/vzd/vzd.h
+  include/parser/magicavoxel/vox.h
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
@@ -112,6 +113,7 @@ add_executable(
   include/volume-manager.h
 
   include/parser/vzd/vzd.h
+  include/parser/magicavoxel/vox.h
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
