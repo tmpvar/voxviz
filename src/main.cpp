@@ -385,7 +385,7 @@ int main(void) {
     bodyDef
   );*/
 
-  Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0));
+  Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.5));
   Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);

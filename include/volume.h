@@ -119,12 +119,17 @@ public:
     return brick;
   }
 
-  Brick *getBrick(glm::ivec3 index) {
+  Brick *getBrick(glm::ivec3 index, bool createIfNotFound = false) {
     auto it = this->bricks.find(index);
     Brick *found = nullptr;
 
     if (it != this->bricks.end()) {
       found = it->second;
+    }
+
+    if (found == nullptr && createIfNotFound) {
+      found = this->AddBrick(index);
+      found->createGPUMemory();
     }
 
     return found;
@@ -283,14 +288,11 @@ public:
   }
 
   void opCut(Volume *tool, Program *program = nullptr) {
+    
     // TODO: return the number of affected voxels
     // TODO: add the bricks into a queue that we can process over a few
     //       frames so we don't jank on the current frame when the 
     //       complexity explodes.
-    // check aabb intersection
-    // check brick intersection
-    // for every intersecting brick
-    //   brick->cut(cutter.bricks[intersectingBrick])
     // TODO: get rid of this allocation
     aabb_t tmpAABB;
     bool overlaps = this->intersect(tool, &tmpAABB);
@@ -298,107 +300,83 @@ public:
       return;
     }
 
-    glm::vec3 lower = tmpAABB.lower;
-    glm::vec3 upper = tmpAABB.upper;
+    glm::vec3 lower = tmpAABB.lower - tool->position;
+    glm::vec3 upper = tmpAABB.upper - tool->position;
     // TODO: support for volume groups
     glm::vec3 pos;
+    Brick *toolBrick;
     for (int x = lower.x; x <= upper.x; x++) {
-      pos.x = x;
       for (int y = lower.y; y <= upper.y; y++) {
-        pos.y = y;
         for (int z = lower.z; z <= upper.z; z++) {
-          pos.z = z;
-          /*Brick *toolBrick = tool->getBrickFromWorldPos(index);
-          Brick *volumeBrick = this->getBrickFromWorldPos(index);
-          if (toolBrick == nullptr || volumeBrick == nullptr) {
-            continue;
-          }*/
-          //volumeBrick->cut(toolBrick, program);
-          Brick *toolBrick = tool->getBrick(pos - tool->position);
-          Brick *volumeBrick = this->getBrick(pos - this->position);
+          // Volume index space
+          toolBrick = tool->getBrick(glm::ivec3(x, y, z));
+          // Volume world space
+          pos = glm::vec3(x, y, z) + tool->position;
 
-          if (toolBrick == nullptr || volumeBrick == nullptr) {
-            continue;
+          glm::vec3 d = glm::floor(pos - this->position);
+
+          for (uint8_t i = 0; i < 8; i++) {
+            glm::vec3 corner = glm::vec3(
+              i & 1 ? 1.0 : 0.0,
+              i & 2 ? 1.0 : 0.0,
+              i & 4 ? 1.0 : 0.0
+            );
+            performOperation(tool, this->getBrick(d + corner), toolBrick, pos, program);
           }
-
-          glm::vec3 cutterOffset = ((this->position + glm::vec3(volumeBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
-          glm::vec3 volumeOffset = ((tool->position + glm::vec3(toolBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
-
-          program->use()
-            ->bufferAddress("volume", volumeBrick->bufferAddress)
-            ->bufferAddress("cutter", toolBrick->bufferAddress)
-            ->uniformVec3i("volumeOffset", glm::ivec3(volumeOffset))
-            ->uniformVec3i("cutterOffset", glm::ivec3(cutterOffset));
-
-          glDispatchCompute(
-            1,
-            BRICK_DIAMETER,
-            BRICK_DIAMETER
-          );
         }
       }
     }
   }
 
   void opAdd(Volume *tool, Program *program = nullptr) {
-    // TODO: return the number of affected voxels
-    // TODO: add the bricks into a queue that we can process over a few
-    //       frames so we don't jank on the current frame when the 
-    //       complexity explodes.
-    // check aabb intersection
-    // check brick intersection
-    // for every intersecting brick
-    //   brick->cut(cutter.bricks[intersectingBrick])
-    // TODO: get rid of this allocation
-    aabb_t tmpAABB;
-    bool overlaps = this->intersect(tool, &tmpAABB);
-    glm::vec3 lower = tmpAABB.lower;
-    glm::vec3 upper = tmpAABB.upper;
-
-    if (!overlaps) {
-      lower = floor(tool->aabb->lower + tool->position);
-      upper = ceil(tool->aabb->upper + tool->position);
-    }
-
+    // Index space bounding box
+    glm::vec3 lower = tool->aabb->lower;
+    glm::vec3 upper = tool->aabb->upper;
 
     // TODO: support for volume groups
     glm::vec3 pos;
-    for (int x = lower.x; x <= upper.x; x++) {
-      pos.x = x;
-      for (int y = lower.y; y <= upper.y; y++) {
-        pos.y = y;
-        for (int z = lower.z; z <= upper.z; z++) {
-          pos.z = z;
+    Brick *toolBrick;
+    for (int x = lower.x; x < upper.x; x++) {
+      for (int y = lower.y; y < upper.y; y++) {
+        for (int z = lower.z; z < upper.z; z++) {
+          // Volume index space
+          toolBrick = tool->getBrick(glm::ivec3(x, y, z));
+          // Volume world space
+          pos = glm::vec3(x, y, z) + tool->position;
 
-          Brick *toolBrick = tool->getBrick(pos - tool->position);
-          if (toolBrick == nullptr) {
-            continue;
+          glm::vec3 d = glm::floor(pos - this->position);
+
+          for (uint8_t i = 0; i < 8; i++) {
+            glm::vec3 corner = glm::vec3(
+              i & 1 ? 1.0 : 0.0,
+              i & 2 ? 1.0 : 0.0,
+              i & 4 ? 1.0 : 0.0
+            );
+            performOperation(tool, this->getBrick(d + corner, true), toolBrick, pos, program);
           }
-
-          Brick *volumeBrick = this->getBrick(pos - this->position);
-
-          if (volumeBrick == nullptr) {
-            volumeBrick = this->AddBrick(pos - this->position);
-            volumeBrick->createGPUMemory();
-          }
-
-          glm::vec3 toolOffset = ((this->position + glm::vec3(volumeBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
-          glm::vec3 volumeOffset = ((tool->position + glm::vec3(toolBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
-
-          program->use()
-            ->bufferAddress("volumeBuffer", volumeBrick->bufferAddress)
-            ->bufferAddress("toolBuffer", toolBrick->bufferAddress)
-            ->uniformVec3i("volumeOffset", glm::ivec3(volumeOffset))
-            ->uniformVec3i("toolOffset", glm::ivec3(toolOffset));
-
-          glDispatchCompute(
-            1,
-            BRICK_DIAMETER,
-            BRICK_DIAMETER
-          );
         }
       }
     }
   }
 
+  void performOperation(Volume *tool, Brick* volumeBrick, Brick *toolBrick, glm::vec3 pos, Program *program) {
+    if (toolBrick == nullptr || volumeBrick == nullptr) {
+      return;
+    }
+
+    glm::vec3 toolBrickWorldPos = (tool->position) + glm::vec3(toolBrick->index);
+    glm::vec3 volumeBrickWorldPos = (this->position) + glm::vec3(volumeBrick->index);
+
+    glm::vec3 worldDiff = toolBrickWorldPos - volumeBrickWorldPos;
+
+    glm::vec3 toolOffset;// = ((this->position + glm::vec3(volumeBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
+    toolOffset = worldDiff * glm::vec3(BRICK_DIAMETER);
+
+    program->use()
+      ->bufferAddress("volumeBuffer", volumeBrick->bufferAddress)
+      ->bufferAddress("toolBuffer", toolBrick->bufferAddress)
+      ->uniformVec3i("toolOffset", glm::ivec3(toolOffset));
+
+    glDispatchCompute(1, BRICK_DIAMETER, BRICK_DIAMETER);
+  }
 };

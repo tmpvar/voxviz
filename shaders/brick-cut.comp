@@ -6,10 +6,10 @@
 
 #include "../include/core.h"
 
-uniform float *volume;
-uniform float *cutter;
-uniform ivec3 volumeOffset;
-uniform ivec3 toolOffset;
+uniform float *volumeBuffer;
+uniform float *toolBuffer;
+uniform ivec3  toolOffset;
+
 
 // TODO: how do we cut transformed bricks?
 // TODO: how do we cut using transformed bricks?
@@ -20,21 +20,19 @@ layout( local_size_x = BRICK_DIAMETER, local_size_y = 1, local_size_z = 1 ) in;
 
 void main() {
 	ivec3 pos = ivec3(gl_GlobalInvocationID);
-	ivec3 volumePos = pos + volumeOffset;
-	ivec3 toolPos = pos + toolOffset;
+	ivec3 volumePos = pos + toolOffset;
+	ivec3 toolPos = pos;
 
 	if (
 		any(lessThan(volumePos, vec3(0))) ||
-		any(lessThan(toolPos, vec3(0))) ||
-		any(greaterThanEqual(volumePos, vec3(BRICK_DIAMETER))) ||
-		any(greaterThanEqual(toolPos, vec3(BRICK_DIAMETER)))
+		any(greaterThanEqual(volumePos, vec3(BRICK_DIAMETER))) 
 	) {
 	  return;
 	}
 
 	uint volumeIdx = volumePos.x + volumePos.y * BRICK_DIAMETER + volumePos.z * BRICK_DIAMETER * BRICK_DIAMETER;
-	uint cutterIdx = toolPos.x + toolPos.y * BRICK_DIAMETER + toolPos.z * BRICK_DIAMETER * BRICK_DIAMETER;
-	if (cutter[cutterIdx] > 0.0) {
-		volume[volumeIdx] = 0.0;
+	uint toolIdx = toolPos.x + toolPos.y * BRICK_DIAMETER + toolPos.z * BRICK_DIAMETER * BRICK_DIAMETER;
+	if (toolBuffer[toolIdx] > 0.0) {
+		volumeBuffer[volumeIdx] = 0.0;
 	}
 }

@@ -8,7 +8,6 @@
 
 uniform float *volumeBuffer;
 uniform float *toolBuffer;
-uniform ivec3 volumeOffset;
 uniform ivec3 toolOffset;
 
 // TODO: how do we cut transformed bricks?
@@ -20,14 +19,12 @@ layout( local_size_x = BRICK_DIAMETER, local_size_y = 1, local_size_z = 1 ) in;
 
 void main() {
 	ivec3 pos = ivec3(gl_GlobalInvocationID);
-	ivec3 volumePos = pos + volumeOffset;
-	ivec3 toolPos = pos + toolOffset;
+	ivec3 volumePos = pos + toolOffset;
+	ivec3 toolPos = pos;
 
 	if (
 		any(lessThan(volumePos, vec3(0))) ||
-		any(lessThan(toolPos, vec3(0))) ||
-		any(greaterThanEqual(volumePos, vec3(BRICK_DIAMETER))) ||
-		any(greaterThanEqual(toolPos, vec3(BRICK_DIAMETER)))
+		any(greaterThanEqual(volumePos, vec3(BRICK_DIAMETER)))
 	) {
 	  return;
 	}
