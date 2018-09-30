@@ -599,6 +599,12 @@ int main(void) {
 
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
+    for (int i = 0; i < 16; i++) {
+      if (volumeManager->tick()) {
+        break;
+      }
+    }
+
     for (auto& volume : volumeManager->volumes) {
       if (volume->bricks.size() == 0) {
         continue;

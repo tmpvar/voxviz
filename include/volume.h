@@ -8,6 +8,24 @@
 #include "glm/gtc/integer.hpp"
 #include "glm/gtx/hash.hpp"
 #include <unordered_map>
+#include <queue>
+
+class VolumeOperation {
+public:
+  Volume *tool;
+  Brick *toolBrick;
+  Brick *volumeBrick;
+  Program *program;
+
+  VolumeOperation(Volume *tool, Brick *toolBrick, Brick *volumeBrick, Program *program) {
+    this->tool = tool;
+    this->toolBrick = toolBrick;
+    this->volumeBrick = volumeBrick;
+    this->program = program;
+  }
+};
+
+
 
 class Volume {
 protected:
@@ -18,7 +36,7 @@ public:
   glm::vec3 position;
   glm::vec3 scale;
   glm::vec4 material;
-
+  std::queue<VolumeOperation *> operation_queue;
   aabb_t *aabb;
 
   Mesh *mesh;
@@ -321,7 +339,7 @@ public:
               i & 2 ? 1.0 : 0.0,
               i & 4 ? 1.0 : 0.0
             );
-            performOperation(tool, this->getBrick(d + corner), toolBrick, pos, program);
+            this->addOperation(tool, toolBrick, this->getBrick(d + corner), program);
           }
         }
       }
@@ -352,29 +370,46 @@ public:
               i & 2 ? 1.0 : 0.0,
               i & 4 ? 1.0 : 0.0
             );
-            performOperation(tool, this->getBrick(d + corner, true), toolBrick, pos, program);
+            this->addOperation(tool, toolBrick, this->getBrick(d + corner, true), program);
           }
         }
       }
     }
   }
 
-  void performOperation(Volume *tool, Brick* volumeBrick, Brick *toolBrick, glm::vec3 pos, Program *program) {
+  bool tick() {
+    size_t size = this->operation_queue.size();
+    if (size > 0) {
+      VolumeOperation *op = this->operation_queue.front();
+      this->operation_queue.pop();
+      this->performOperation(op);
+      return size == 1;
+    }
+    return true;
+  }
+
+  void addOperation(Volume *tool, Brick* volumeBrick, Brick *toolBrick, Program *program) {
     if (toolBrick == nullptr || volumeBrick == nullptr) {
       return;
     }
+    VolumeOperation *op = new VolumeOperation(tool, volumeBrick, toolBrick, program);
+    this->operation_queue.push(op);
+  }
 
-    glm::vec3 toolBrickWorldPos = (tool->position) + glm::vec3(toolBrick->index);
-    glm::vec3 volumeBrickWorldPos = (this->position) + glm::vec3(volumeBrick->index);
+  void performOperation(VolumeOperation *op) {
+    if (op == nullptr) {
+      return;
+    }
+
+    glm::vec3 toolBrickWorldPos = (op->tool->position) + glm::vec3(op->toolBrick->index);
+    glm::vec3 volumeBrickWorldPos = (this->position) + glm::vec3(op->volumeBrick->index);
 
     glm::vec3 worldDiff = toolBrickWorldPos - volumeBrickWorldPos;
+    glm::vec3 toolOffset = worldDiff * glm::vec3(BRICK_DIAMETER);
 
-    glm::vec3 toolOffset;// = ((this->position + glm::vec3(volumeBrick->index)) - pos) * glm::vec3(BRICK_DIAMETER);
-    toolOffset = worldDiff * glm::vec3(BRICK_DIAMETER);
-
-    program->use()
-      ->bufferAddress("volumeBuffer", volumeBrick->bufferAddress)
-      ->bufferAddress("toolBuffer", toolBrick->bufferAddress)
+    op->program->use()
+      ->bufferAddress("volumeBuffer", op->volumeBrick->bufferAddress)
+      ->bufferAddress("toolBuffer", op->toolBrick->bufferAddress)
       ->uniformVec3i("toolOffset", glm::ivec3(toolOffset));
 
     glDispatchCompute(1, BRICK_DIAMETER, BRICK_DIAMETER);

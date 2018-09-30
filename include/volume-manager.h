@@ -22,4 +22,12 @@ Volume *addVolume(Volume *volume) {
   this->volumes.push_back(volume);
 }
 
+bool tick() {
+  bool ret = true;
+  for (auto& volume : this->volumes) {
+    ret = ret && volume->tick();
+  }
+  return ret;
+}
+
 };
