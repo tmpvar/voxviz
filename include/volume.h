@@ -9,6 +9,7 @@
 #include "glm/gtx/hash.hpp"
 #include <unordered_map>
 #include <queue>
+#include <imgui.h>
 
 class VolumeOperation {
 public:
@@ -25,6 +26,32 @@ public:
   }
 };
 
+
+static glm::vec3 txPoint(glm::mat4 mat, glm::vec3 point) {
+  glm::vec4 tmp = mat * glm::vec4(point, 1.0);
+  return glm::vec3(tmp.x, tmp.y, tmp.z) / tmp.w;
+}
+
+static glm::vec3 txNormal(glm::mat4 mat, glm::vec3 point) {
+  glm::vec4 tmp = mat * glm::vec4(point, 0.0);
+  return glm::vec3(tmp.x, tmp.y, tmp.z);
+}
+
+static glm::vec3 vmin(glm::vec3 a, glm::vec3 b) {
+  return glm::vec3(
+    min(a.x, b.x),
+    min(a.y, b.y),
+    min(a.z, b.z)
+  );
+}
+
+static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
+  return glm::vec3(
+    max(a.x, b.x),
+    max(a.y, b.y),
+    max(a.z, b.z)
+  );
+}
 
 
 class Volume {
@@ -270,41 +297,6 @@ public:
     return aabb_isect(mine, other, out);
   }
 
-  void computeBrickOffset(
-    Brick *myBrick,
-    Brick *otherBrick,
-    glm::vec3 *myOffset,
-    glm::vec3 *otherOffset,
-    glm::ivec3 *sliceDims
-  ) {
-    Volume *otherVolume = otherBrick->volume;
-    aabb_t *mine = aabb_create();
-    aabb_t *other = aabb_create();
-    aabb_t *overlap = aabb_create();
-  
-    mine->lower = this->position + glm::vec3(myBrick->index);
-    mine->upper = mine->lower + glm::vec3(1.0);
-
-    other->lower = otherVolume->position + glm::vec3(otherBrick->index);
-    other->upper = other->lower + glm::vec3(1.0);
-
-    aabb_isect(mine, other, overlap);
-    
-    glm::vec3 slice = overlap->upper - overlap->lower;
-
-    sliceDims->x = int32_t(fabs(slice.x) * BRICK_DIAMETER);
-    sliceDims->y = int32_t(fabs(slice.y) * BRICK_DIAMETER);
-    sliceDims->z = int32_t(fabs(slice.z) * BRICK_DIAMETER);
-
-    myOffset->x = floorf((overlap->lower.x - mine->lower.x) * (BRICK_DIAMETER));
-    myOffset->y = floorf((overlap->lower.y - mine->lower.y) * (BRICK_DIAMETER));
-    myOffset->z = floorf((overlap->lower.z - mine->lower.z) * (BRICK_DIAMETER));
-
-    otherOffset->x = ceilf((overlap->lower.x - other->lower.x) * BRICK_DIAMETER);
-    otherOffset->y = ceilf((overlap->lower.y - other->lower.y) * BRICK_DIAMETER);
-    otherOffset->z = ceilf((overlap->lower.z - other->lower.z) * BRICK_DIAMETER);
-  }
-
   void opCut(Volume *tool, Program *program = nullptr) {
     
     // TODO: return the number of affected voxels
@@ -346,31 +338,64 @@ public:
     }
   }
 
+  void obb(glm::vec3 *lower, glm::vec3 *upper) {
+    glm::mat4 model = this->getModelMatrix();
+    glm::vec3 l = txPoint(model, this->aabb->lower);
+    glm::vec3 u = txPoint(model, this->aabb->upper);
+
+    lower->x = fmin(l.x, u.x);
+    lower->y = fmin(l.y, u.y);
+    lower->z = fmin(l.z, u.z);
+
+    upper->x = fmax(l.x, u.x);
+    upper->y = fmax(l.y, u.y);
+    upper->z = fmax(l.z, u.z);
+  }
+
   void opAdd(Volume *tool, Program *program = nullptr) {
     // Index space bounding box
     glm::vec3 lower = tool->aabb->lower;
     glm::vec3 upper = tool->aabb->upper;
-
+    glm::mat4 toolModel = tool->getModelMatrix();
+    glm::mat4 toolToVolume = glm::inverse(this->getModelMatrix()) * tool->getModelMatrix();
     // TODO: support for volume groups
     glm::vec3 pos;
     Brick *toolBrick;
-    for (int x = lower.x; x < upper.x; x++) {
-      for (int y = lower.y; y < upper.y; y++) {
-        for (int z = lower.z; z < upper.z; z++) {
-          // Volume index space
-          toolBrick = tool->getBrick(glm::ivec3(x, y, z));
-          // Volume world space
-          pos = glm::vec3(x, y, z) + tool->position;
+    for (auto& it : tool->bricks) {
+      toolBrick = it.second;
 
-          glm::vec3 d = glm::floor(pos - this->position);
+      // Volume index space
+      glm::vec3 brickIndex = toolBrick->index;
 
-          for (uint8_t i = 0; i < 8; i++) {
-            glm::vec3 corner = glm::vec3(
-              i & 1 ? 1.0 : 0.0,
-              i & 2 ? 1.0 : 0.0,
-              i & 4 ? 1.0 : 0.0
-            );
-            this->addOperation(tool, toolBrick, this->getBrick(d + corner, true), program);
+      // Compute the worldspace bounds that need to be processed for
+      // this brick.
+      glm::vec3 txBrickIndexLower = txPoint(toolToVolume, brickIndex);
+      glm::vec3 txBrickIndexUpper = txPoint(toolToVolume, brickIndex + glm::vec3(1.0));
+      glm::vec3 start = glm::floor(vmin(txBrickIndexLower, txBrickIndexUpper));
+      glm::vec3 end = glm::ceil(vmax(txBrickIndexLower, txBrickIndexUpper));
+      glm::vec3 step = txNormal(glm::inverse(toolModel), glm::vec3(1.0));
+      step = glm::vec3(1.0);
+      // TODO: handle negative scales?
+      for (float i = start.x; i < end.x; i+=step.x ) {
+        for (float j = start.y; j < end.y; j += step.y) {
+          for (float k = start.z; k < end.z; k += step.z) {
+
+            for (uint8_t idx = 0; idx < 8; idx++) {
+              glm::vec3 corner = glm::vec3(
+                idx & 1 ? 1.0 : 0.0,
+                idx & 2 ? 1.0 : 0.0,
+                idx & 4 ? 1.0 : 0.0
+              );
+              glm::vec3 volumeBrickIndex;
+
+              volumeBrickIndex = corner + glm::vec3(i, j, k);
+
+              Brick *volumeBrick = this->getBrick(volumeBrickIndex, true);
+              //volumeBrick->fillConst(1.0);
+              // TODO: the brick positioning code is basically correct, now it's time to 
+              //       make the operation operate on the correct regions of each brick.
+              this->addOperation(tool, toolBrick, volumeBrick, program);
+            }
           }
         }
       }
@@ -401,16 +426,66 @@ public:
       return;
     }
 
-    glm::vec3 toolBrickWorldPos = (op->tool->position) + glm::vec3(op->toolBrick->index);
-    glm::vec3 volumeBrickWorldPos = (this->position) + glm::vec3(op->volumeBrick->index);
+    /*
+    OPS
+     - transform the volume brick into world space
+     - transform the volume brick by the inverted tool model
+    
+           +
+         /   \
+        /     \
+       +       +
+        \     /
+      +--o---o
+      |   \ /|
+      |    + |
+      +------+
+    
+     - find the transform/warp that turns a point in tool voxel space to volume voxel space
+    
+    */
 
-    glm::vec3 worldDiff = toolBrickWorldPos - volumeBrickWorldPos;
-    glm::vec3 toolOffset = worldDiff * glm::vec3(BRICK_DIAMETER);
+
+
+    //glm::mat4 toolTransform = op->tool->getModelMatrix();
+    //glm::mat4 invToolTransform = glm::inverse(toolTransform);
+    //glm::mat4 volumeTransform = this->getModelMatrix();
+    //glm::mat4 invVolumeTransform = glm::inverse(volumeTransform);
+    //glm::mat4 toolToVolume = toolTransform * volumeTransform;
+    
+    //glm::vec3 toolBrickWorldPos = txPoint(toolTransform, glm::vec3(op->toolBrick->index));
+    //glm::vec3 volumeBrickWorldPos = txPoint(volumeTransform, glm::vec3(op->volumeBrick->index));
+
+    //glm::vec3 worldDiff = toolBrickWorldPos - volumeBrickWorldPos;
+    //glm::vec3 toolOffset = worldDiff * glm::vec3(BRICK_DIAMETER);
+
+    //glm::vec3 toolDirection = txNormal(toolToVolume, glm::vec3(0.0));
+    //glm::vec3 otherToolDirection = txNormal(invToolTransform, glm::vec3(1.0));
+
+    glm::mat4 volumeBrickModel = glm::mat4(1.0f);
+    volumeBrickModel = glm::translate(volumeBrickModel, this->position + glm::vec3(op->volumeBrick->index));
+    volumeBrickModel = glm::rotate(volumeBrickModel, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
+    volumeBrickModel = glm::rotate(volumeBrickModel, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
+    volumeBrickModel = glm::rotate(volumeBrickModel, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
+    volumeBrickModel = glm::scale(volumeBrickModel, this->scale);
+
+    glm::mat4 toolBrickModel = glm::mat4(1.0f);
+    toolBrickModel = glm::translate(toolBrickModel, op->tool->position + glm::vec3(op->toolBrick->index));
+    toolBrickModel = glm::rotate(toolBrickModel, op->tool->rotation.x, glm::vec3(1.0, 0.0, 0.0));
+    toolBrickModel = glm::rotate(toolBrickModel, op->tool->rotation.y, glm::vec3(0.0, 1.0, 0.0));
+    toolBrickModel = glm::rotate(toolBrickModel, op->tool->rotation.z, glm::vec3(0.0, 0.0, 1.0));
+    toolBrickModel = glm::scale(toolBrickModel, op->tool->scale);
+
+    glm::mat4 toolToVolume = glm::inverse(volumeBrickModel) * toolBrickModel;
 
     op->program->use()
       ->bufferAddress("volumeBuffer", op->volumeBrick->bufferAddress)
       ->bufferAddress("toolBuffer", op->toolBrick->bufferAddress)
-      ->uniformVec3i("toolOffset", glm::ivec3(toolOffset));
+      //->uniformVec3i("toolOffset", glm::ivec3(toolOffset))
+      //->uniformVec3("toolDirection", otherToolDirection)
+      //->uniformVec3("toolBrickIndex", op->toolBrick->index)
+      //->uniformVec3("toolVolumeIndex", op->volumeBrick->index)
+      ->uniformMat4("toolToVolume", toolToVolume);
 
     glDispatchCompute(1, BRICK_DIAMETER, BRICK_DIAMETER);
   }

@@ -21,6 +21,7 @@
 #include <q3.h>
 #include <glm/glm.hpp>
 #include "parser/vzd/vzd.h"
+#include "parser/magicavoxel/vox.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -385,19 +386,26 @@ int main(void) {
     bodyDef
   );*/
 
-  Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.5));
-  Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
+    volumeManager,
+    physicsScene,
+    bodyDef
+  );
+
+  Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
+  
+  /*Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
+  */
   
+
   Brick *toolBrick2 = tool->AddBrick(glm::ivec3(0, 0, 0), &boxDef);
   toolBrick2->createGPUMemory();
   toolBrick2->fillConst(1.0);
   
   volumeManager->addVolume(tool);
-
-  
-
 
   q3Transform tx;
   q3Identity(tx);
@@ -418,6 +426,9 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
+  tool->scale.x = 1.0;
+ // tool->rotation.z = M_PI / 4.0;
+  //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
 
@@ -461,9 +472,14 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.01;
+  const float movementSpeed = 0.01f;
   GLFWgamepadstate state;
   while (!glfwWindowShouldClose(window)) {
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
     float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
     if (keys[GLFW_KEY_W]) {
       camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
@@ -489,7 +505,7 @@ int main(void) {
       raytracer->showHeat = 0;
     }
 
-    float debug = keys[GLFW_KEY_1] ? 1.0 : 0.0;
+    float debug = keys[GLFW_KEY_1] ? 1.0f : 0.0f;
 
     if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
       if (!fullscreen) {
@@ -525,7 +541,7 @@ int main(void) {
     mouse[0] = xpos;
     mouse[1] = ypos;
 
-    camera->ProcessMouseMovement(delta[0], -delta[1]);
+    camera->ProcessMouseMovement((float)delta[0], (float)-delta[1]);
     
     if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
       int axis_count;
@@ -599,7 +615,7 @@ int main(void) {
 
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 64; i++) {
       if (volumeManager->tick()) {
         break;
       }
@@ -660,7 +676,8 @@ int main(void) {
 */
     
     physicsScene->Step();
-
+    //floor->rotation.z += 0.001;
+    //tool->rotation.z += 0.01;
     
     /*fbo->unbind();
     
@@ -696,20 +713,24 @@ int main(void) {
       }
     }
 
-    if (state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER]) {
+    if (state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] || keys[GLFW_KEY_SPACE]) {
       floor->opAdd(tool, brickAddProgram);
     }
 
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-    
+
     {
       static float f = 0.0f;
       static int counter = 0;
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGui::Text("camera pos(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
+      ImGui::Text(
+        "tool pos(%.3f, %.3f, %.3f)",
+        tool->position.x,
+        tool->position.y,
+        tool->position.z
+      );
     }
+
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);

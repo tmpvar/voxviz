@@ -20,6 +20,7 @@ Volume *addVolume(Volume *volume) {
   }
   // TODO: uniqueness test
   this->volumes.push_back(volume);
+  return volume;
 }
 
 bool tick() {

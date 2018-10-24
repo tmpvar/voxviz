@@ -9,7 +9,7 @@
 uniform float *volumeBuffer;
 uniform float *toolBuffer;
 uniform ivec3  toolOffset;
-
+uniform mat4 toolToVolume;
 
 // TODO: how do we cut transformed bricks?
 // TODO: how do we cut using transformed bricks?

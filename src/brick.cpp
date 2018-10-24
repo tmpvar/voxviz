@@ -104,7 +104,7 @@ void Brick::fillConst(float val) {
   glClearBufferData(GL_TEXTURE_BUFFER, GL_R32F, GL_RED, GL_FLOAT, &val);
 }
 
-
+/*
 void Brick::cut(Brick *cutter, Program *program) {
   // compute overlapping aabb
   // kick off a compute job
@@ -127,18 +127,6 @@ void Brick::cut(Brick *cutter, Program *program) {
       ->uniformVec3ui("volumeOffset", glm::uvec3(volumeOffset))
       ->uniformVec3ui("cutterOffset", glm::uvec3(cutterOffset));
 
-    /*
-    // this is currently triggering a gl error which causes the process to die
-    sliceDims = glm::clamp(sliceDims, glm::uvec3(1), glm::uvec3(BRICK_DIAMETER - 1));
-    glDispatchComputeGroupSizeARB(
-      1,
-      1,
-      1,
-      sliceDims.x,
-      sliceDims.y,
-      sliceDims.z
-    );*/
-
     glDispatchCompute(
       1,
       BRICK_DIAMETER,
@@ -147,4 +135,4 @@ void Brick::cut(Brick *cutter, Program *program) {
  
     gl_error();
   }
-}
+}*/
