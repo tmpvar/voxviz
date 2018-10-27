@@ -3,7 +3,7 @@ const { Brick, BRICK_DIAMETER } = require('./brick')
 const square = require('./square')
 const tx = require('./tx')
 const fill = require('ndarray-fill')
-
+const collide = require('./collision/aabb-obb')
 const min = Math.min
 const max = Math.max
 const floor = Math.floor
@@ -101,21 +101,18 @@ class Volume {
     })
   }
 
-  opAdd(ctx, tool) {
+  opAdd (ctx, tool) {
     const toolModel = tool.modelMatrix
-    const volumeModel = this.modelMatrix
-    const invVolumeModel = mat3.invert(mat3.create(), volumeModel)
+    const invVolumeModel = mat3.invert(mat3.create(), this.modelMatrix)
 
     // tool index space -> stock index space
     const toolToVolume = mat3.create()
     mat3.multiply(toolToVolume, invVolumeModel, toolModel)
 
-    const lower = vec2.create()
-    const upper = vec2.create()
+    const lower = [Number.MAX_VALUE, Number.MAX_VALUE]
+    const upper = [-Number.MAX_VALUE, -Number.MAX_VALUE]
     const start = vec2.create()
     const end = vec2.create()
-
-    const brickIndex = [0, 0]
 
     const verts = [
       vec2.create(),
@@ -128,56 +125,65 @@ class Volume {
       [0, 1],
       [1, 1],
       [1, 0],
-      [0, 0],
+      [0, 0]
     ]
 
+    const brickIndex = [0, 0]
+
     tool.bricks.forEach((toolBrick) => {
-      ctx.lineWidth = .1
+      ctx.lineWidth = 0.025
+      ctx.beginPath()
 
-      // move tool brick index to stock index space
-      vec2.transformMat3(lower, toolBrick.index, toolToVolume)
-      vec2.transformMat3(upper, vec2.add(upper, toolBrick.index, one), toolToVolume)
+      const txVerts = verts.map((vert, i) => {
+        const out = vec2.create()
+        vec2.transformMat3(
+          out,
+          vec2.add(out, toolBrick.index, offsets[i]),
+          toolToVolume
+        )
 
-      // const txVerts = verts.map((vert, i) => {
-      //   vec2.transformMat3(vert, vec2.add(vert, toolBrick.index, offsets[i]), toolToVolume)
+        i === 0
+        ? ctx.moveTo(out[0], out[1])
+        : ctx.lineTo(out[0], out[1])
 
-      //   const b = [vert[0]|0, vert[1]|0]
+        lower[0] = min(lower[0], out[0])
+        upper[0] = max(upper[0], out[0])
 
-      //   var stockBrick = this.getBrick(b, true)
-      //   opAddBrick(toolToVolume, toolBrick, stockBrick, vert)
-      // })
+        lower[1] = min(lower[1], out[1])
+        upper[1] = max(upper[1], out[1])
 
+        return out
+      })
+      ctx.closePath()
+      ctx.strokeStyle = 'yellow'
+      ctx.stroke()
 
       // compute the stock index space bounding box
-      start[0] = floor(min(lower[0], upper[0]) - 1)
-      start[1] = floor(min(lower[1], upper[1]) - 1)
-      end[0] = ceil(max(lower[0], upper[0]) + 1)
-      end[1] = ceil(max(lower[1], upper[1]) + 1)
+      start[0] = floor(lower[0])
+      start[1] = floor(lower[1])
+      end[0] = ceil(upper[0])
+      end[1] = ceil(upper[1])
+      ctx.lineWidth = 0.01
+      ctx.strokeRect(start[0], start[1], end[0] - start[0], end[1] - start[1])
 
       // iterate over the bounding box
-       for (var x = start[0]; x <= end[0]; x+=1) {
-        for (var y = start[1]; y <= end[1]; y+=1) {
+       for (var x = start[0]; x < end[0]; x+=1) {
+        for (var y = start[1]; y < end[1]; y+=1) {
           brickIndex[0] = x|0
           brickIndex[1] = y|0
 
-          // TODO: test if the brick index is inside of the box
+
 
           var pos = [x, y]
-          //var px = x + 1
-          //var py = y + 1
-          // if (
-          //   edgeTest(txVerts[0], txVerts[1], px, py) &&
-          //   edgeTest(txVerts[1], txVerts[2], px, py) &&
-          //   edgeTest(txVerts[2], txVerts[3], px, py) &&
-          //   edgeTest(txVerts[3], txVerts[0], px, py)
-          // ) {
-          //   var stockBrick = this.getBrick(brickIndex, true)
-          //   opAddBrick(toolToVolume, toolBrick, stockBrick, pos)
-          // }
 
-          var stockBrick = this.getBrick(brickIndex, true)
-          opAddBrick(toolToVolume, toolBrick, stockBrick, pos)
-
+          const p = [brickIndex, [brickIndex[0]+1, brickIndex[1]+1]]
+          if (collide(p, txVerts)) {
+            // TODO: this can be optimized by running SAT over the
+            //       aabb (stock brick) and the obb (tool brick)
+            //this.getBrick(brickIndex, true)
+            var stockBrick = this.getBrick(brickIndex, true)
+            opAddBrick(toolToVolume, toolBrick, stockBrick, pos)
+          }
         }
       }
 
@@ -190,6 +196,19 @@ function edgeTest(start, end, px, py) {
 }
 
 function opAddBrick(tx, toolBrick, stockBrick, brickStart) {
+  // var px = x
+  // var py = y
+  // if (
+  //   edgeTest(txVerts[0], txVerts[1], px, py) &&
+  //   edgeTest(txVerts[1], txVerts[2], px, py) &&
+  //   edgeTest(txVerts[2], txVerts[3], px, py) &&
+  //   edgeTest(txVerts[3], txVerts[0], px, py)
+  // ) {
+  //   var stockBrick = this.getBrick(brickIndex, true)
+  //   opAddBrick(toolToVolume, toolBrick, stockBrick, pos)
+  // }
+  //
+
   const INV_BRICK_DIAMETER = 1/BRICK_DIAMETER
   const offset = INV_BRICK_DIAMETER / 2.0
   const lower = [0, 0]
