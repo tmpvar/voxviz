@@ -103,11 +103,16 @@ class Volume {
 
   opAdd (ctx, tool) {
     const toolModel = tool.modelMatrix
-    const invVolumeModel = mat3.invert(mat3.create(), this.modelMatrix)
+    const stockModel = this.modelMatrix
+    const invStockModel = mat3.invert(mat3.create(), stockModel)
+    const invToolModel = mat3.invert(mat3.create(), toolModel)
 
     // tool index space -> stock index space
-    const toolToVolume = mat3.create()
-    mat3.multiply(toolToVolume, invVolumeModel, toolModel)
+    const toolToStock = mat3.create()
+    mat3.multiply(toolToStock, invStockModel, toolModel)
+    // stock index space -> tool index space
+    const stockToTool = mat3.create()
+    mat3.multiply(stockToTool, invToolModel, stockModel)
 
     const lower = [Number.MAX_VALUE, Number.MAX_VALUE]
     const upper = [-Number.MAX_VALUE, -Number.MAX_VALUE]
@@ -131,20 +136,13 @@ class Volume {
     const brickIndex = [0, 0]
 
     tool.bricks.forEach((toolBrick) => {
-      ctx.lineWidth = 0.025
-      ctx.beginPath()
-
       const txVerts = verts.map((vert, i) => {
         const out = vec2.create()
         vec2.transformMat3(
           out,
           vec2.add(out, toolBrick.index, offsets[i]),
-          toolToVolume
+          toolToStock
         )
-
-        i === 0
-        ? ctx.moveTo(out[0], out[1])
-        : ctx.lineTo(out[0], out[1])
 
         lower[0] = min(lower[0], out[0])
         upper[0] = max(upper[0], out[0])
@@ -163,97 +161,70 @@ class Volume {
       start[1] = floor(lower[1])
       end[0] = ceil(upper[0])
       end[1] = ceil(upper[1])
-      ctx.lineWidth = 0.01
-      ctx.strokeRect(start[0], start[1], end[0] - start[0], end[1] - start[1])
 
       // iterate over the bounding box
-       for (var x = start[0]; x < end[0]; x+=1) {
-        for (var y = start[1]; y < end[1]; y+=1) {
-          brickIndex[0] = x|0
-          brickIndex[1] = y|0
+      for (var x = start[0]; x < end[0]; x += 1) {
+        for (var y = start[1]; y < end[1]; y += 1) {
+          brickIndex[0] = x | 0
+          brickIndex[1] = y | 0
 
-
-
-          var pos = [x, y]
-
-          const p = [brickIndex, [brickIndex[0]+1, brickIndex[1]+1]]
+          const p = [brickIndex, [brickIndex[0] + 1, brickIndex[1] + 1]]
           if (collide(p, txVerts)) {
             // TODO: this can be optimized by running SAT over the
             //       aabb (stock brick) and the obb (tool brick)
-            //this.getBrick(brickIndex, true)
             var stockBrick = this.getBrick(brickIndex, true)
-            opAddBrick(toolToVolume, toolBrick, stockBrick, pos)
+            opAddBrick(stockToTool, toolBrick, stockBrick, txVerts)
           }
         }
       }
-
     })
   }
 }
 
-function edgeTest(start, end, px, py) {
+function edgeTest (start, end, px, py) {
   return ((px - start[0]) * (end[1] - start[1]) - (py - start[1]) * (end[0] - start[0]) >= 0)
 }
 
-function opAddBrick(tx, toolBrick, stockBrick, brickStart) {
-  // var px = x
-  // var py = y
-  // if (
-  //   edgeTest(txVerts[0], txVerts[1], px, py) &&
-  //   edgeTest(txVerts[1], txVerts[2], px, py) &&
-  //   edgeTest(txVerts[2], txVerts[3], px, py) &&
-  //   edgeTest(txVerts[3], txVerts[0], px, py)
-  // ) {
-  //   var stockBrick = this.getBrick(brickIndex, true)
-  //   opAddBrick(toolToVolume, toolBrick, stockBrick, pos)
-  // }
-  //
-
-  const INV_BRICK_DIAMETER = 1/BRICK_DIAMETER
+function opAddBrick (stockToTool, toolBrick, stockBrick, toolVerts) {
+  const INV_BRICK_DIAMETER = 1 / BRICK_DIAMETER
   const offset = INV_BRICK_DIAMETER / 2.0
-  const lower = [0, 0]
-  const upper = [0, 0]
-  const start = [0, 0]
-  const end = [0, 0]
-  const pos = [0, 0]
-  for (var x = 0; x<1; x+=INV_BRICK_DIAMETER) {
-    for (var y = 0; y<1; y+=INV_BRICK_DIAMETER) {
-      lower[0] = x
-      lower[1] = y
-      upper[0] = x + offset
-      upper[1] = y + offset
+  const v2 = vec2.create()
 
-      // transform each tool voxel into stock voxel space
-      vec2.transformMat3(lower, lower, tx)
-      vec2.transformMat3(upper, upper, tx)
+  for (var x = 0; x < 1; x += INV_BRICK_DIAMETER) {
+    for (var y = 0; y < 1; y += INV_BRICK_DIAMETER) {
+      var ix = (x * BRICK_DIAMETER) | 0
+      var iy = (y * BRICK_DIAMETER) | 0
 
-      start[0] = (min(lower[0], upper[0]) - brickStart[0]) * BRICK_DIAMETER
-      start[1] = (min(lower[1], upper[1]) - brickStart[1]) * BRICK_DIAMETER
-      end[0]   = (max(lower[0], upper[0]) - brickStart[0]) * BRICK_DIAMETER
-      end[1]   = (max(lower[1], upper[1]) - brickStart[1]) * BRICK_DIAMETER
-
-
-      var t = toolBrick.grid.get((x * BRICK_DIAMETER)|0, (y * BRICK_DIAMETER)|0)
-      if (!t) {
-        continue
+      // skip voxels that are already filled
+      if (stockBrick.grid.get(ix, iy)) {
+        // TODO: this is an optimization to avoid further computation
+        //       when the stock voxel is already set. For debugging purposes
+        //       it has been commented out.
+        // continue
       }
 
-      //console.log(start, end, lower, upper, brickStart)
+      v2[0] = stockBrick.index[0] + x + offset
+      v2[1] = stockBrick.index[1] + y + offset
 
-      for (var a=start[0]; a<end[0]; a+=1) {
-        for (var b=start[1]; b<end[1]; b+=1) {
-          if (a < 0 || b < 0 || a >= BRICK_DIAMETER || b >= BRICK_DIAMETER) {
-           continue
-          }
-
-          stockBrick.grid.set(a|0, b|0, t)
+      // is this position inside of the transformed tool?
+      if (
+        edgeTest(toolVerts[0], toolVerts[1], v2[0], v2[1]) &&
+        edgeTest(toolVerts[1], toolVerts[2], v2[0], v2[1]) &&
+        edgeTest(toolVerts[2], toolVerts[3], v2[0], v2[1]) &&
+        edgeTest(toolVerts[3], toolVerts[0], v2[0], v2[1])
+      ) {
+        // transform the point back into tool space
+        vec2.transformMat3(v2, v2, stockToTool)
+        var toolVoxelX = ((v2[0] - toolBrick.index[0]) * BRICK_DIAMETER) | 0
+        var toolVoxelY = ((v2[1] - toolBrick.index[1]) * BRICK_DIAMETER) | 0
+        var toolValue = toolBrick.grid.get(toolVoxelX, toolVoxelY)
+        if (toolValue) {
+          stockBrick.grid.set(ix, iy, toolValue)
           stockBrick.empty = false
         }
       }
     }
   }
-
 }
-
 
 module.exports = Volume
