@@ -1,3 +1,5 @@
+const { vec2 } = require('gl-matrix')
+
 module.exports = collide
 
 const axes = [
@@ -37,24 +39,20 @@ function collide (aabb, obb) {
   aabbCorners[3][0] = aabb[0][0]
   aabbCorners[3][1] = aabb[1][1]
 
-  axes[2][0] = mag(obb[1][0] - obb[0][0])
-  axes[2][1] = mag(obb[1][1] - obb[0][1])
-  axes[3][0] = mag(obb[3][0] - obb[0][0])
-  axes[3][1] = mag(obb[3][1] - obb[0][1])
-
-  axes[4][0] = mag(obb[3][0] - obb[2][0])
-  axes[4][1] = mag(obb[3][1] - obb[2][1])
-  axes[5][0] = mag(obb[1][0] - obb[2][0])
-  axes[5][1] = mag(obb[1][1] - obb[2][1])
+  axes[2][0] = obb[1][0] - obb[0][0]
+  axes[2][1] = obb[1][1] - obb[0][1]
+  axes[3][0] = obb[3][0] - obb[0][0]
+  axes[3][1] = obb[3][1] - obb[0][1]
 
   for (var axisIdx = 0; axisIdx < axes.length; axisIdx++) {
+    const axis = vec2.normalize(vec2.create(), axes[axisIdx])
     resultIntervals[0][0] = Number.MAX_VALUE
     resultIntervals[0][1] = -Number.MAX_VALUE
     resultIntervals[1][0] = Number.MAX_VALUE
     resultIntervals[1][1] = -Number.MAX_VALUE
     for (var cornerIdx = 0; cornerIdx < 4; cornerIdx++) {
-      var aabbProjection = dot(axes[axisIdx], aabbCorners[cornerIdx])
-      var obbProjection = dot(axes[axisIdx], obb[cornerIdx])
+      var aabbProjection = dot(axis, aabbCorners[cornerIdx])
+      var obbProjection = dot(axis, obb[cornerIdx])
 
       resultIntervals[0][0] = Math.min(resultIntervals[0][0], aabbProjection)
       resultIntervals[0][1] = Math.max(resultIntervals[0][1], aabbProjection)
@@ -69,9 +67,13 @@ function collide (aabb, obb) {
     ) {
       return false
     }
-    // TODO: compute and return the vector of intersection
-    // v = aabbmax > obbmax ? -(obbmax - aabbmin) : aabbmax - obbmin
   }
+  // TODO: compute and return the depth of intersection
+  // console.log(
+    // resultIntervals[0][1] > resultIntervals[1][1]
+    // ? -(resultIntervals[1][1] - resultIntervals[0][0])
+    // : resultIntervals[0][1] - resultIntervals[1][0]
+  // )
   return true
 }
 
