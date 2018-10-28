@@ -2,6 +2,8 @@
 #include "core.h"
 #include "brick.h"
 #include "gl-wrap.h"
+#include "collision/aabb-obb.h"
+
 #include <q3.h>
 
 #include "glm/gtc/matrix_transform.hpp"
@@ -10,19 +12,22 @@
 #include <unordered_map>
 #include <queue>
 #include <imgui.h>
+#include <limits>
 
 class VolumeOperation {
 public:
-  Volume *tool;
   Brick *toolBrick;
-  Brick *volumeBrick;
+  Brick *stockBrick;
+  glm::mat4 stockToTool;
+  glm::vec3 toolVerts[8];
   Program *program;
 
-  VolumeOperation(Volume *tool, Brick *toolBrick, Brick *volumeBrick, Program *program) {
-    this->tool = tool;
+  VolumeOperation(Brick *toolBrick, Brick *stockBrick, glm::mat4 stockToTool, glm::vec3 toolVerts[8], Program *program) {
     this->toolBrick = toolBrick;
-    this->volumeBrick = volumeBrick;
+    this->stockBrick = stockBrick;
     this->program = program;
+    this->stockToTool = stockToTool;
+    memcpy(this->toolVerts, toolVerts, sizeof(glm::vec3) * 8);
   }
 };
 
@@ -35,6 +40,46 @@ static glm::vec3 txPoint(glm::mat4 mat, glm::vec3 point) {
 static glm::vec3 txNormal(glm::mat4 mat, glm::vec3 point) {
   glm::vec4 tmp = mat * glm::vec4(point, 0.0);
   return glm::vec3(tmp.x, tmp.y, tmp.z);
+}
+
+static bool collisionAABBvOBB(const glm::vec3 aabb[8], const glm::vec3 obb[8]) {
+  glm::vec3 axes[6] = {
+    glm::vec3(1.0, 0.0, 0.0),
+    glm::vec3(0.0, 1.0, 0.0),
+    glm::vec3(0.0, 0.0, 1.0),
+    glm::normalize(obb[1] - obb[0]),
+    glm::normalize(obb[2] - obb[0]),
+    glm::normalize(obb[4] - obb[0])
+  };
+  double inf = std::numeric_limits<double>::infinity();
+  glm::vec2 resultIntervals[2];
+
+  for (int axisIdx = 0; axisIdx < 6; axisIdx++) {
+    resultIntervals[0].x = inf;
+    resultIntervals[0].y = -inf;
+    resultIntervals[1].x = inf;
+    resultIntervals[1].y = -inf;
+    glm::vec3 axis = axes[axisIdx];
+
+    for (int cornerIdx = 0; cornerIdx < 8; cornerIdx++) {
+      auto aabbProjection = glm::dot(axis, aabb[cornerIdx]);
+      auto obbProjection = glm::dot(axis, obb[cornerIdx]);
+
+      resultIntervals[0].x = min(resultIntervals[0].x, aabbProjection);
+      resultIntervals[0].y = max(resultIntervals[0].y, aabbProjection);
+
+      resultIntervals[1].x = min(resultIntervals[1].x, obbProjection);
+      resultIntervals[1].y = max(resultIntervals[1].y, obbProjection);
+    }
+
+    if (
+      resultIntervals[1].x > resultIntervals[0].y ||
+      resultIntervals[1].y < resultIntervals[0].x
+      ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static glm::vec3 vmin(glm::vec3 a, glm::vec3 b) {
@@ -296,9 +341,9 @@ public:
 
     return aabb_isect(mine, other, out);
   }
-
+  
   void opCut(Volume *tool, Program *program = nullptr) {
-    
+  /*
     // TODO: return the number of affected voxels
     // TODO: add the bricks into a queue that we can process over a few
     //       frames so we don't jank on the current frame when the 
@@ -331,11 +376,12 @@ public:
               i & 2 ? 1.0 : 0.0,
               i & 4 ? 1.0 : 0.0
             );
-            this->addOperation(tool, toolBrick, this->getBrick(d + corner), program);
+            this->addOperation(toolBrick, this->getBrick(d + corner), program);
           }
         }
       }
     }
+    */
   }
 
   void obb(glm::vec3 *lower, glm::vec3 *upper) {
@@ -353,55 +399,77 @@ public:
   }
 
   void opAdd(Volume *tool, Program *program = nullptr) {
-    // Index space bounding box
-    glm::vec3 lower = tool->aabb->lower;
-    glm::vec3 upper = tool->aabb->upper;
-    glm::mat4 toolModel = tool->getModelMatrix();
-    glm::mat4 toolToVolume = glm::inverse(this->getModelMatrix()) * tool->getModelMatrix();
-    // TODO: support for volume groups
-    glm::vec3 pos;
+    glm::mat4 toolToStock = glm::inverse(this->getModelMatrix()) * tool->getModelMatrix();
+    glm::mat4 stockToTool = glm::inverse(tool->getModelMatrix()) * this->getModelMatrix();
+
+    glm::vec3 lower = glm::vec3(std::numeric_limits<double>::infinity());
+    glm::vec3 upper = glm::vec3(-std::numeric_limits<double>::infinity());
+
+    glm::vec3 toolVerts[8];
+    glm::vec3 stockVerts[8];
+    glm::vec3 offsets[8] = {
+      glm::vec3(0.0, 1.0, 0.0),
+      glm::vec3(1.0, 1.0, 0.0),
+      glm::vec3(1.0, 0.0, 0.0),
+      glm::vec3(0.0, 0.0, 0.0),
+
+      glm::vec3(0.0, 1.0, 1.0),
+      glm::vec3(1.0, 1.0, 1.0),
+      glm::vec3(1.0, 0.0, 1.0),
+      glm::vec3(0.0, 0.0, 1.0)
+
+
+      /*
+            glm::vec3(0.0, 0.0, 0.0),
+            glm::vec3(0.0, 0.0, 1.0),
+            glm::vec3(0.0, 1.0, 0.0),
+            glm::vec3(0.0, 1.0, 1.0),
+            glm::vec3(1.0, 0.0, 0.0),
+            glm::vec3(1.0, 0.0, 1.0),
+            glm::vec3(1.0, 1.0, 0.0),
+            glm::vec3(1.0, 1.0, 1.0)
+      */
+    };
+
     Brick *toolBrick;
     for (auto& it : tool->bricks) {
       toolBrick = it.second;
 
-      // Volume index space
-      glm::vec3 brickIndex = toolBrick->index;
+      for (int vertIdx = 0; vertIdx < 8; vertIdx++) {
+        toolVerts[vertIdx] = txPoint(toolToStock, glm::vec3(toolBrick->index) + offsets[vertIdx]);
 
-      // Compute the worldspace bounds that need to be processed for
-      // this brick.
-      glm::vec3 txBrickIndexLower = txPoint(toolToVolume, brickIndex);
-      glm::vec3 txBrickIndexUpper = txPoint(toolToVolume, brickIndex + glm::vec3(1.0));
-      glm::vec3 start = glm::floor(vmin(txBrickIndexLower, txBrickIndexUpper));
-      glm::vec3 end = glm::ceil(vmax(txBrickIndexLower, txBrickIndexUpper));
-      glm::vec3 step = txNormal(glm::inverse(toolModel), glm::vec3(1.0));
-      step = glm::vec3(1.0);
-      // TODO: handle negative scales?
-      for (float i = start.x; i < end.x; i+=step.x ) {
-        for (float j = start.y; j < end.y; j += step.y) {
-          for (float k = start.z; k < end.z; k += step.z) {
+        // maintain the extents of the transformed verts in volume space
+        lower.x = min(lower.x, toolVerts[vertIdx].x);
+        lower.y = min(lower.y, toolVerts[vertIdx].y);
+        lower.z = min(lower.z, toolVerts[vertIdx].z);
+        upper.x = max(upper.x, toolVerts[vertIdx].x);
+        upper.y = max(upper.y, toolVerts[vertIdx].y);
+        upper.z = max(upper.z, toolVerts[vertIdx].z);
+      }
 
-            for (uint8_t idx = 0; idx < 8; idx++) {
-              glm::vec3 corner = glm::vec3(
-                idx & 1 ? 1.0 : 0.0,
-                idx & 2 ? 1.0 : 0.0,
-                idx & 4 ? 1.0 : 0.0
-              );
-              glm::vec3 volumeBrickIndex;
 
-              volumeBrickIndex = corner + glm::vec3(i, j, k);
+      glm::ivec3 start = glm::floor(lower);
+      glm::ivec3 end = glm::ceil(upper);
 
-              Brick *volumeBrick = this->getBrick(volumeBrickIndex, true);
+      for (int x = start.x; x < end.x; x++) {
+        for (int y = start.y; y < end.y; y++) {
+          for (int z = start.z; z < end.z; z++) {
+            glm::ivec3 brickIndex = glm::ivec3(x, y, z);
+
+            for (int vertIdx = 0; vertIdx < 8; vertIdx++) {
+              stockVerts[vertIdx] = glm::vec3(brickIndex) + offsets[vertIdx];
+            }
+
+            if (collisionAABBvOBB(stockVerts, toolVerts)) {
+              Brick *volumeBrick = this->getBrick(brickIndex, true);
               //volumeBrick->fillConst(1.0);
-              // TODO: the brick positioning code is basically correct, now it's time to 
-              //       make the operation operate on the correct regions of each brick.
-              this->addOperation(tool, toolBrick, volumeBrick, program);
+              this->addOperation(toolBrick, volumeBrick, stockToTool, toolVerts, program);
             }
           }
         }
       }
     }
   }
-
   bool tick() {
     size_t size = this->operation_queue.size();
     if (size > 0) {
@@ -413,11 +481,11 @@ public:
     return true;
   }
 
-  void addOperation(Volume *tool, Brick* volumeBrick, Brick *toolBrick, Program *program) {
+  void addOperation(Brick* volumeBrick, Brick *toolBrick, glm::mat4 stockToTool, glm::vec3 toolVerts[8], Program *program) {
     if (toolBrick == nullptr || volumeBrick == nullptr) {
       return;
     }
-    VolumeOperation *op = new VolumeOperation(tool, volumeBrick, toolBrick, program);
+    VolumeOperation *op = new VolumeOperation(volumeBrick, toolBrick, stockToTool, toolVerts, program);
     this->operation_queue.push(op);
   }
 
@@ -426,67 +494,15 @@ public:
       return;
     }
 
-    /*
-    OPS
-     - transform the volume brick into world space
-     - transform the volume brick by the inverted tool model
-    
-           +
-         /   \
-        /     \
-       +       +
-        \     /
-      +--o---o
-      |   \ /|
-      |    + |
-      +------+
-    
-     - find the transform/warp that turns a point in tool voxel space to volume voxel space
-    
-    */
-
-
-
-    //glm::mat4 toolTransform = op->tool->getModelMatrix();
-    //glm::mat4 invToolTransform = glm::inverse(toolTransform);
-    //glm::mat4 volumeTransform = this->getModelMatrix();
-    //glm::mat4 invVolumeTransform = glm::inverse(volumeTransform);
-    //glm::mat4 toolToVolume = toolTransform * volumeTransform;
-    
-    //glm::vec3 toolBrickWorldPos = txPoint(toolTransform, glm::vec3(op->toolBrick->index));
-    //glm::vec3 volumeBrickWorldPos = txPoint(volumeTransform, glm::vec3(op->volumeBrick->index));
-
-    //glm::vec3 worldDiff = toolBrickWorldPos - volumeBrickWorldPos;
-    //glm::vec3 toolOffset = worldDiff * glm::vec3(BRICK_DIAMETER);
-
-    //glm::vec3 toolDirection = txNormal(toolToVolume, glm::vec3(0.0));
-    //glm::vec3 otherToolDirection = txNormal(invToolTransform, glm::vec3(1.0));
-
-    glm::mat4 volumeBrickModel = glm::mat4(1.0f);
-    volumeBrickModel = glm::translate(volumeBrickModel, this->position + glm::vec3(op->volumeBrick->index));
-    volumeBrickModel = glm::rotate(volumeBrickModel, this->rotation.x, glm::vec3(1.0, 0.0, 0.0));
-    volumeBrickModel = glm::rotate(volumeBrickModel, this->rotation.y, glm::vec3(0.0, 1.0, 0.0));
-    volumeBrickModel = glm::rotate(volumeBrickModel, this->rotation.z, glm::vec3(0.0, 0.0, 1.0));
-    volumeBrickModel = glm::scale(volumeBrickModel, this->scale);
-
-    glm::mat4 toolBrickModel = glm::mat4(1.0f);
-    toolBrickModel = glm::translate(toolBrickModel, op->tool->position + glm::vec3(op->toolBrick->index));
-    toolBrickModel = glm::rotate(toolBrickModel, op->tool->rotation.x, glm::vec3(1.0, 0.0, 0.0));
-    toolBrickModel = glm::rotate(toolBrickModel, op->tool->rotation.y, glm::vec3(0.0, 1.0, 0.0));
-    toolBrickModel = glm::rotate(toolBrickModel, op->tool->rotation.z, glm::vec3(0.0, 0.0, 1.0));
-    toolBrickModel = glm::scale(toolBrickModel, op->tool->scale);
-
-    glm::mat4 toolToVolume = glm::inverse(volumeBrickModel) * toolBrickModel;
-
     op->program->use()
-      ->bufferAddress("volumeBuffer", op->volumeBrick->bufferAddress)
+      ->bufferAddress("stockBuffer", op->stockBrick->bufferAddress)
       ->bufferAddress("toolBuffer", op->toolBrick->bufferAddress)
-      //->uniformVec3i("toolOffset", glm::ivec3(toolOffset))
-      //->uniformVec3("toolDirection", otherToolDirection)
-      //->uniformVec3("toolBrickIndex", op->toolBrick->index)
-      //->uniformVec3("toolVolumeIndex", op->volumeBrick->index)
-      ->uniformMat4("toolToVolume", toolToVolume);
+      ->uniformVec3("toolBrickIndex", glm::vec3(op->toolBrick->index))
+      ->uniformVec3("stockBrickIndex", glm::vec3(op->stockBrick->index))
+      ->uniformVec3fArray("toolBrickVerts", op->toolVerts, 8)
+      ->uniformMat4("stockToTool", op->stockToTool);
 
     glDispatchCompute(1, BRICK_DIAMETER, BRICK_DIAMETER);
+    gl_error();
   }
 };

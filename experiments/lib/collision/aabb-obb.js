@@ -77,13 +77,6 @@ function collide (aabb, obb) {
   return true
 }
 
-function mag (v) {
-  if (v === 0) {
-    return 0
-  }
-  return 1 / v
-}
-
 function dot (a, b) {
   return a[0] * b[0] + a[1] * b[1]
 }

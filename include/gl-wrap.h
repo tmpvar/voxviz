@@ -14,6 +14,7 @@
   #include <string>
   #include <map>
   #include <glm/glm.hpp>
+  #include <glm/gtc/type_ptr.hpp>
 
   using namespace std;
   
@@ -171,6 +172,23 @@
       GLint loc = this->uniformLocation(name);
 
       glUniform3f(loc, v[0], v[1], v[2]);
+      return this;
+    }
+
+    Program *uniformVec3fArray(string name, glm::vec3 *v, size_t count) {
+
+      GLint loc = this->uniformLocation(name);
+      GLfloat *buf = (GLfloat *)malloc(sizeof(GLfloat) * 3 * count);
+      
+      for (size_t i = 0; i < count; i++) {
+        buf[i * 3] = v[i].x;
+        buf[i * 3 + 1] = v[i].y;
+        buf[i * 3 + 2] = v[i].z;
+      }
+
+      glUniform3fv(loc, count, &buf[0]);
+      gl_error();
+      free(buf);
       return this;
     }
 

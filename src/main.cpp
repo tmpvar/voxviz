@@ -394,16 +394,16 @@ int main(void) {
   );
 
   Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
-  
-  /*Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
+  Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
-  */
+  
   
 
-  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(0, 0, 0), &boxDef);
+  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(2, 0, 0), &boxDef);
   toolBrick2->createGPUMemory();
   toolBrick2->fillConst(1.0);
+  //toolBrick2->fill(fillSphereProgram);
   
   volumeManager->addVolume(tool);
 
@@ -426,7 +426,7 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
-  tool->scale.x = 1.0;
+  tool->scale.x = 2.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
@@ -615,7 +615,7 @@ int main(void) {
 
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 128; i++) {
       if (volumeManager->tick()) {
         break;
       }
@@ -677,7 +677,7 @@ int main(void) {
     
     physicsScene->Step();
     //floor->rotation.z += 0.001;
-    //tool->rotation.z += 0.01;
+    tool->rotation.z += 0.01;
     
     /*fbo->unbind();
     

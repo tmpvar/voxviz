@@ -165,8 +165,8 @@ class Volume {
       // iterate over the bounding box
       for (var x = start[0]; x < end[0]; x += 1) {
         for (var y = start[1]; y < end[1]; y += 1) {
-          brickIndex[0] = x | 0
-          brickIndex[1] = y | 0
+          brickIndex[0] = floor(x)
+          brickIndex[1] = floor(y)
 
           const p = [brickIndex, [brickIndex[0] + 1, brickIndex[1] + 1]]
           if (collide(p, txVerts)) {
@@ -187,24 +187,21 @@ function edgeTest (start, end, px, py) {
 
 function opAddBrick (stockToTool, toolBrick, stockBrick, toolVerts) {
   const INV_BRICK_DIAMETER = 1 / BRICK_DIAMETER
-  const offset = INV_BRICK_DIAMETER / 2.0
+  const offset = 0.5
   const v2 = vec2.create()
 
-  for (var x = 0; x < 1; x += INV_BRICK_DIAMETER) {
-    for (var y = 0; y < 1; y += INV_BRICK_DIAMETER) {
-      var ix = (x * BRICK_DIAMETER) | 0
-      var iy = (y * BRICK_DIAMETER) | 0
-
+  for (var x = 0; x < BRICK_DIAMETER; x += 1) {
+    for (var y = 0; y < BRICK_DIAMETER; y += 1) {
       // skip voxels that are already filled
-      if (stockBrick.grid.get(ix, iy)) {
+      if (stockBrick.grid.get(x, y)) {
         // TODO: this is an optimization to avoid further computation
         //       when the stock voxel is already set. For debugging purposes
         //       it has been commented out.
         // continue
       }
 
-      v2[0] = stockBrick.index[0] + x + offset
-      v2[1] = stockBrick.index[1] + y + offset
+      v2[0] = stockBrick.index[0] + (x + offset) * INV_BRICK_DIAMETER
+      v2[1] = stockBrick.index[1] + (y + offset) * INV_BRICK_DIAMETER
 
       // is this position inside of the transformed tool?
       if (
@@ -219,7 +216,7 @@ function opAddBrick (stockToTool, toolBrick, stockBrick, toolVerts) {
         var toolVoxelY = ((v2[1] - toolBrick.index[1]) * BRICK_DIAMETER) | 0
         var toolValue = toolBrick.grid.get(toolVoxelX, toolVoxelY)
         if (toolValue) {
-          stockBrick.grid.set(ix, iy, toolValue)
+          stockBrick.grid.set(x, y, toolValue)
           stockBrick.empty = false
         }
       }

@@ -66,6 +66,8 @@ add_executable(
   include/parser/vzd/vzd.h
   include/parser/magicavoxel/vox.h
 
+  include/collision/aabb-obb.h
+
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
 
