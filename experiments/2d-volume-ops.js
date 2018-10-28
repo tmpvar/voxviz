@@ -21,8 +21,7 @@ fill(toolBrick.grid, (x, y) => {
 toolBrick.empty = false
 
 
-tool.scale[0] = 1
-tool.scale[1] = 1.0
+tool.scale[0] = 10
 
 
 const volumes = [
@@ -112,4 +111,3 @@ function render() {
 	})
 	camera.end()
 }
-
