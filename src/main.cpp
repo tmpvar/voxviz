@@ -677,7 +677,7 @@ int main(void) {
     
     physicsScene->Step();
     //floor->rotation.z += 0.001;
-    tool->rotation.z += 0.01;
+    tool->rotation.z += 0.001;
     
     /*fbo->unbind();
     
@@ -709,12 +709,12 @@ int main(void) {
           continue;
         }
         
-        volume->opCut(tool, brickCutProgram);
+        volume->booleanOp(tool, false, brickCutProgram);
       }
     }
 
     if (state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] || keys[GLFW_KEY_SPACE]) {
-      floor->opAdd(tool, brickAddProgram);
+      floor->booleanOp(tool, true, brickAddProgram);
     }
 
 

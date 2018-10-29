@@ -341,48 +341,6 @@ public:
 
     return aabb_isect(mine, other, out);
   }
-  
-  void opCut(Volume *tool, Program *program = nullptr) {
-  /*
-    // TODO: return the number of affected voxels
-    // TODO: add the bricks into a queue that we can process over a few
-    //       frames so we don't jank on the current frame when the 
-    //       complexity explodes.
-    // TODO: get rid of this allocation
-    aabb_t tmpAABB;
-    bool overlaps = this->intersect(tool, &tmpAABB);
-    if (!overlaps) {
-      return;
-    }
-
-    glm::vec3 lower = tmpAABB.lower - tool->position;
-    glm::vec3 upper = tmpAABB.upper - tool->position;
-    // TODO: support for volume groups
-    glm::vec3 pos;
-    Brick *toolBrick;
-    for (int x = lower.x; x <= upper.x; x++) {
-      for (int y = lower.y; y <= upper.y; y++) {
-        for (int z = lower.z; z <= upper.z; z++) {
-          // Volume index space
-          toolBrick = tool->getBrick(glm::ivec3(x, y, z));
-          // Volume world space
-          pos = glm::vec3(x, y, z) + tool->position;
-
-          glm::vec3 d = glm::floor(pos - this->position);
-
-          for (uint8_t i = 0; i < 8; i++) {
-            glm::vec3 corner = glm::vec3(
-              i & 1 ? 1.0 : 0.0,
-              i & 2 ? 1.0 : 0.0,
-              i & 4 ? 1.0 : 0.0
-            );
-            this->addOperation(toolBrick, this->getBrick(d + corner), program);
-          }
-        }
-      }
-    }
-    */
-  }
 
   void obb(glm::vec3 *lower, glm::vec3 *upper) {
     glm::mat4 model = this->getModelMatrix();
@@ -398,7 +356,7 @@ public:
     upper->z = fmax(l.z, u.z);
   }
 
-  void opAdd(Volume *tool, Program *program = nullptr) {
+  void booleanOp(Volume *tool, bool additive, Program *program = nullptr) {
     glm::mat4 toolToStock = glm::inverse(this->getModelMatrix()) * tool->getModelMatrix();
     glm::mat4 stockToTool = glm::inverse(tool->getModelMatrix()) * this->getModelMatrix();
 
@@ -417,18 +375,6 @@ public:
       glm::vec3(1.0, 1.0, 1.0),
       glm::vec3(1.0, 0.0, 1.0),
       glm::vec3(0.0, 0.0, 1.0)
-
-
-      /*
-            glm::vec3(0.0, 0.0, 0.0),
-            glm::vec3(0.0, 0.0, 1.0),
-            glm::vec3(0.0, 1.0, 0.0),
-            glm::vec3(0.0, 1.0, 1.0),
-            glm::vec3(1.0, 0.0, 0.0),
-            glm::vec3(1.0, 0.0, 1.0),
-            glm::vec3(1.0, 1.0, 0.0),
-            glm::vec3(1.0, 1.0, 1.0)
-      */
     };
 
     Brick *toolBrick;
@@ -461,9 +407,11 @@ public:
             }
 
             if (collisionAABBvOBB(stockVerts, toolVerts)) {
-              Brick *volumeBrick = this->getBrick(brickIndex, true);
-              //volumeBrick->fillConst(1.0);
-              this->addOperation(toolBrick, volumeBrick, stockToTool, toolVerts, program);
+              Brick *stockBrick = this->getBrick(brickIndex, additive);
+              if (!stockBrick) {
+                continue;
+              }
+              this->addOperation(toolBrick, stockBrick, stockToTool, toolVerts, program);
             }
           }
         }
