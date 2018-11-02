@@ -4,8 +4,8 @@
 
 #include "../include/core.h"
 
-uniform float *stockBuffer;
-uniform float *toolBuffer;
+uniform uint *stockBuffer;
+uniform uint *toolBuffer;
 uniform vec3 toolBrickIndex;
 uniform vec3 stockBrickIndex;
 uniform mat4 stockToTool;
@@ -35,7 +35,7 @@ void main() {
 	vec3 localPos = stockBrickIndex + (vec3(stockVoxel) + 0.5) * INV_BRICK_DIAMETER;
 	uint stockIdx = stockVoxel.x + stockVoxel.y * BRICK_DIAMETER + stockVoxel.z * BRICK_DIAMETER * BRICK_DIAMETER;
 
-	if (stockBuffer[stockIdx] > 0.0) {
+	if (stockBuffer[stockIdx] > 0) {
 		return;
 	}
 
@@ -64,8 +64,8 @@ void main() {
 		
 		uint toolIdx = toolVoxel.x + toolVoxel.y * BRICK_DIAMETER + toolVoxel.z * BRICK_DIAMETER * BRICK_DIAMETER;
 
-		if (toolBuffer[toolIdx] > 0.0) {
-			stockBuffer[stockIdx] = 1.0;
+		if (toolBuffer[toolIdx] > 0) {
+			stockBuffer[stockIdx] = 1;
 		}
 	}
 	//stockBuffer[stockIdx] = 1.0;

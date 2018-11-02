@@ -7,7 +7,7 @@
 
 in vec3 brickSurfacePos; 
 flat in vec3 brickTranslation; 
-flat in float *volumePointer;
+flat in uint *volumePointer;
 //flat in layout(bindless_sampler) sampler3D volumeSampler;
 
 layout(location = 0) out vec4 outColor;
@@ -32,7 +32,7 @@ float voxel(ivec3 pos) {
 	}
 
 	uint idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
-	return volumePointer[idx];
+	return float(volumePointer[idx]);
 }
 
 float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {

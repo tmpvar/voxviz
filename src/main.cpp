@@ -426,7 +426,9 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
-  tool->scale.x = 2.0;
+  tool->scale.x = 4.0;
+  tool->scale.y = 4.0;
+  tool->scale.z = 4.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
@@ -615,7 +617,7 @@ int main(void) {
 
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    for (int i = 0; i < 128; i++) {
+    for (int i = 0; i < 512; i++) {
       if (volumeManager->tick()) {
         break;
       }
@@ -729,6 +731,7 @@ int main(void) {
         tool->position.y,
         tool->position.z
       );
+      ImGui::Text("%i floor bricks", floor->bricks.size());
     }
 
     ImGui::Render();
