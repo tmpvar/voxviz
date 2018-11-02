@@ -23,6 +23,8 @@
 #include "parser/vzd/vzd.h"
 #include "parser/magicavoxel/vox.h"
 
+#include "OVR_CAPI.h"
+
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <string.h>
@@ -215,6 +217,29 @@ void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
 /* LIBUV JUNK*/
 
 int main(void) {
+  ovrInitParams initParams = { ovrInit_RequestVersion, OVR_MINOR_VERSION, NULL, 0, 0 };
+  ovrResult result = ovr_Initialize(&initParams);
+  if(OVR_FAILURE(result)) {
+      ovrErrorInfo errorInfo;
+      ovr_GetLastErrorInfo(&errorInfo);
+      printf("ovr_Initialize failed: %s", errorInfo.ErrorString);
+      return 1;
+  }
+
+  ovrSession session;
+  ovrGraphicsLuid luid;
+  result = ovr_Create(&session, &luid);
+  if (OVR_FAILURE(result))
+  {
+    ovr_Shutdown();
+    return 1;
+  }
+
+  ovrHmdDesc desc = ovr_GetHmdDesc(session);
+  ovrSizei resolution = desc.Resolution;
+
+
+
   VolumeManager *volumeManager = new VolumeManager();
   float dt = 1.0f / 60.0f;
   q3Scene *physicsScene = new q3Scene(dt);
@@ -567,6 +592,83 @@ int main(void) {
       );
     }
 
+    
+    double displayMidpointSeconds = ovr_GetPredictedDisplayTime(session, time);
+    ovrTrackingState trackState = ovr_GetTrackingState(session, displayMidpointSeconds, ovrTrue);
+    ovrPosef         handPoses[2];
+    ovrInputState    inputState;
+
+    // Grab hand poses useful for rendering hand or controller representation
+    handPoses[ovrHand_Left] = trackState.HandPoses[ovrHand_Left].ThePose;
+    handPoses[ovrHand_Right] = trackState.HandPoses[ovrHand_Right].ThePose;
+   
+    tool->position.x = (handPoses[ovrHand_Right].Position.x) * 200;
+    tool->position.y = (handPoses[ovrHand_Right].Position.y + 0.84) * 200;
+    tool->position.z = (handPoses[ovrHand_Right].Position.z + 0.340) * 200;
+
+    glm::quat toolRot = glm::quat(
+      handPoses[ovrHand_Right].Orientation.x,
+      handPoses[ovrHand_Right].Orientation.y,
+      handPoses[ovrHand_Right].Orientation.z,
+      handPoses[ovrHand_Right].Orientation.w
+    );
+
+    /*
+      TODO: this is buggy at certain rotations - SAT looks fine, but
+      perhaps the stockToTool inversion is not working properly in some cases OR
+      the inside test is failing
+    */
+    tool->rotation.z = -glm::pitch(toolRot);
+    if (tool->rotation.z < 0) {
+      tool->rotation.z += M_PI * 2;
+    }
+    tool->rotation.y = glm::yaw(toolRot);
+
+    if (tool->rotation.y < 0) {
+      tool->rotation.y += M_PI * 2;
+    }
+
+    tool->rotation.x = -glm::roll(toolRot);
+    if (tool->rotation.x < 0) {
+      tool->rotation.x += M_PI * 2;
+    }
+
+    tool->rotation.x = fmod(tool->rotation.x, M_PI * 2);
+    tool->rotation.y = fmod(tool->rotation.y, M_PI * 2);
+    tool->rotation.z = fmod(tool->rotation.z, M_PI * 2);
+
+
+    ImGui::Text("rotation: (%f, %f, %f)",
+      tool->rotation.x,
+      tool->rotation.y,
+      tool->rotation.z
+    );
+
+   
+    ImGui::Text("tool: (%f, %f, %f)",
+      tool->position.x,
+      tool->position.y,
+      tool->position.z
+    );
+
+
+    if (OVR_SUCCESS(ovr_GetInputState(session, ovrControllerType_Touch, &inputState)))
+    {
+      if (inputState.Buttons & ovrButton_A)
+      {
+        // Handle A button being pressed
+      }
+
+      ImGui::Text("right indexTrigger: %f", inputState.IndexTriggerRaw[ovrHand_Right]);
+      
+      
+      if (inputState.HandTrigger[ovrHand_Right] > 0.5f)
+      {
+        // Handle hand grip...
+        cout << "right hand trigger" << endl;
+      }
+    }
+
     if (tool_position_queue.size() > 0) {
       glm::vec3 new_tool_pos = glm::abs(tool_position_queue.front());
       tool_position_queue.pop();
@@ -805,5 +907,8 @@ int main(void) {
   uv_stop(uv_default_loop());
   uv_loop_close(uv_default_loop());
   glfwTerminate();
+
+  ovr_Destroy(session);
+  ovr_Shutdown();
   return 0;
 }
