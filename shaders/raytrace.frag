@@ -3,11 +3,11 @@
 #extension GL_ARB_bindless_texture : require
 //#extension GL_EXT_shader_image_load_store : require
 
-#include "../include/core.h"
+#include "voxel.glsl"
 
-in vec3 brickSurfacePos; 
-flat in vec3 brickTranslation; 
-flat in uint *volumePointer;
+in vec3 brickSurfacePos;
+flat in vec3 brickTranslation;
+flat in float *volumePointer;
 //flat in layout(bindless_sampler) sampler3D volumeSampler;
 
 layout(location = 0) out vec4 outColor;
@@ -26,15 +26,6 @@ uniform vec3 eye;
 //#define ITERATIONS BRICK_DIAMETER*2
 #define ITERATIONS BRICK_DIAMETER*2 + BRICK_RADIUS
 
-float voxel(ivec3 pos) {
-	if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(BRICK_DIAMETER)))) {
-		return -1;
-	}
-
-	uint idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
-	return float(volumePointer[idx]);
-}
-
 float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
   // grid space
   vec3 origin = pos;
@@ -52,7 +43,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
   hit = 0.0;
   iterations = 0.0;
   for (float i = 0.0; i < ITERATIONS; i++ ) {
-    if (hit > 0.0 || voxel( ivec3(floor(pos)) ) > 0.0) {
+    if (hit > 0.0 || voxel_get(volumePointer, ivec3(floor(pos)))) {
       hit = 1.0;
 	  continue;
     }
@@ -63,7 +54,7 @@ float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out flo
     pos += grid_step * ivec3(mask);
     ratio += ratio_step * vec3(mask);
   }
-  
+
   center = floor(pos) + vec3( 0.5 );
   vec3 d = abs(center - pos);
 
@@ -75,8 +66,7 @@ float march_groundtruth(in out vec3 pos, vec3 dir, out vec3 center, out vec3 nor
 	vec3 invDir = 1.0 / dir;
 	float hit = 0.0;
 	for (iterations = 0; iterations < ITERATIONS*20; iterations++) {
-		float v = voxel(ivec3(floor(pos)));
-		if (v > 0.0) {
+		if (voxel_get(volumePointer, ivec3(floor(pos)))) {
 			hit = 1.0;
 			break;
 		}
@@ -103,7 +93,7 @@ void main() {
   vec3 normal;
   vec3 voxelCenter;
   float iterations;
-  
+
   // move the location to positive space to better align with the underlying grid
   vec3 pos = brickSurfacePos * BRICK_DIAMETER;
 
@@ -130,19 +120,4 @@ void main() {
   outColor = mix(vec4(normal, 1.0), vec4(1.0, 0.0, 0.0, 1.0), debug);
   //outColor = vec4(brickSurfacePos, 1.0);
   //outColor = material;
-}
-
-void main1() {
-	outColor = vec4(
-		vec3(voxel(ivec3(brickSurfacePos * BRICK_DIAMETER - 0.1))),
-		1.0
-	);
-
-	//outColor = vec4(voxel(uvec3(ceil(brickSurfacePos * BRICK_DIAMETER - 1))));
-//	if (edgeVoxel < 0.0) {
-//		discard;
-//	} else {
-//		outColor = vec4(brickSurfacePos, 1.0);
-//	}
-	//outColor = vec4(floor(brickSurfacePos * BRICK_DIAMETER) / BRICK_DIAMETER, 1.0);
 }

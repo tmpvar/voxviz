@@ -2,10 +2,10 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-#include "../include/core.h"
+#include "voxel.glsl"
 
-uniform uint *stockBuffer;
-uniform uint *toolBuffer;
+uniform float *stockBuffer;
+uniform float *toolBuffer;
 uniform vec3 toolBrickIndex;
 uniform vec3 stockBrickIndex;
 uniform mat4 stockToTool;
@@ -61,11 +61,8 @@ void main() {
 			return;
 		}
 
-		
-		uint toolIdx = toolVoxel.x + toolVoxel.y * BRICK_DIAMETER + toolVoxel.z * BRICK_DIAMETER * BRICK_DIAMETER;
-
-		if (toolBuffer[toolIdx] > 0) {
-			stockBuffer[stockIdx] = 1;
+		if (voxel_get(toolBuffer, toolVoxel)) {
+			voxel_set(stockBuffer, stockVoxel, true);
 		}
 	}
 	//stockBuffer[stockIdx] = 1.0;
