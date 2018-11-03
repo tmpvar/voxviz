@@ -34,7 +34,7 @@ void Brick::createGPUMemory() {
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
     GL_TEXTURE_BUFFER,
-    BRICK_VOXEL_COUNT * sizeof(GLfloat),
+    BRICK_VOXEL_COUNT * sizeof(uint32_t),
     NULL,
     GL_STATIC_DRAW
   );
@@ -56,7 +56,7 @@ void Brick::upload() {
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
     GL_TEXTURE_BUFFER,
-    BRICK_VOXEL_COUNT * sizeof(GLfloat),
+    BRICK_VOXEL_COUNT * sizeof(uint32_t),
     this->data,
     GL_STATIC_DRAW
   );
@@ -99,9 +99,9 @@ void Brick::setVoxel(glm::uvec3 pos, float val) {
   //this->upload();
 }
 
-void Brick::fillConst(float val) {
+void Brick::fillConst(uint32_t val) {
   glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
-  glClearBufferData(GL_TEXTURE_BUFFER, GL_R32F, GL_RED, GL_FLOAT, &val);
+  glClearBufferData(GL_TEXTURE_BUFFER, GL_R32UI, GL_RED, GL_UNSIGNED_INT, &val);
 }
 
 /*

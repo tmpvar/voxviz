@@ -4,8 +4,8 @@
 
 #include "voxel.glsl"
 
-uniform float *stockBuffer;
-uniform float *toolBuffer;
+uniform uint *stockBuffer;
+uniform uint *toolBuffer;
 uniform vec3 toolBrickIndex;
 uniform vec3 stockBrickIndex;
 uniform mat4 stockToTool;

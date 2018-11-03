@@ -6,7 +6,7 @@
 
 #include "voxel.glsl"
 
-uniform float *volume;
+uniform uint *volume;
 
 layout( local_size_x = BRICK_DIAMETER, local_size_y = 1, local_size_z = 1 ) in;
 

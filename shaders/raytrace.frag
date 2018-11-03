@@ -7,7 +7,7 @@
 
 in vec3 brickSurfacePos;
 flat in vec3 brickTranslation;
-flat in float *volumePointer;
+flat in uint *volumePointer;
 //flat in layout(bindless_sampler) sampler3D volumeSampler;
 
 layout(location = 0) out vec4 outColor;

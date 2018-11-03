@@ -29,7 +29,7 @@
     bool isect(Brick *other, aabb_t *out);
 
     void setVoxel(glm::uvec3 pos, float val);
-    void fillConst(float val);
+    void fillConst(uint32_t val);
     void cut(Brick *cutter, Program *program);
   };
 #endif

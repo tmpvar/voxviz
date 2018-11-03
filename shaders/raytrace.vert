@@ -6,7 +6,7 @@
 
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 translation;
-layout (location = 2) in float *iBufferPointer;
+layout (location = 2) in uint *iBufferPointer;
 
 uniform mat4 MVP;
 
@@ -14,7 +14,7 @@ out vec3 brickSurfacePos;
 flat out vec3 brickTranslation;
 
 // flat means "do not interpolate"
-flat out float *volumePointer;
+flat out uint *volumePointer;
 
 void main() {
   brickTranslation = translation;
