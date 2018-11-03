@@ -12,6 +12,7 @@ ENDIF()
 
 IF(WINDOWS)
 	set_target_properties(voxviz PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS /EHsc")
+  set(CMAKE_GENERATOR_PLATFORM "x64")
 ENDIF()
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -93,6 +94,7 @@ target_link_libraries(
 	qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
+  ../deps/oculus-sdk-1.30.0/LibOVR/Lib/Windows/x64/Release/VS2017/LibOVR
  )
 
 file(GLOB TEST_FILES test/*)
