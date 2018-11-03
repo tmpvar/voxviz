@@ -43,7 +43,7 @@ include_directories(
   deps/catch2/include
 )
 
-file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp)
+file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp shaders/*.glsl)
 
 add_executable(
   voxviz

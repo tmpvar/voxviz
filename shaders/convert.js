@@ -18,33 +18,41 @@ function outputLine(line) {
     const r = line.map(outputLine).join('\n')
     return r;
   }
-  return `        "${line.trim().replace(/"/g,'\\"')}\\n"`
+  return (" ").repeat(8) + '"' + line.replace(/"/g,'\\"') + '\\n"'
 }
 
 const init = files.map((file) => {
-  let lines = fs.readFileSync(file, 'utf8').split(splitExp)
-  const relpath = path.relative(__dirname, file)
-
-  lines = lines.map(line => {
-    if (line.indexOf('#include') > -1) {
-      const matches = line.match(includeExp)
-      if (!matches) {
-        return line
-      }
-
-      return fs.readFileSync(path.join(path.dirname(file), path.normalize(matches[1])), "utf8").split(splitExp)
-    }
-    return line
-  })
-
+  let lines = processIncludes(file, fs.readFileSync(file, 'utf8').split(splitExp))
 
   const type = types[path.extname(file)]
   if (!type) {
     throw new Error(file + " could not be associated with a shader type")
   }
-
+  const relpath = path.relative(__dirname, file)
   return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.filter(Boolean).map(outputLine).join('\n') + `, "${relpath}", ${type});\n`
 }).join('\n      ')
+
+
+function processIncludes(file, lines) {
+  let out = []
+  const baseDir = path.dirname(file)
+  lines.forEach(line => {
+    if (line.indexOf('#include') > -1) {
+      const matches = line.match(includeExp)
+      if (!matches) {
+        out.push(line)
+      }
+      const includeFile = path.join(baseDir, path.normalize(matches[1]))
+      const includeLines = fs.readFileSync(includeFile, "utf8").split(splitExp)
+      const includes = processIncludes(includeFile, includeLines)
+      Array.prototype.push.apply(out, includes)
+    } else {
+      out.push(line)
+    }
+  })
+  return out
+}
+
 
 out.unshift(`
 #ifndef SHADER_H
