@@ -6,14 +6,32 @@
 
 #include "voxel.glsl"
 
-uniform uint *volume;
+uniform uint32_t *volume;
 
-layout( local_size_x = BRICK_DIAMETER, local_size_y = 1, local_size_z = 1 ) in;
+layout( local_size_x = 1, local_size_y = 1, local_size_z = 1 ) in;
+
 
 void main() {
-	ivec3 pos = ivec3(gl_GlobalInvocationID);
+// pos becomes `word` and then we iterate 32 times over the bits and
+// convert them into 3d coords via lookup table(?). Finally we can 
+// take the resulting word and write into the volume at a specific index
+	uint idx = gl_GlobalInvocationID.x;
+	uint lower = idx * VOXEL_WORD_BITS;
+	uint upper = lower + VOXEL_WORD_BITS;
+	uint bits = 0;
 	float hd = float(BRICK_RADIUS);
-	float d = distance(vec3(pos), vec3(hd)) - hd;
 
-	voxel_set(volume, pos, d < 0.0);
+	for (uint p = lower; p < upper; p++) {
+		uint mask = 1 << (p - lower);
+		uvec3 pos = uvec3(
+			p % BRICK_DIAMETER,
+			(p / BRICK_DIAMETER) % BRICK_DIAMETER,
+			((p / BRICK_DIAMETER) / BRICK_DIAMETER) % BRICK_DIAMETER
+		);
+
+		float d = distance(vec3(pos), vec3(hd)) - hd;
+		bits |= d < 0.0 ? mask : 0;
+	}
+
+	volume[idx] = bits;
 }

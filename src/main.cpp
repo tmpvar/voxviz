@@ -299,6 +299,12 @@ int main(void) {
     ->link();
  
 
+  Program *fillAllProgram = new Program();
+  fillAllProgram
+    ->add(Shaders::get("fill-all.comp"))
+    ->link();
+
+
   Program *brickCutProgram = new Program();
   brickCutProgram
     ->add(Shaders::get("brick-cut.comp"))
@@ -386,12 +392,12 @@ int main(void) {
     bodyDef
   );*/
 
-  VOXParser::parse(
+  /*VOXParser::parse(
     "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
     volumeManager,
     physicsScene,
     bodyDef
-  );
+  );*/
 
   Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
   Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
@@ -402,8 +408,8 @@ int main(void) {
 
   Brick *toolBrick2 = tool->AddBrick(glm::ivec3(2, 0, 0), &boxDef);
   toolBrick2->createGPUMemory();
-  toolBrick2->fillConst(1.0);
-  //toolBrick2->fill(fillSphereProgram);
+  toolBrick2->fillConst(0xFFFFFFFF);
+  
   
   volumeManager->addVolume(tool);
 
@@ -426,26 +432,29 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
-  tool->scale.x = 4.0;
-  tool->scale.y = 4.0;
-  tool->scale.z = 4.0;
+  tool->scale.x = 1.0;
+  tool->scale.y = 1.0;
+  tool->scale.z = 1.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
 
-  for (int x = 0; x < 32; x++) {
-    for (int y = 0; y < 1; y++) {
-      for (int z = 0; z < 4; z++) {
-        floor->AddBrick(glm::ivec3(x, y, z))->createGPUMemory();
+  for (int x = 0; x < 16; x++) {
+    for (int y = 0; y < 32; y++) {
+      for (int z = 0; z < 16; z++) {
+        floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
   }
 
+  //fillAllProgram->use()->uniform1ui("val", 0xFFFFFFFF);
   for (auto& it : floor->bricks) {
     Brick *brick = it.second;
-    brick->fillConst(1.0);
+    brick->createGPUMemory();
+    brick->fillConst(0xFFFFFFFF);
     //brick->fill(fillSphereProgram);
+   // brick->fill(fillAllProgram);
   }
 
 
@@ -649,8 +658,18 @@ int main(void) {
       );*/
 
       gl_error();
-      volume->bind();
-      raytracer->render(volume, raytracer->program);
+      size_t activeBricks = volume->bind();
+      //raytracer->render(volume, raytracer->program);
+
+      glDrawElementsInstanced(
+        GL_TRIANGLES,
+        volume->mesh->faces.size(),
+        GL_UNSIGNED_INT,
+        0,
+        //volume->bricks.size()
+        activeBricks
+      );
+      gl_error();
     }
 
     //volumeManager->volumes[0]->rotation.x += 0.0001;
@@ -680,6 +699,8 @@ int main(void) {
     physicsScene->Step();
     //floor->rotation.z += 0.001;
     tool->rotation.z += 0.001;
+    tool->rotation.y += 0.002;
+     tool->rotation.x += 0.005;
     
     /*fbo->unbind();
     

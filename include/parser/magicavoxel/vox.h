@@ -97,7 +97,7 @@ public:
             */
           Brick *b = volume->AddBrick(glm::ivec3(val[0], val[2], val[1]));
           b->createGPUMemory();
-          b->fillConst(1.0);
+          b->fillConst(0xFFFFFFFFFF);
         }
       }
       else {

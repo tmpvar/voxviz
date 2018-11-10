@@ -110,9 +110,10 @@ public:
   glm::vec4 material;
   std::queue<VolumeOperation *> operation_queue;
   aabb_t *aabb;
+  size_t activeBricks;
 
   Mesh *mesh;
-
+   
   q3Body* physicsBody;
   Volume(glm::vec3 pos, q3Scene *scene = nullptr, q3BodyDef *bodyDef = nullptr) {
     this->position = pos;
@@ -220,6 +221,7 @@ public:
     if (found == nullptr && createIfNotFound) {
       found = this->AddBrick(index);
       found->createGPUMemory();
+      found->fillConst(0);
     }
 
     return found;
@@ -237,14 +239,40 @@ public:
     this->position.z += z;
   }
 
-  void bind() {
+  bool occluded(glm::ivec3 pos) {
+    // TODO: this could probably be optimized by using a bitset or similar
+    Brick *tmp;
+
+    for (int x = -1; x <= 1; x++) {
+      for (int y = -1; y <= 1; y++) {
+        for (int z = -1; z <= 1; z++) {
+
+          if (x == 0 && y == 0 && z == 0) {
+            continue;
+          }
+
+          tmp = this->getBrick(pos + glm::ivec3(x, y, z));
+          if (tmp == nullptr) {
+            return false;
+          }
+
+          if (!tmp->full) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  size_t bind() {
     // Mesh data
     if (!this->dirty) {
       glBindVertexArray(this->mesh->vao);
       glEnableVertexAttribArray(0);
       glEnableVertexAttribArray(1);
       glEnableVertexAttribArray(2);
-      return;
+      return this->activeBricks;
     }
     this->dirty = false;
     //this->mesh->upload();
@@ -255,7 +283,8 @@ public:
 
     size_t total_bricks = this->bricks.size();
     if (total_bricks == 0) {
-      return;
+      this->activeBricks = 0;
+      return activeBricks;
     }
 
     size_t total_position_mem = total_bricks * 3 * sizeof(float);
@@ -265,6 +294,10 @@ public:
     size_t loc = 0;
     for (auto& it : this->bricks) {
       Brick *brick = it.second;
+      /*if (this->occluded(brick->index)) {
+        continue;
+      }*/
+
       positions[loc * 3 + 0] = float(brick->index.x);
       positions[loc * 3 + 1] = float(brick->index.y);
       positions[loc * 3 + 2] = float(brick->index.z);
@@ -273,13 +306,14 @@ public:
       loc++;
     }
 
+    cout << "loc: " << loc << endl;
     // Instance data
     unsigned int instanceVBO;
     glGenBuffers(1, &instanceVBO); gl_error();
     glEnableVertexAttribArray(1); gl_error();
     glBindBuffer(GL_ARRAY_BUFFER, instanceVBO); gl_error();
     glBufferData(GL_ARRAY_BUFFER, total_position_mem, &positions[0], GL_STATIC_DRAW); gl_error();
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0); gl_error();
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0); gl_error();
     glVertexAttribDivisor(1, 1); gl_error();
 
     // Buffer pointer data
@@ -288,11 +322,13 @@ public:
     glEnableVertexAttribArray(2); gl_error();
     glBindBuffer(GL_ARRAY_BUFFER, pointerVBO); gl_error();
     glBufferData(GL_ARRAY_BUFFER, total_brick_pointer_mem, &pointers[0], GL_STATIC_DRAW); gl_error();
-    glVertexAttribLPointer(2, 1, GL_UNSIGNED_INT64_ARB, 0, 0); gl_error();
+    glVertexAttribLPointer(2, 1, GL_UNSIGNED_INT64_ARB, sizeof(GLuint64), 0); gl_error();
     glVertexAttribDivisor(2, 1); gl_error();
 
-    free(positions);
-    free(pointers);
+    //free(positions);
+    //free(pointers);
+    this->activeBricks = loc;
+    return this->activeBricks;
   }
 
   glm::mat4 getModelMatrix() {
@@ -450,7 +486,7 @@ public:
       ->uniformVec3fArray("toolBrickVerts", op->toolVerts, 8)
       ->uniformMat4("stockToTool", op->stockToTool);
 
-    glDispatchCompute(1, BRICK_DIAMETER, BRICK_DIAMETER);
+    glDispatchCompute(BRICK_VOXEL_WORDS, 1, 1);
     gl_error();
   }
 };

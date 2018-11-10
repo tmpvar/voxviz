@@ -14,7 +14,7 @@ Brick::Brick(glm::ivec3 index) {
   this->aabb->upper = glm::vec3(index) + glm::vec3(1.0);
   // TODO: we probably only need to malloc this if the data for
   // this brick originates at the HOST
-  this->data = (float *)malloc(BRICK_VOXEL_COUNT * sizeof(GLfloat));
+  //this->data = (float *)malloc(BRICK_VOXEL_COUNT * sizeof(GLfloat));
 }
 
 Brick::~Brick() {
@@ -34,7 +34,10 @@ void Brick::createGPUMemory() {
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
     GL_TEXTURE_BUFFER,
-    BRICK_VOXEL_COUNT * sizeof(uint32_t),
+    // 4096 * 4 = 16384
+    // vs
+    // 4096 / 8 = 512
+    BRICK_VOXEL_BYTES,//BRICK_VOXEL_COUNT * sizeof(uint32_t),
     NULL,
     GL_STATIC_DRAW
   );
@@ -56,7 +59,7 @@ void Brick::upload() {
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
     GL_TEXTURE_BUFFER,
-    BRICK_VOXEL_COUNT * sizeof(uint32_t),
+    BRICK_VOXEL_BYTES,//BRICK_VOXEL_COUNT * sizeof(uint32_t),
     this->data,
     GL_STATIC_DRAW
   );
@@ -67,9 +70,9 @@ void Brick::fill(Program *program) {
   program->use()->bufferAddress("volume", this->bufferAddress);
 
   glDispatchCompute(
+    BRICK_VOXEL_WORDS,
     1,
-    BRICK_DIAMETER,
-    BRICK_DIAMETER
+    1
   );
   gl_error();
 }
@@ -101,7 +104,8 @@ void Brick::setVoxel(glm::uvec3 pos, float val) {
 
 void Brick::fillConst(uint32_t val) {
   glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
-  glClearBufferData(GL_TEXTURE_BUFFER, GL_R32UI, GL_RED, GL_UNSIGNED_INT, &val);
+  glClearBufferData(GL_TEXTURE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
+  this->full = true;
 }
 
 /*

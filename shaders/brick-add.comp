@@ -16,14 +16,7 @@ uniform vec3 toolBrickVerts[8];
 
 // TODO: use variable group size so we can better control the
 //       slice size
-layout( local_size_x = BRICK_DIAMETER, local_size_y = 1, local_size_z = 1 ) in;
-
-bool edgeTest(vec3 start, vec3 end, vec3 p) {
-	return (
-		(p.x - start.x) * (end.y - start.y) - 
-		(p.y - start.y) * (end.x - start.x) >= 0
-	);
-}
+layout( local_size_x = 1, local_size_y = 1, local_size_z = 1 ) in;
 
 vec3 tx(mat4 m, vec3 v) {
   vec4 tmp = m * vec4(v, 1.0);
@@ -31,39 +24,22 @@ vec3 tx(mat4 m, vec3 v) {
 }
 
 void main() {
-	ivec3 stockVoxel = ivec3(gl_GlobalInvocationID);
-	vec3 localPos = stockBrickIndex + (vec3(stockVoxel) + 0.5) * INV_BRICK_DIAMETER;
-	uint stockIdx = stockVoxel.x + stockVoxel.y * BRICK_DIAMETER + stockVoxel.z * BRICK_DIAMETER * BRICK_DIAMETER;
+	uint idx = gl_GlobalInvocationID.x;
+	uint lower = idx * VOXEL_WORD_BITS;
+	uint upper = lower + VOXEL_WORD_BITS;
 
-	if (stockBuffer[stockIdx] > 0) {
-		return;
-	}
+	for (uint p = lower; p < upper; p++) {
+		uint mask = 1 << (p - lower);
+		vec3 stockVoxel = vec3(
+			p % BRICK_DIAMETER,
+			(p / BRICK_DIAMETER) % BRICK_DIAMETER,
+			((p / BRICK_DIAMETER) / BRICK_DIAMETER) % BRICK_DIAMETER
+		);
 
-    // is this position inside of the transformed tool?
-    if (
-		edgeTest(toolBrickVerts[0], toolBrickVerts[1], localPos) &&
-		edgeTest(toolBrickVerts[1], toolBrickVerts[2], localPos) &&
-		edgeTest(toolBrickVerts[2], toolBrickVerts[3], localPos) &&
-		edgeTest(toolBrickVerts[3], toolBrickVerts[4], localPos) &&
-		edgeTest(toolBrickVerts[4], toolBrickVerts[5], localPos) &&
-		edgeTest(toolBrickVerts[5], toolBrickVerts[6], localPos) &&
-		edgeTest(toolBrickVerts[6], toolBrickVerts[7], localPos) &&
-		edgeTest(toolBrickVerts[7], toolBrickVerts[0], localPos)
-    ) {
-        // transform the point back into tool space
-        vec3 v2 = tx(stockToTool, localPos);
+		vec3 localPos = stockBrickIndex + (vec3(stockVoxel) + 0.5) * INV_BRICK_DIAMETER;
+		// transform the point back into tool space
+		vec3 v2 = tx(stockToTool, localPos);
 		ivec3 toolVoxel = ivec3(floor((v2 - toolBrickIndex) * BRICK_DIAMETER));
-    
-		if (
-			any(lessThan(toolVoxel, vec3(0.0))) ||
-			any(greaterThanEqual(toolVoxel, vec3(BRICK_DIAMETER)))
-		) {
-			return;
-		}
-
-		if (voxel_get(toolBuffer, toolVoxel)) {
-			voxel_set(stockBuffer, stockVoxel, true);
-		}
+		stockBuffer[idx] |= voxel_get(toolBuffer, toolVoxel) ? mask : 0;
 	}
-	//stockBuffer[stockIdx] = 1.0;
 }

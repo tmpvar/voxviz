@@ -222,6 +222,11 @@
       return this;
     }
 
+    Program *uniform1ui(string name, uint32_t ui) {
+      GLint loc = this->uniformLocation(name);
+      glUniform1ui(loc, ui);
+      return this;
+    }
 
     Program *texture2d(string name, GLuint  texture_id) {
       glActiveTexture(GL_TEXTURE0 + this->texture_index);

@@ -19,7 +19,7 @@
     float *data;
     aabb_t *aabb;
     Volume *volume;
-
+    bool full;
     Brick(glm::ivec3 index);
     ~Brick();
     void createGPUMemory();
