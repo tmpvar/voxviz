@@ -10,7 +10,7 @@
 #include "shadowmap.h"
 #include "volume.h"
 #include "volume-manager.h"
-
+#include "a-buffer.h"
 #include <shaders/built.h>
 #include <iostream>
 
@@ -39,6 +39,7 @@ glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 Shadowmap *shadowmap;
 FBO *fbo = nullptr;
 FBO *shadowFBO = nullptr;
+ABuffer *aBuffer = nullptr;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -91,6 +92,10 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 
   if (shadowFBO != nullptr) {
     shadowFBO->setDimensions(width, height);
+  }
+
+  if (aBuffer != nullptr) {
+    aBuffer->resize(width, height);
   }
   
 }
@@ -483,6 +488,9 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
+  
+  aBuffer = new ABuffer(windowDimensions[0], windowDimensions[1]);
+  
   const float movementSpeed = 0.01f;
   GLFWgamepadstate state;
   while (!glfwWindowShouldClose(window)) {
@@ -631,7 +639,7 @@ int main(void) {
         break;
       }
     }
-
+    
     for (auto& volume : volumeManager->volumes) {
       if (volume->bricks.size() == 0) {
         continue;
