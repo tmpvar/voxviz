@@ -26,57 +26,72 @@ uniform vec3 eye;
 //#define ITERATIONS BRICK_DIAMETER*2
 #define ITERATIONS BRICK_DIAMETER*2 + BRICK_RADIUS
 
-float march(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
-  // grid space
-  vec3 origin = pos;
-  vec3 grid = floor(pos);
-  vec3 grid_step = sign( dir );
-  vec3 corner = max( grid_step, vec3( 0.0 ) );
-  bvec3 mask;
+float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out float iterations) {
+  pos -= rayDir * 4.0;
+  vec3 mapPos = vec3(floor(pos));
+  vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
+  vec3 rayStep = sign(rayDir);
+  vec3 sideDist = (sign(rayDir) * (mapPos - pos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+  vec3 mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
+
   float hit = 0.0;
-  // ray space
-  vec3 inv = vec3( 1.0 ) / dir;
-  vec3 ratio = ( grid + corner - pos ) * inv;
-  vec3 ratio_step = grid_step * inv;
-
-  // dda
-  hit = 0.0;
-  iterations = 0.0;
-  for (float i = 0.0; i < ITERATIONS; i++ ) {
-    if (hit > 0.0 || voxel_get(volumePointer, ivec3(floor(pos)))) {
+  vec3 prevPos = pos;
+  for (int iterations = 0; iterations < ITERATIONS; iterations++) {
+    if (hit > 0.0 || voxel_get(volumePointer, ivec3(mapPos))) {
       hit = 1.0;
-	  continue;
+      break;
     }
-    iterations++;
 
-    mask = lessThanEqual(ratio.xyz, min(ratio.yzx, ratio.zxy));
-    grid += ivec3(grid_step) * ivec3(mask);
-    pos += grid_step * ivec3(mask);
-    ratio += ratio_step * vec3(mask);
+    mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
+    sideDist += mask * deltaDist;
+    mapPos += mask * rayStep;
   }
 
-  center = floor(pos) + vec3( 0.5 );
-  vec3 d = abs(center - pos);
-
-  normal = iterations == 0.0 ? vec3(greaterThan(d.xyz, max(d.yzx, d.zxy))) : vec3(mask);
+  pos = floor(mapPos) + 0.5;
+  normal = mask;
   return hit;
 }
+
 
 float march_groundtruth(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
 	vec3 invDir = 1.0 / dir;
 	float hit = 0.0;
-	for (iterations = 0; iterations < ITERATIONS*20; iterations++) {
+  pos -= dir;
+  vec3 prevPos = pos;
+
+
+
+	for (iterations = 0; iterations < ITERATIONS*10; iterations++) {
 		if (voxel_get(volumePointer, ivec3(floor(pos)))) {
 			hit = 1.0;
 			break;
 		}
-		pos += dir / 5;
+    prevPos = pos;
+		pos += dir / 10;
 	}
 
-	center = floor(pos) + vec3( 0.5 );
-	vec3 d = sign(fract(pos));
+	// center = floor(pos) + vec3( 0.5 );
+	// vec3 d = sign(fract(pos));
 
-	normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
+	// normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
+
+
+  vec3 d =  min(abs(fract(pos)), abs((1.0 - fract(pos))));
+  //normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
+  // normal = vec3(0.0);
+  if (d.x > d.y && d.x > d.z) {
+    normal = vec3(1.0, 0.0, 0.0);
+  }
+  // else if (d.y < d.x && d.y < d.z) {
+  //   normal = vec3(0.0, 1.0, 0.0);
+  // }
+  // // else if (d.z < d.x && d.z < d.y) {
+  // //   normal = vec3(0.0, 0.0, 1.0);
+  // // }
+  else {
+    normal = vec3(distance(pos, invEye) / 50);
+  }
+
 	return hit;
 }
 

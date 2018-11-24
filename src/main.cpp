@@ -449,10 +449,12 @@ int main(void) {
   }
 
   //fillAllProgram->use()->uniform1ui("val", 0xFFFFFFFF);
+  size_t i = 0;
   for (auto& it : floor->bricks) {
+    i++;
     Brick *brick = it.second;
     brick->createGPUMemory();
-    brick->fillConst(0xFFFFFFFF);
+    i % 5 > 0 ? brick->fillConst(0xFFFFFFFF) : brick->fill(fillSphereProgram);
     //brick->fill(fillSphereProgram);
    // brick->fill(fillAllProgram);
   }
@@ -700,7 +702,7 @@ int main(void) {
     //floor->rotation.z += 0.001;
     tool->rotation.z += 0.001;
     tool->rotation.y += 0.002;
-     tool->rotation.x += 0.005;
+    //tool->rotation.x += 0.005;
     
     /*fbo->unbind();
     
