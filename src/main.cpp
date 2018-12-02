@@ -322,7 +322,7 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera(
-    glm::vec3(0, 8, 8)
+    glm::vec3(10, 40, 30)
   );
 
   int time = 0;
@@ -392,12 +392,12 @@ int main(void) {
     bodyDef
   );*/
 
-  /*VOXParser::parse(
+  VOXParser::parse(
     "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
     volumeManager,
     physicsScene,
     bodyDef
-  );*/
+  );
 
   Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
   Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
@@ -440,9 +440,9 @@ int main(void) {
 
   volumeManager->addVolume(floor);
 
-  for (int x = 0; x < 16; x++) {
+  for (int x = 0; x < 32; x++) {
     for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 16; z++) {
+      for (int z = 0; z < 32; z++) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }

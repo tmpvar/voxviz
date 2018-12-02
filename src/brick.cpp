@@ -107,36 +107,3 @@ void Brick::fillConst(uint32_t val) {
   glClearBufferData(GL_TEXTURE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
   this->full = true;
 }
-
-/*
-void Brick::cut(Brick *cutter, Program *program) {
-  // compute overlapping aabb
-  // kick off a compute job
-  glm::vec3 volumeOffset;
-  glm::vec3 cutterOffset;
-  glm::ivec3 sliceDims;
-
-  this->volume->computeBrickOffset(
-    this,
-    cutter,
-    &volumeOffset,
-    &cutterOffset,
-    &sliceDims
-  );
-
-  if (program != nullptr) {
-    program->use()
-      ->bufferAddress("volume", this->bufferAddress)
-      ->bufferAddress("cutter", cutter->bufferAddress)
-      ->uniformVec3ui("volumeOffset", glm::uvec3(volumeOffset))
-      ->uniformVec3ui("cutterOffset", glm::uvec3(cutterOffset));
-
-    glDispatchCompute(
-      1,
-      BRICK_DIAMETER,
-      BRICK_DIAMETER
-    );
- 
-    gl_error();
-  }
-}*/
