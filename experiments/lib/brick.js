@@ -1,5 +1,5 @@
-
 const ndarray = require("ndarray")
+const fill = require('ndarray-fill')
 const square = require('./square')
 const BRICK_DIAMETER = 4
 const BRICK_DIAMETER_SQUARED = Math.pow(BRICK_DIAMETER, 2)
@@ -39,6 +39,11 @@ class Brick {
 
       }
     }
+  }
+
+  fill(fn) {
+    fill(this.grid, fn)
+    return this
   }
 }
 
