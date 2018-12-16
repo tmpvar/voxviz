@@ -17,7 +17,7 @@ layout(location = 1) out vec3 outPosition;
 
 uniform float debug;
 
-uniform vec3 invEye;
+//uniform vec3 invEye;
 uniform int showHeat;
 uniform float maxDistance;
 uniform vec4 material;
@@ -25,6 +25,11 @@ uniform mat4 model;
 uniform vec3 eye;
 //#define ITERATIONS BRICK_DIAMETER*2
 #define ITERATIONS BRICK_DIAMETER*2 + BRICK_RADIUS
+
+vec3 tx(mat4 m, vec3 v) {
+  vec4 tmp = m * vec4(v, 1.0);
+  return tmp.xyz / tmp.w;
+}
 
 float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out float iterations) {
   pos -= rayDir * 4.0;
@@ -70,38 +75,21 @@ float march_groundtruth(in out vec3 pos, vec3 dir, out vec3 center, out vec3 nor
 		pos += dir / 10;
 	}
 
-	// center = floor(pos) + vec3( 0.5 );
-	// vec3 d = sign(fract(pos));
-
-	// normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
-
-
   vec3 d =  min(abs(fract(pos)), abs((1.0 - fract(pos))));
-  //normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
-  // normal = vec3(0.0);
   if (d.x > d.y && d.x > d.z) {
     normal = vec3(1.0, 0.0, 0.0);
   }
-  // else if (d.y < d.x && d.y < d.z) {
-  //   normal = vec3(0.0, 1.0, 0.0);
-  // }
-  // // else if (d.z < d.x && d.z < d.y) {
-  // //   normal = vec3(0.0, 0.0, 1.0);
-  // // }
-  else {
-    normal = vec3(distance(pos, invEye) / 50);
+  else if (d.y < d.x && d.y < d.z) {
+    normal = vec3(0.0, 1.0, 0.0);
   }
-
+  else if (d.z < d.x && d.z < d.y) {
+    normal = vec3(0.0, 0.0, 1.0);
+  }
 	return hit;
 }
 
-vec3 tx(mat4 m, vec3 v) {
-  vec4 tmp = m * vec4(v, 1.0);
-  return tmp.xyz / tmp.w;
-}
-
 void main() {
-
+  vec3 invEye = tx(inverse(model), eye);
   // TODO: handle the case where the camera is inside of a brick
   vec3 eyeToPlane = (brickSurfacePos + brickTranslation) - invEye;
   vec3 dir = normalize(eyeToPlane);
@@ -124,9 +112,9 @@ void main() {
 
 
   gl_FragDepth = mix(
-	1.0,
-	distance(tx(model, brickTranslation + pos), eye) / maxDistance,
-	hit
+	  1.0,
+	  distance(tx(model, brickTranslation + pos), eye) / maxDistance,
+	  hit
   );
 
   //outColor = vec4(pos, 1.0);

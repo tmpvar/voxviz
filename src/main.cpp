@@ -643,11 +643,6 @@ int main(void) {
       glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
       raytracer->program->use()
         ->uniformMat4("MVP", VP * volumeModel)
-        ->uniformVec3("invEye", glm::vec3(
-          invEye.x / invEye.w,
-          invEye.y / invEye.w,
-          invEye.z / invEye.w
-        ))
         ->uniformMat4("model", volumeModel)
         ->uniformVec3("eye", currentEye)
         ->uniformFloat("maxDistance", max_distance)
