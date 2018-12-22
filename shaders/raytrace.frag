@@ -59,8 +59,8 @@ float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out 
 
 
 float march_groundtruth(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
-	vec3 invDir = 1.0 / dir;
-	float hit = 0.0;
+  vec3 invDir = 1.0 / dir;
+  float hit = 0.0;
   pos -= dir;
   vec3 prevPos = pos;
 

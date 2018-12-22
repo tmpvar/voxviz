@@ -70,6 +70,7 @@ add_executable(
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
+  include/voxel-cascade.h
 
   ${SHADER_FILES}
 
