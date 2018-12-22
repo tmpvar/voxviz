@@ -2,7 +2,6 @@
 #include "core.h"
 #include "brick.h"
 #include "gl-wrap.h"
-#include "collision/aabb-obb.h"
 
 #include <q3.h>
 

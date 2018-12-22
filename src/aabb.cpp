@@ -42,13 +42,13 @@ bool aabb_isect(const aabb_t *a, const aabb_t *b, aabb_t *out) {
   /*out->upper = min(a->upper, b->upper);
   out->lower = max(a->lower, b->lower);
   */
-  out->upper.x = fmin(a->upper.x, b->upper.x);
-  out->upper.y = fmin(a->upper.y, b->upper.y);
-  out->upper.z = fmin(a->upper.z, b->upper.z);
+  out->upper.x = glm::min(a->upper.x, b->upper.x);
+  out->upper.y = glm::min(a->upper.y, b->upper.y);
+  out->upper.z = glm::min(a->upper.z, b->upper.z);
 
-  out->lower.x = fmax(a->lower.x, b->lower.x);
-  out->lower.y = fmax(a->lower.y, b->lower.y);
-  out->lower.z = fmax(a->lower.z, b->lower.z);
+  out->lower.x = glm::max(a->lower.x, b->lower.x);
+  out->lower.y = glm::max(a->lower.y, b->lower.y);
+  out->lower.z = glm::max(a->lower.z, b->lower.z);
   
   return true;
 }
@@ -59,9 +59,18 @@ bool aabb_contains(const aabb_t *box, const glm::vec3 v) {
 }
 
 bool aabb_overlaps(const aabb_t *a, const aabb_t *b) {
+  return aabb_overlaps_component(
+    a->lower,
+    a->upper,
+    b->lower,
+    b->upper
+  );
+}
+
+bool aabb_overlaps_component(glm::vec3 a_lower, glm::vec3 a_upper, glm::vec3 b_lower, glm::vec3 b_upper) {
   return (
-    (a->lower.x <= b->upper.x && a->upper.x >= b->lower.x) &&
-    (a->lower.y <= b->upper.y && a->upper.y >= b->lower.y) &&
-    (a->lower.z <= b->upper.z && a->upper.z >= b->lower.z)
-   );
+    (a_lower.x <= b_upper.x && a_upper.x >= b_lower.x) &&
+    (a_lower.y <= b_upper.y && a_upper.y >= b_lower.y) &&
+    (a_lower.z <= b_upper.z && a_upper.z >= b_lower.z)
+    );
 }

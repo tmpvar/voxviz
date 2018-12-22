@@ -10,6 +10,7 @@
 #include "shadowmap.h"
 #include "volume.h"
 #include "volume-manager.h"
+#include "voxel-cascade.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -27,6 +28,7 @@
 #include <math.h>
 #include <string.h>
 #include <queue>
+#include <set>
 
 bool keys[1024];
 bool prevKeys[1024];
@@ -39,6 +41,12 @@ glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 Shadowmap *shadowmap;
 FBO *fbo = nullptr;
 FBO *shadowFBO = nullptr;
+
+struct DepthBucket {
+  Brick **bricks;
+  size_t max_size;
+  size_t pos;
+};
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -322,7 +330,8 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera(
-    glm::vec3(10, 40, 30)
+    //glm::vec3(10, 40, 30)
+    glm::vec3(0, 0, 0)
   );
 
   int time = 0;
@@ -392,12 +401,14 @@ int main(void) {
     bodyDef
   );*/
 
+  /*
   VOXParser::parse(
     "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
     volumeManager,
     physicsScene,
     bodyDef
   );
+  */
 
   Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
   Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
@@ -411,7 +422,7 @@ int main(void) {
   toolBrick2->fillConst(0xFFFFFFFF);
   
   
-  volumeManager->addVolume(tool);
+  //volumeManager->addVolume(tool);
 
   q3Transform tx;
   q3Identity(tx);
@@ -432,22 +443,22 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
-  tool->scale.x = 1.0;
-  tool->scale.y = 1.0;
-  tool->scale.z = 1.0;
+  tool->scale.x = 10.0;
+  tool->scale.y = 10.0;
+  tool->scale.z = 10.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
 
-  for (int x = 0; x < 32; x++) {
-    for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 32; z++) {
+  for (int x = 0; x < 16; x+=2) {
+    for (int y = 0; y < 16; y+=2) {
+      for (int z = 0; z < 16; z+=2) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
   }
-
+  
   //fillAllProgram->use()->uniform1ui("val", 0xFFFFFFFF);
   size_t i = 0;
   for (auto& it : floor->bricks) {
@@ -487,6 +498,23 @@ int main(void) {
   ImGui::CreateContext();
   const float movementSpeed = 0.01f;
   GLFWgamepadstate state;
+  
+  // Depth buckets
+  #define DEPTH_BUCKET_SIZE 1 
+  #define MAX_DEPTH_BUCKETS MAX_DISTANCE/DEPTH_BUCKET_SIZE
+  
+  DepthBucket *depthBuckets = (DepthBucket *)malloc(sizeof(DepthBucket) * MAX_DEPTH_BUCKETS);
+  
+  for (size_t i = 0; i < MAX_DEPTH_BUCKETS; i++) {
+    depthBuckets[i].pos = 0;
+    depthBuckets[i].max_size = 1024;
+    depthBuckets[i].bricks = (Brick **)malloc(sizeof(Brick *) * depthBuckets[i].max_size);
+  }
+
+
+  /// VOXEL CASCADE
+  VoxelCascade *voxelCascade = new VoxelCascade(4);
+
   while (!glfwWindowShouldClose(window)) {
 
     ImGui_ImplOpenGL3_NewFrame();
@@ -633,8 +661,75 @@ int main(void) {
         break;
       }
     }
+    
+    // Depth bucketting
+    if (false) {
+      double start = glfwGetTime();
+      ImGui::Begin("depth buckets");
+      ImVec2 pos = { 0, 200 };
+      ImVec2 dims = { 300, 700 };
+      ImGui::SetWindowPos(pos);
+      ImGui::SetWindowSize(dims);
 
+      for (size_t i = 0; i < MAX_DEPTH_BUCKETS; i++) {
+        if (depthBuckets[i].pos > depthBuckets[i].max_size) {
+          ImGui::Text("malloc bucket %i", i);
+          depthBuckets[i].max_size = (size_t)(ceilf(depthBuckets[i].pos / 1024.0f) * 1024);
+          free(depthBuckets[i].bricks);
+          depthBuckets[i].bricks = (Brick **)malloc(sizeof(Brick *) * depthBuckets[i].max_size);
+        }
+
+        depthBuckets[i].pos = 0;
+      }
+
+      for (auto& volume : volumeManager->volumes) {
+        Brick *brick;
+        glm::mat4 mat = volume->getModelMatrix();
+        glm::vec3 invEye = glm::inverse(mat) * glm::vec4(currentEye, 1.0);
+
+        for (auto& it : volume->bricks) {
+          brick = it.second;
+          
+          float dx = invEye.x - (brick->index.x + 0.5f);
+          float dy = invEye.y - (brick->index.y + 0.5f);
+          float dz = invEye.z - (brick->index.z + 0.5f);
+
+          float distance = sqrtf(dx*dx + dy*dy + dz*dz);
+
+          size_t bucket = (size_t)(floorf(logf(distance / 10)));
+          if (depthBuckets[bucket].pos < depthBuckets[bucket].max_size) {
+            depthBuckets[bucket].bricks[depthBuckets[bucket].pos] = brick;
+          }
+          depthBuckets[bucket].pos++;
+        }
+      }
+
+      for (size_t i = 0; i < MAX_DEPTH_BUCKETS; i++) {
+        if (depthBuckets[i].pos > 0) {
+          ImGui::Text("depth bucket %i entries %i (%i)", i, depthBuckets[i].pos, depthBuckets[i].max_size);
+        }
+      }
+      ImGui::End();
+    }
+    
+    // Voxel Cascade
+    {
+      ImGui::Begin("stats");
+      double start = glfwGetTime();
+      voxelCascade->begin(currentEye);
+      for (auto& volume : volumeManager->volumes) {
+        voxelCascade->addVolume(volume);
+      }
+      voxelCascade->end();
+
+      ImGui::Text("cascade time: %.3fms", (glfwGetTime() - start) * 1000);
+      ImGui::End();
+    }
+
+
+    //Normal Render Everything approach
     for (auto& volume : volumeManager->volumes) {
+
       if (volume->bricks.size() == 0) {
         continue;
       }
@@ -648,11 +743,6 @@ int main(void) {
         ->uniformFloat("maxDistance", max_distance)
         ->uniform1i("showHeat", raytracer->showHeat)
         ->uniformVec4("material", volume->material);
-
-      /*raytracer->program->uniformFloat(
-        "debug",
-        volume != tool && tool->overlaps(volume) ? 1.0 : 0.0
-      );*/
 
       gl_error();
       size_t activeBricks = volume->bind();
@@ -668,6 +758,7 @@ int main(void) {
       );
       gl_error();
     }
+    
 
     //volumeManager->volumes[0]->rotation.x += 0.0001;
     //volumeManager->volumes[1]->scale.z = 1.0 + abs(sin(time / 1000.0)) * 10.0;
@@ -736,9 +827,10 @@ int main(void) {
     if (state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] || keys[GLFW_KEY_SPACE]) {
       floor->booleanOp(tool, true, brickAddProgram);
     }
-
+    
 
     {
+      ImGui::Begin("stats");
       static float f = 0.0f;
       static int counter = 0;
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -750,6 +842,7 @@ int main(void) {
         tool->position.z
       );
       ImGui::Text("%i floor bricks", floor->bricks.size());
+      ImGui::End();
     }
 
     ImGui::Render();
