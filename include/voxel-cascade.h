@@ -34,9 +34,9 @@ class VoxelCascade {
   size_t slab_size = 0;
   size_t slab_pos = 0;
   size_t total_slab_bytes = 0;
-  SlabEntry *slab = nullptr;
 
-  GPUCell *gpu_cells;
+  SSBO *ssbo_index;
+  SSBO *ssbo_slab;
 
   glm::vec3 center;
   Mesh *mesh;
@@ -53,33 +53,27 @@ class VoxelCascade {
         this->levels[i].cells[j] = new CPUCell;
       }
     }
-    
-    // TODO: GPUCell
+
+    // Setup the GPU cascade index
     size_t gpu_cells_bytes = BRICK_VOXEL_COUNT * level_count * sizeof(GPUCell);
-    this->gpu_cells = (GPUCell *)malloc(gpu_cells_bytes);
-    memset(this->gpu_cells, 0, gpu_cells_bytes);
+    this->ssbo_index = new SSBO(gpu_cells_bytes);
+
+    // Setup the GPU cascade slab
+    this->ssbo_slab = new SSBO(0);
 
     this->setupDebugRender();
   };
 
   void begin(glm::vec3 eye) {
     if (this->slab_pos > this->slab_size) {
-      // realloc the slab
-      if (this->slab != nullptr) {
-        free(this->slab);
-      }
-
       this->slab_size = (size_t)(ceilf(this->slab_pos / 1024.0f) * 1024);
-      printf("increasing slab size to %li\n", this->slab_size);
       this->total_slab_bytes = sizeof(SlabEntry) * this->slab_size;
-
-      this->slab = (SlabEntry *)malloc(total_slab_bytes);
       
+      this->ssbo_slab->resize(this->total_slab_bytes);
     }
 
     // reset the slab
     this->slab_pos = 0;
-    memset(this->slab, 0, this->total_slab_bytes);
 
     // reset the previous cpu cascade
     for (int i = 0; i < level_count; i++) {
@@ -178,7 +172,11 @@ class VoxelCascade {
   void end() {
     // Push each cell's bricks into contiguous memory while keeping the index to populate
     // the GPUCell's memory.
-    
+    this->ssbo_slab->resize(this->slab_size * sizeof(SlabEntry));
+    SlabEntry *gpu_slab = (SlabEntry *)this->ssbo_slab->beginMap(SSBO::MAP_WRITE_ONLY);
+    // TODO: we need to clear this slab or we're going to get ghosting when cells were filled
+    //       but are no longer filled.
+    GPUCell *gpu_cells = (GPUCell *)this->ssbo_index->beginMap(SSBO::MAP_WRITE_ONLY);
     for (int i = 0; i < level_count; i++) {
       size_t level_offset = BRICK_VOXEL_COUNT * i;    
       for (int j = 0; j < BRICK_VOXEL_COUNT; j++) {
@@ -188,26 +186,33 @@ class VoxelCascade {
           continue;
         }
 
-        GPUCell gpu_cell = this->gpu_cells[level_offset + j];
         // Mark this cell as active
-        gpu_cell.state = 1;
-        gpu_cell.start = this->slab_pos;
+        GPUCell store;
+        store.state = 1;
+        store.start = this->slab_pos;
         
         for (auto& brick : cpu_cell->bricks) {
           if (this->slab_pos < this->slab_size) {
-            SlabEntry entry = this->slab[this->slab_pos];
+            SlabEntry entry;
             entry.brickData = brick->bufferAddress;
             entry.brickIndex = brick->index;
             // TODO: figure out where volumes live on the GPU
             entry.volume = 0;
-
+            if (gpu_slab != nullptr) {
+              memcpy(&gpu_slab[this->slab_pos], &entry, sizeof(entry));
+            }
           }
           this->slab_pos++;
         }
         
-        gpu_cell.end = this->slab_pos;
+        store.end = this->slab_pos;
+        if (gpu_cells != nullptr) {
+          memcpy(&gpu_cells[level_offset + j], &store, sizeof(store));
+        }
       }
     }
+    this->ssbo_slab->endMap();
+    this->ssbo_index->endMap();
   };
 
   void setupDebugRender() {
