@@ -39,7 +39,8 @@ class VoxelCascade {
   GPUCell *gpu_cells;
 
   glm::vec3 center;
-
+  Mesh *mesh;
+  Program *program;
   public:
   VoxelCascade(int level_count) {
     this->level_count = level_count;
@@ -57,6 +58,8 @@ class VoxelCascade {
     size_t gpu_cells_bytes = BRICK_VOXEL_COUNT * level_count * sizeof(GPUCell);
     this->gpu_cells = (GPUCell *)malloc(gpu_cells_bytes);
     memset(this->gpu_cells, 0, gpu_cells_bytes);
+
+    this->setupDebugRender();
   };
 
   void begin(glm::vec3 eye) {
@@ -176,8 +179,6 @@ class VoxelCascade {
     // Push each cell's bricks into contiguous memory while keeping the index to populate
     // the GPUCell's memory.
     
-    
-    
     for (int i = 0; i < level_count; i++) {
       size_t level_offset = BRICK_VOXEL_COUNT * i;    
       for (int j = 0; j < BRICK_VOXEL_COUNT; j++) {
@@ -207,6 +208,115 @@ class VoxelCascade {
         gpu_cell.end = this->slab_pos;
       }
     }
-
   };
+
+  void setupDebugRender() {
+    this->program = new Program();
+
+    this->program
+      ->add(Shaders::get("voxel-cascade-debug.vert"))
+      ->add(Shaders::get("voxel-cascade-debug.frag"))
+      ->output("outColor")
+      ->link();
+    // Setup Debug Rendering
+    this->mesh = new Mesh();
+
+    this->mesh
+      ->edge(0, 1)
+      ->edge(1, 2)
+      ->edge(2, 3)
+      ->edge(3, 0)
+      
+      ->edge(4, 5)
+      ->edge(5, 6)
+      ->edge(6, 7)
+      ->edge(7, 4)
+
+      ->edge(0, 4)
+      ->edge(1, 5)
+      ->edge(2, 6)
+      ->edge(3, 7);
+
+    this->mesh
+      ->vert(0, 0, 0)
+      ->vert(1, 0, 0)
+      ->vert(1, 1, 0)
+      ->vert(0, 1, 0)
+      ->vert(0, 0, 1)
+      ->vert(1, 0, 1)
+      ->vert(1, 1, 1)
+      ->vert(0, 1, 1);
+
+    mesh->upload();
+
+    size_t total_position_mem = this->level_count * 3 * sizeof(float) * BRICK_VOXEL_COUNT;
+    float *positions = (float *)malloc(total_position_mem);
+
+    size_t total_level_mem = this->level_count * sizeof(int32_t) * BRICK_VOXEL_COUNT;
+    int32_t *levels_mem = (int32_t *)malloc(total_level_mem);
+    size_t loc = 0;
+
+    for (int levelIdx = 0; levelIdx <this->level_count; levelIdx++) {
+      int cellSize = 1 << (levelIdx + 1);
+      int radius = cellSize * BRICK_RADIUS;
+      glm::vec3 v3CellSize = glm::vec3(cellSize);
+
+      glm::vec3 level_lower = this->center - glm::vec3(radius);
+      glm::vec3 level_upper = this->center + glm::vec3(radius);
+
+      for (float x=-BRICK_RADIUS; x < BRICK_RADIUS; x++) {
+        for (float y=-BRICK_RADIUS; y < BRICK_RADIUS; y++) {
+          for (float z=-BRICK_RADIUS; z < BRICK_RADIUS; z++) {
+            //int idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER)
+            positions[loc * 3 + 0] = x * cellSize;
+            positions[loc * 3 + 1] = y * cellSize;
+            positions[loc * 3 + 2] = z * cellSize;
+
+            levels_mem[loc] = levelIdx;
+
+            loc++;
+          }
+        }
+      }
+      printf("LEVELIDX %i - %f\n", levelIdx, float(levelIdx) / float(this->level_count));
+    }
+    // Instance data
+    unsigned int instanceVBO;
+    glGenBuffers(1, &instanceVBO); gl_error();
+    glEnableVertexAttribArray(1); gl_error();
+    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO); gl_error();
+    glBufferData(GL_ARRAY_BUFFER, total_position_mem, &positions[0], GL_STATIC_DRAW); gl_error();
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0); gl_error();
+    glVertexAttribDivisor(1, 1); gl_error();
+    
+    // Level data
+    unsigned int levelVBO;
+    glGenBuffers(1, &levelVBO); gl_error();
+    glEnableVertexAttribArray(2); gl_error();
+    glBindBuffer(GL_ARRAY_BUFFER, levelVBO); gl_error();
+    glBufferData(GL_ARRAY_BUFFER, total_level_mem, &levels_mem[0], GL_STATIC_DRAW); gl_error();
+    glVertexAttribIPointer(2, 1, GL_INT, sizeof(int32_t), 0); gl_error();
+    glVertexAttribDivisor(2, 1); gl_error();
+  }
+
+  void debugRender(glm::mat4 mvp) {
+    this->program->use()
+      ->uniformVec3("center", this->center)
+      ->uniform1i("total_levels", this->level_count)
+      ->uniformMat4("mvp", mvp);
+
+    glBindVertexArray(this->mesh->vao);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+
+
+    glDrawElementsInstanced(
+      GL_LINES,
+      this->mesh->faces.size(),
+      GL_UNSIGNED_INT,
+      0,
+      BRICK_VOXEL_COUNT * this->level_count
+    );
+  }
 };
