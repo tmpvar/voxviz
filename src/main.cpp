@@ -513,7 +513,7 @@ int main(void) {
 
 
   /// VOXEL CASCADE
-  VoxelCascade *voxelCascade = new VoxelCascade(4);
+  VoxelCascade *voxelCascade = new VoxelCascade(12);
 
   while (!glfwWindowShouldClose(window)) {
 
@@ -521,7 +521,7 @@ int main(void) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
+    float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 100.0 : 1.0);
     if (keys[GLFW_KEY_W]) {
       camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
       //camera->translate(0.0f, 0.0f, 10.0f);
@@ -716,12 +716,15 @@ int main(void) {
     {
       ImGui::Begin("stats");
       double start = glfwGetTime();
-      voxelCascade->begin(currentEye);
+      //voxelCascade->begin(currentEye);
+      // detach the cascade from the eye until we know it is
+      // working.
+      voxelCascade->begin(glm::vec3(0.0));
       for (auto& volume : volumeManager->volumes) {
         voxelCascade->addVolume(volume);
       }
       voxelCascade->end();
-
+      voxelCascade->debugRender(VP);
       ImGui::Text("cascade time: %.3fms", (glfwGetTime() - start) * 1000);
       ImGui::End();
     }
@@ -729,7 +732,6 @@ int main(void) {
 
     //Normal Render Everything approach
     for (auto& volume : volumeManager->volumes) {
-
       if (volume->bricks.size() == 0) {
         continue;
       }

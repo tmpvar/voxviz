@@ -340,6 +340,12 @@
       return this;
     }
 
+    Mesh* edge(GLuint a, GLuint b) {
+      this->faces.push_back(a);
+      this->faces.push_back(b);
+      return this;
+    }
+
     void render (Program *program, const char* attribute) {
       program->attribute(attribute);
       gl_error();
