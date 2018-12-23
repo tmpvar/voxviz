@@ -267,10 +267,9 @@ class VoxelCascade {
       for (float x=-BRICK_RADIUS; x < BRICK_RADIUS; x++) {
         for (float y=-BRICK_RADIUS; y < BRICK_RADIUS; y++) {
           for (float z=-BRICK_RADIUS; z < BRICK_RADIUS; z++) {
-            //int idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER)
-            positions[loc * 3 + 0] = x * cellSize;
-            positions[loc * 3 + 1] = y * cellSize;
-            positions[loc * 3 + 2] = z * cellSize;
+            positions[loc * 3 + 0] = x;
+            positions[loc * 3 + 1] = y;
+            positions[loc * 3 + 2] = z;
 
             levels_mem[loc] = levelIdx;
 

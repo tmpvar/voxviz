@@ -21,5 +21,5 @@ void main() {
 
   color = hsl2rgb(float(level)/float(total_levels), 0.9, .4);
 
-  gl_Position = mvp * vec4(position * cellSize + translation, 1.0);
+  gl_Position = mvp * vec4((position + translation) * cellSize, 1.0);
 }
