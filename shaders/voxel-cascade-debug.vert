@@ -13,13 +13,14 @@ uniform vec3 center;
 uniform int total_levels;
 
 flat out vec3 color;
-
+flat out int vlevel;
+flat out vec3 vposition;
 
 void main() {
-
   float cellSize = float(1 << (level + 1));
 
   color = hsl2rgb(float(level)/float(total_levels), 0.9, .4);
-
-  gl_Position = mvp * vec4((position + translation) * cellSize, 1.0);
+  vposition = translation;
+  vlevel = level;
+  gl_Position = mvp * vec4((position + translation - BRICK_RADIUS) * cellSize, 1.0);
 }

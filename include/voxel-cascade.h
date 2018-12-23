@@ -12,7 +12,7 @@ struct SlabEntry {
 };
 
 struct GPUCell { 
-  uint8_t state; // 0 empty, 0x01 has something
+  uint32_t state; // 0 empty, 0x01 has something
   uint32_t start;
   uint32_t end;
 };
@@ -165,6 +165,10 @@ class VoxelCascade {
 
   void addBrickToCell(Brick *brick, int levelIdx, glm::ivec3 pos) {
     int idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
+    if (idx < 0 || idx > BRICK_VOXEL_COUNT) {
+      return;
+    }
+
     CPUCell *cell = this->levels[levelIdx].cells[idx];
     cell->bricks.push_back(brick);
   };
@@ -182,32 +186,29 @@ class VoxelCascade {
       for (int j = 0; j < BRICK_VOXEL_COUNT; j++) {
         CPUCell *cpu_cell = this->levels[i].cells[j];
         size_t brick_count = cpu_cell->bricks.size();
-        if (brick_count == 0) {
-          continue;
-        }
+        GPUCell store;
+        store.state = 
+        gpu_cells[level_offset + j].state = brick_count == 0 ? 0 : 1;
+        gpu_cells[level_offset + j].start = this->slab_pos;
+        gpu_cells[level_offset + j].end = this->slab_pos + brick_count;
 
         // Mark this cell as active
-        GPUCell store;
-        store.state = 1;
-        store.start = this->slab_pos;
-        
-        for (auto& brick : cpu_cell->bricks) {
-          if (this->slab_pos < this->slab_size) {
-            SlabEntry entry;
-            entry.brickData = brick->bufferAddress;
-            entry.brickIndex = brick->index;
-            // TODO: figure out where volumes live on the GPU
-            entry.volume = 0;
-            if (gpu_slab != nullptr) {
-              memcpy(&gpu_slab[this->slab_pos], &entry, sizeof(entry));
+        if (brick_count != 0) {
+          store.start = this->slab_pos;
+          for (auto& brick : cpu_cell->bricks) {
+            if (this->slab_pos < this->slab_size) {
+              SlabEntry entry;
+              entry.brickData = brick->bufferAddress;
+              entry.brickIndex = brick->index;
+              entry.volume = 0;
+              if (gpu_slab != nullptr) {
+                memcpy(&gpu_slab[this->slab_pos], &entry, sizeof(entry));
+              }
             }
+            this->slab_pos++;
           }
-          this->slab_pos++;
-        }
         
-        store.end = this->slab_pos;
-        if (gpu_cells != nullptr) {
-          memcpy(&gpu_cells[level_offset + j], &store, sizeof(store));
+          store.end = this->slab_pos;
         }
       }
     }
@@ -254,8 +255,8 @@ class VoxelCascade {
 
     mesh->upload();
 
-    size_t total_position_mem = this->level_count * 3 * sizeof(float) * BRICK_VOXEL_COUNT;
-    float *positions = (float *)malloc(total_position_mem);
+    size_t total_translation_mem = this->level_count * 3 * sizeof(float) * BRICK_VOXEL_COUNT;
+    float *translations = (float *)malloc(total_translation_mem);
 
     size_t total_level_mem = this->level_count * sizeof(int32_t) * BRICK_VOXEL_COUNT;
     int32_t *levels_mem = (int32_t *)malloc(total_level_mem);
@@ -269,12 +270,12 @@ class VoxelCascade {
       glm::vec3 level_lower = this->center - glm::vec3(radius);
       glm::vec3 level_upper = this->center + glm::vec3(radius);
 
-      for (float x=-BRICK_RADIUS; x < BRICK_RADIUS; x++) {
-        for (float y=-BRICK_RADIUS; y < BRICK_RADIUS; y++) {
-          for (float z=-BRICK_RADIUS; z < BRICK_RADIUS; z++) {
-            positions[loc * 3 + 0] = x;
-            positions[loc * 3 + 1] = y;
-            positions[loc * 3 + 2] = z;
+      for (float x=0; x < BRICK_DIAMETER; x++) {
+        for (float y=0; y < BRICK_DIAMETER; y++) {
+          for (float z=0; z < BRICK_DIAMETER; z++) {
+            translations[loc * 3 + 0] = x;
+            translations[loc * 3 + 1] = y;
+            translations[loc * 3 + 2] = z;
 
             levels_mem[loc] = levelIdx;
 
@@ -289,7 +290,7 @@ class VoxelCascade {
     glGenBuffers(1, &instanceVBO); gl_error();
     glEnableVertexAttribArray(1); gl_error();
     glBindBuffer(GL_ARRAY_BUFFER, instanceVBO); gl_error();
-    glBufferData(GL_ARRAY_BUFFER, total_position_mem, &positions[0], GL_STATIC_DRAW); gl_error();
+    glBufferData(GL_ARRAY_BUFFER, total_translation_mem, &translations[0], GL_STATIC_DRAW); gl_error();
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0); gl_error();
     glVertexAttribDivisor(1, 1); gl_error();
     
@@ -307,12 +308,14 @@ class VoxelCascade {
     this->program->use()
       ->uniformVec3("center", this->center)
       ->uniform1i("total_levels", this->level_count)
-      ->uniformMat4("mvp", mvp);
+      ->uniformMat4("mvp", mvp)
+      ->ssbo("cascade_index", this->ssbo_index)
+      ->ssbo("cascade_slab", this->ssbo_slab);
 
-    glBindVertexArray(this->mesh->vao);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
+    glBindVertexArray(this->mesh->vao); gl_error();
+    glEnableVertexAttribArray(0); gl_error();
+    glEnableVertexAttribArray(1); gl_error();
+    glEnableVertexAttribArray(2); gl_error();
 
 
     glDrawElementsInstanced(
@@ -322,5 +325,6 @@ class VoxelCascade {
       0,
       BRICK_VOXEL_COUNT * this->level_count
     );
+    gl_error();
   }
 };
