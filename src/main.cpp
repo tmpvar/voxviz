@@ -330,30 +330,11 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera(
-    //glm::vec3(10, 40, 30)
-    glm::vec3(0, 0, 0)
+    glm::vec3(10, 40, 30)
+    //glm::vec3(0, 0, 0)
   );
 
   int time = 0;
-
-#if RENDER_STATIC == 1
-  //update_volumes(raytracer, compute, time);
-#endif
-
-  //Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
-  //tool->fillConst(1.0);
-  /*compute->lock(compute->job.command_queues[0], tool->computeBuffer);
-  compute->fill(
-    "fillAll",
-    compute->job.command_queues[0],
-    tool,
-    0
-  );
-  compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
-  */
-  //tool->position(0.0, 512, 0.0);
-
-  //clFinish(compute->job.command_queues[0]);
 
   Program *fullscreen_program = new Program();
   fullscreen_program
@@ -422,7 +403,7 @@ int main(void) {
   toolBrick2->fillConst(0xFFFFFFFF);
   
   
-  //volumeManager->addVolume(tool);
+  volumeManager->addVolume(tool);
 
   q3Transform tx;
   q3Identity(tx);
@@ -513,7 +494,7 @@ int main(void) {
 
 
   /// VOXEL CASCADE
-  VoxelCascade *voxelCascade = new VoxelCascade(12);
+  VoxelCascade *voxelCascade = new VoxelCascade(8);
 
   while (!glfwWindowShouldClose(window)) {
 
@@ -789,7 +770,7 @@ int main(void) {
     physicsScene->Step();
     //floor->rotation.z += 0.001;
     tool->rotation.z += 0.001;
-    tool->rotation.y += 0.002;
+    tool->rotation.y += 0.02;
     //tool->rotation.x += 0.005;
     
     /*fbo->unbind();

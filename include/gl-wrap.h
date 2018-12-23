@@ -87,9 +87,85 @@ public:
   }
 };
 
+// TODO: consider renaming this to MappableSlab or something less gl specific
+class SSBO {
+  size_t total_bytes = 0;
+  GLuint handle = 0;
+  bool mapped = false;
+
+public:
+
+  const enum MAP_TYPE {
+    MAP_READ_ONLY = GL_READ_ONLY,
+    MAP_READ_WRITE = GL_READ_WRITE,
+    MAP_WRITE_ONLY = GL_WRITE_ONLY,
+  };
+
+  SSBO(size_t bytes) {
+    this->resize(bytes);
+  }
+
+  SSBO *resize(size_t bytes) {
+    if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
+      glDeleteBuffers(1, &this->handle);
+    }
+
+    if (bytes == 0) {
+      return this;
+    }
+
+    glGenBuffers(1, &this->handle); gl_error();
+    this->bind();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_COPY); gl_error();
+    this->unbind();
+
+    this->total_bytes = bytes;
+    return this;
+  }
+
+  void *beginMap(MAP_TYPE m = MAP_READ_WRITE) {
+    if (this->total_bytes == 0) {
+      return nullptr;
+    }
+
+    this->bind();
+    void *out = glMapBuffer(GL_SHADER_STORAGE_BUFFER, m); gl_error();
+    this->unbind();
+    this->mapped = true;
+    return out;
+  }
+
+  void endMap() {
+    if (this->total_bytes == 0 || !this->mapped || this->handle == 0) {
+      return;
+    }
+    this->bind();
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); gl_error();
+    this->unbind();
+    this->mapped = false;
+  }
+
+  GLuint bind() {
+    if (this->handle != 0) {
+      glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->handle); gl_error();
+    }
+    return this->handle;
+  }
+
+  void unbind() {
+    //glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
+  }
+
+  size_t size() {
+    return this->total_bytes;
+  }
+};
+
+
 class Program {
   map<string, GLint> uniforms;
   map<string, GLint> attributes;
+  map<string, GLint> resource_indices;
   GLuint texture_index;
   string compositeName;
 public:
@@ -111,6 +187,19 @@ public:
       gl_error();
     } else {
       ret = this->uniforms[name];
+    }
+    return ret;
+  }
+
+  GLint resourceIndex(string name, GLenum type) {
+    GLint ret;
+    if (this->resource_indices.find(name) == this->resource_indices.end()) {
+      glGetProgramResourceIndex(this->handle, type, name.c_str());
+      this->resource_indices[name] = ret;
+      gl_error();
+    }
+    else {
+      ret = this->resource_indices[name];
     }
     return ret;
   }
@@ -248,6 +337,23 @@ public:
   Program *bufferAddress(string name, GLuint64 val) {
     GLint loc = this->uniformLocation(name);
     glProgramUniformui64NV(this->handle, loc, val);
+    return this;
+  }
+
+  Program *ssbo(string name, SSBO *ssbo) {
+    GLuint idx = glGetProgramResourceIndex(this->handle, GL_SHADER_STORAGE_BLOCK, name.c_str());
+    gl_error();
+    
+    if (idx == GL_INVALID_INDEX) {
+      printf("SSBO binding failed, could not find '%s'\n", name.c_str());
+      return this;
+    }
+
+    GLuint ssbo_handle = ssbo->bind();
+    if (ssbo_handle != 0) {
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, idx, ssbo_handle); gl_error();
+    }
+    ssbo->unbind();
     return this;
   }
 };
@@ -549,64 +655,4 @@ public:
       GL_LINEAR
     );
   }
-};
-
-
-class SSBO {
-  size_t total_bytes = 0;
-  GLuint ssbo = 0;
-  bool mapped = false;
-
-  public:
-
-  const enum MAP_TYPE {
-    MAP_READ_ONLY = GL_READ_ONLY,
-    MAP_READ_WRITE = GL_READ_WRITE,
-    MAP_WRITE_ONLY = GL_WRITE_ONLY,
-  };
-
-  SSBO(size_t bytes) {
-    this->resize(bytes);
-  }
-
-  SSBO *resize(size_t bytes) {
-    if (this->total_bytes != 0 && bytes != this->total_bytes && this->ssbo != 0) {
-      glDeleteBuffers(1, &this->ssbo);
-    }
-
-    if (bytes == 0) {
-      return this;
-    }
-    
-    glGenBuffers(1, &this->ssbo); gl_error();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->ssbo); gl_error();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_COPY); gl_error();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
-
-    this->total_bytes = bytes;
-    return this;
-  }
-  
-  void *beginMap(MAP_TYPE m = MAP_READ_WRITE) {
-    if (this->total_bytes == 0) {
-      return nullptr;
-    }
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->ssbo); gl_error();
-    
-    void *out = glMapBuffer(GL_SHADER_STORAGE_BUFFER, m); gl_error();
-    this->mapped = true;
-    return out;
-  }
-
-  void endMap() {
-    if (this->total_bytes == 0 || !this->mapped || this->ssbo == 0) {
-      return;
-    }
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->ssbo); gl_error();
-    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); gl_error();
-    this->mapped = false;
-  }
-
-
 };
