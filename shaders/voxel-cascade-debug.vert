@@ -20,7 +20,10 @@ void main() {
   float cellSize = float(1 << (level + 1));
 
   color = hsl2rgb(float(level)/float(total_levels), 0.9, .4);
-  vposition = translation;
+  vposition = translation + BRICK_RADIUS;
   vlevel = level;
-  gl_Position = mvp * vec4((position + translation - BRICK_RADIUS) * cellSize, 1.0);
+  gl_Position = mvp * vec4(
+    center + (position + translation) * cellSize,
+    1.0
+  );
 }
