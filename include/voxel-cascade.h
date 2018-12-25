@@ -64,7 +64,9 @@ class VoxelCascade {
     this->setupDebugRender();
   };
 
-  void begin(glm::vec3 eye) {
+  void begin(glm::vec3 cascadeCenter) {
+    this->center = cascadeCenter;
+
     if (this->slab_pos > this->slab_size) {
       this->slab_size = (size_t)(ceilf(this->slab_pos / 1024.0f) * 1024);
       this->total_slab_bytes = sizeof(SlabEntry) * this->slab_size;
@@ -81,17 +83,28 @@ class VoxelCascade {
         this->levels[i].cells[j]->bricks.clear();
       }
     }
-
-    this->center = eye;
   };
 
   void addVolume(Volume *volume) {
     glm::mat4 mat = volume->getModelMatrix();
     
     glm::vec3 txVerts[8];
+    glm::vec3 aabbVerts[8];
     glm::ivec3 lower(INT_MAX);
     glm::ivec3 upper(INT_MIN);
     glm::ivec3 offset;
+
+    glm::vec3 offsets[8] = {
+      glm::vec3(0.0, 1.0, 0.0),
+      glm::vec3(1.0, 1.0, 0.0),
+      glm::vec3(1.0, 0.0, 0.0),
+      glm::vec3(0.0, 0.0, 0.0),
+
+      glm::vec3(0.0, 1.0, 1.0),
+      glm::vec3(1.0, 1.0, 1.0),
+      glm::vec3(1.0, 0.0, 1.0),
+      glm::vec3(0.0, 0.0, 1.0)
+    };
 
     //glm::ivec3 offset = txPoint(mat, brick->index + offset);
     for (auto& it : volume->bricks) {
@@ -104,22 +117,18 @@ class VoxelCascade {
       upper.y = INT_MIN;
       upper.z = INT_MIN;
 
-
       for (uint8_t i = 0; i < 8; i++) {
-        offset.x = float((i & 4) >> 2);
-        offset.y = float((i & 2) >> 1);
-        offset.z = float(i & 1);
+        offset = offsets[i];
         
         txVerts[i] = txPoint(mat, brick->index + offset);
-        lower.x = min(txVerts[i].x, lower.x);
-        lower.y = min(txVerts[i].y, lower.y);
-        lower.z = min(txVerts[i].z, lower.z);
+        lower.x = min(txVerts[i].x, float(lower.x));
+        lower.y = min(txVerts[i].y, float(lower.y));
+        lower.z = min(txVerts[i].z, float(lower.z));
  
-        upper.x = max(txVerts[i].x, upper.x);
-        upper.y = max(txVerts[i].y, upper.y);
-        upper.z = max(txVerts[i].z, upper.z);
+        upper.x = max(txVerts[i].x, float(upper.x));
+        upper.y = max(txVerts[i].y, float(upper.y));
+        upper.z = max(txVerts[i].z, float(upper.z));
       }
-     
 
       for (int level = 0; level < this->level_count; level++) {
         int cellSize = 1 << (level + 1);
@@ -131,30 +140,52 @@ class VoxelCascade {
         glm::vec3 level_lower = this->center - glm::vec3(radius);
         glm::vec3 level_upper = this->center + glm::vec3(radius);
 
-        glm::ivec3 start = glm::ivec3(glm::floor(glm::vec3(lower) / float(cellSize)));// * float(cellSize));
-        glm::ivec3 end = glm::ivec3(glm::ceil(glm::vec3(upper) / float(cellSize)));// * float(cellSize));
-
         // TODO: ensure the start/end lies within the current level
         if (!aabb_overlaps_component(level_lower, level_upper, lower, upper)) {
           continue;
         }
 
-        for (int x = start.x; x < end.x; x++) {
+        glm::ivec3 start = glm::ivec3(
+          glm::floor(glm::vec3(lower) / float(cellSize)) * float(cellSize)
+        );
+        glm::ivec3 end = glm::ivec3(
+          glm::ceil(glm::vec3(upper) / float(cellSize)) * float(cellSize)
+        );
+
+        /*
+        start.x = max(start.x, level_lower.x);
+        start.y = max(start.y, level_lower.y);
+        start.z = max(start.z, level_lower.z);
+
+        end.x = min(end.x, level_upper.x);
+        end.y = min(end.y, level_upper.y);
+        end.z = min(end.z, level_upper.z);
+        */
+
+        for (int x = start.x; x <= end.x; x+= cellSize) {
           pos.x = x;
-          for (int y = start.y; y < end.y; y++) {
+          for (int y = start.y; y <= end.y; y+= cellSize) {
             pos.y = y;
-            for (int z = start.z; z < end.z; z++) {
+            for (int z = start.z; z <= end.z; z+= cellSize) {
               pos.z = z;
+
+              for (int vertIdx = 0; vertIdx < 8; vertIdx++) {
+                aabbVerts[vertIdx] = pos + offsets[vertIdx] * v3CellSize;
+              }
 
               // TODO: test if current cell intersects the obb
               bool isect = collision_aabb_obb(
-                pos * v3CellSize,
-                pos * v3CellSize + v3CellSize,
+                aabbVerts,
                 txVerts
               );
 
               if (isect) {
-                this->addBrickToCell(brick, level, pos);
+                this->addBrickToCell(
+                  brick,
+                  level,
+                  glm::ivec3(glm::floor((pos - this->center + glm::vec3(radius)) / v3CellSize))
+                  //glm::ivec3(BRICK_RADIUS) + (glm::ivec3(pos) / glm::ivec3(v3CellSize)) - glm::ivec3(this->center)
+                );
               }
             }
           }
@@ -164,10 +195,18 @@ class VoxelCascade {
   };
 
   void addBrickToCell(Brick *brick, int levelIdx, glm::ivec3 pos) {
-    int idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
-    if (idx < 0 || idx > BRICK_VOXEL_COUNT) {
+    if (
+      pos.x < 0 ||
+      pos.y < 0 ||
+      pos.z < 0 ||
+      pos.x >= BRICK_DIAMETER ||
+      pos.y >= BRICK_DIAMETER ||
+      pos.z >= BRICK_DIAMETER
+    ) {
       return;
     }
+
+    int idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
 
     CPUCell *cell = this->levels[levelIdx].cells[idx];
     cell->bricks.push_back(brick);
@@ -181,20 +220,19 @@ class VoxelCascade {
     // TODO: we need to clear this slab or we're going to get ghosting when cells were filled
     //       but are no longer filled.
     GPUCell *gpu_cells = (GPUCell *)this->ssbo_index->beginMap(SSBO::MAP_WRITE_ONLY);
+
     for (int i = 0; i < level_count; i++) {
       size_t level_offset = BRICK_VOXEL_COUNT * i;    
       for (int j = 0; j < BRICK_VOXEL_COUNT; j++) {
         CPUCell *cpu_cell = this->levels[i].cells[j];
         size_t brick_count = cpu_cell->bricks.size();
-        GPUCell store;
-        store.state = 
+        
         gpu_cells[level_offset + j].state = brick_count == 0 ? 0 : 1;
         gpu_cells[level_offset + j].start = this->slab_pos;
         gpu_cells[level_offset + j].end = this->slab_pos + brick_count;
 
         // Mark this cell as active
         if (brick_count != 0) {
-          store.start = this->slab_pos;
           for (auto& brick : cpu_cell->bricks) {
             if (this->slab_pos < this->slab_size) {
               SlabEntry entry;
@@ -207,8 +245,6 @@ class VoxelCascade {
             }
             this->slab_pos++;
           }
-        
-          store.end = this->slab_pos;
         }
       }
     }
@@ -273,9 +309,9 @@ class VoxelCascade {
       for (float x=0; x < BRICK_DIAMETER; x++) {
         for (float y=0; y < BRICK_DIAMETER; y++) {
           for (float z=0; z < BRICK_DIAMETER; z++) {
-            translations[loc * 3 + 0] = x;
-            translations[loc * 3 + 1] = y;
-            translations[loc * 3 + 2] = z;
+            translations[loc * 3 + 0] = x - BRICK_RADIUS;
+            translations[loc * 3 + 1] = y - BRICK_RADIUS;
+            translations[loc * 3 + 2] = z - BRICK_RADIUS;
 
             levels_mem[loc] = levelIdx;
 

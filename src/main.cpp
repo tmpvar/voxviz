@@ -476,7 +476,7 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.01f;
+  const float movementSpeed = 0.1f;
   GLFWgamepadstate state;
   
   // Depth buckets
@@ -491,9 +491,9 @@ int main(void) {
     depthBuckets[i].bricks = (Brick **)malloc(sizeof(Brick *) * depthBuckets[i].max_size);
   }
 
-
-  /// VOXEL CASCADE
+    /// VOXEL CASCADE
   VoxelCascade *voxelCascade = new VoxelCascade(8);
+  glm::vec3 cascadeCenter(0.0);
 
   while (!glfwWindowShouldClose(window)) {
 
@@ -570,7 +570,13 @@ int main(void) {
       const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
       const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
       const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
-      tool->move(
+      /*tool->move(
+        fabs(x) > 0.1 ? x * movementSpeed : 0,
+        fabs(y) > 0.1 ? -y * movementSpeed : 0,
+        fabs(z) > 0.1 ? z * movementSpeed : 0
+      );*/
+
+      cascadeCenter += glm::vec3(
         fabs(x) > 0.1 ? x * movementSpeed : 0,
         fabs(y) > 0.1 ? -y * movementSpeed : 0,
         fabs(z) > 0.1 ? z * movementSpeed : 0
@@ -696,14 +702,20 @@ int main(void) {
     {
       ImGui::Begin("stats");
       double start = glfwGetTime();
-      //voxelCascade->begin(currentEye);
+      voxelCascade->begin(currentEye);
+      ImGui::Text("c: (%.1f, %.1f, %.1f)", 
+        cascadeCenter.x,
+        cascadeCenter.y,
+        cascadeCenter.z
+      );
       // detach the cascade from the eye until we know it is
       // working.
-      voxelCascade->begin(glm::vec3(0.0));
+      //voxelCascade->begin(glm::vec3(0.0));
       for (auto& volume : volumeManager->volumes) {
         voxelCascade->addVolume(volume);
       }
       voxelCascade->end();
+
       voxelCascade->debugRender(VP);
       ImGui::Text("cascade time: %.3fms", (glfwGetTime() - start) * 1000);
       ImGui::End();
@@ -768,8 +780,8 @@ int main(void) {
     
     physicsScene->Step();
     //floor->rotation.z += 0.001;
-    tool->rotation.z += 0.001;
-    tool->rotation.y += 0.02;
+    //tool->rotation.z += 0.001;
+    tool->rotation.y += 0.002;
     //tool->rotation.x += 0.005;
     
     /*fbo->unbind();

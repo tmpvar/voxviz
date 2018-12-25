@@ -15,7 +15,49 @@
     o---------o
     0         1
 */
-bool collision_aabb_obb(glm::vec3 aabb_lower, glm::vec3 aabb_upper, glm::vec3 obb[8]) {
+
+static bool collision_aabb_obb(const glm::vec3 aabb[8], const glm::vec3 obb[8]) {
+  glm::vec3 axes[6] = {
+    glm::vec3(1.0, 0.0, 0.0),
+    glm::vec3(0.0, 1.0, 0.0),
+    glm::vec3(0.0, 0.0, 1.0),
+    glm::normalize(obb[1] - obb[0]),
+    glm::normalize(obb[2] - obb[0]),
+    glm::normalize(obb[4] - obb[0])
+  };
+  double inf = std::numeric_limits<double>::infinity();
+  glm::vec2 resultIntervals[2];
+
+  for (int axisIdx = 0; axisIdx < 6; axisIdx++) {
+    resultIntervals[0].x = inf;
+    resultIntervals[0].y = -inf;
+    resultIntervals[1].x = inf;
+    resultIntervals[1].y = -inf;
+    glm::vec3 axis = axes[axisIdx];
+
+    for (int cornerIdx = 0; cornerIdx < 8; cornerIdx++) {
+      auto aabbProjection = glm::dot(axis, aabb[cornerIdx]);
+      auto obbProjection = glm::dot(axis, obb[cornerIdx]);
+
+      resultIntervals[0].x = min(resultIntervals[0].x, aabbProjection);
+      resultIntervals[0].y = max(resultIntervals[0].y, aabbProjection);
+
+      resultIntervals[1].x = min(resultIntervals[1].x, obbProjection);
+      resultIntervals[1].y = max(resultIntervals[1].y, obbProjection);
+    }
+
+    if (
+      resultIntervals[1].x > resultIntervals[0].y ||
+      resultIntervals[1].y < resultIntervals[0].x
+      ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+
+bool collision_aabb_obb_old(glm::vec3 aabb_lower, glm::vec3 aabb_upper, glm::vec3 obb[8]) {
   
   glm::vec3 axes[6] = {
     // aabb axes
