@@ -19,7 +19,7 @@ flat out vec3 vposition;
 void main() {
   float cellSize = float(1 << (level + 1));
 
-  color = hsl2rgb(float(level)/float(total_levels), 0.9, .4);
+  color = hsl2rgb(float(level)/float(TOTAL_VOXEL_CASCADE_LEVELS), 0.9, .4);
   vposition = translation + BRICK_RADIUS;
   vlevel = level;
   gl_Position = mvp * vec4(

@@ -39,8 +39,11 @@ class VoxelCascade {
   SSBO *ssbo_slab;
 
   glm::vec3 center;
-  Mesh *mesh;
-  Program *program;
+  Mesh *debugLineMesh;
+  Program *debugLineProgram;
+  Program *debugRaytraceProgram;
+  FullscreenSurface *debugRaytraceSurface;
+
   public:
   VoxelCascade(int level_count) {
     this->level_count = level_count;
@@ -183,7 +186,7 @@ class VoxelCascade {
                 this->addBrickToCell(
                   brick,
                   level,
-                  glm::ivec3(glm::floor((pos - this->center + glm::vec3(radius)) / v3CellSize))
+                  glm::ivec3(glm::round((pos - this->center + glm::vec3(radius)) / v3CellSize))
                   //glm::ivec3(BRICK_RADIUS) + (glm::ivec3(pos) / glm::ivec3(v3CellSize)) - glm::ivec3(this->center)
                 );
               }
@@ -253,17 +256,23 @@ class VoxelCascade {
   };
 
   void setupDebugRender() {
-    this->program = new Program();
+    this->debugRaytraceSurface = new FullscreenSurface();
+    this->debugRaytraceProgram = new Program();
+    this->debugRaytraceProgram
+      ->add(Shaders::get("voxel-cascade-debug-raytrace.vert"))
+      ->add(Shaders::get("voxel-cascade-debug-raytrace.frag"))
+      ->link();
 
-    this->program
+    this->debugLineProgram = new Program();
+    this->debugLineProgram
       ->add(Shaders::get("voxel-cascade-debug.vert"))
       ->add(Shaders::get("voxel-cascade-debug.frag"))
       ->output("outColor")
       ->link();
     // Setup Debug Rendering
-    this->mesh = new Mesh();
+    this->debugLineMesh = new Mesh();
 
-    this->mesh
+    this->debugLineMesh
       ->edge(0, 1)
       ->edge(1, 2)
       ->edge(2, 3)
@@ -279,7 +288,7 @@ class VoxelCascade {
       ->edge(2, 6)
       ->edge(3, 7);
 
-    this->mesh
+    this->debugLineMesh
       ->vert(0, 0, 0)
       ->vert(1, 0, 0)
       ->vert(1, 1, 0)
@@ -289,7 +298,7 @@ class VoxelCascade {
       ->vert(1, 1, 1)
       ->vert(0, 1, 1);
 
-    mesh->upload();
+    debugLineMesh->upload();
 
     size_t total_translation_mem = this->level_count * 3 * sizeof(float) * BRICK_VOXEL_COUNT;
     float *translations = (float *)malloc(total_translation_mem);
@@ -341,14 +350,13 @@ class VoxelCascade {
   }
 
   void debugRender(glm::mat4 mvp) {
-    this->program->use()
+    this->debugLineProgram->use()
       ->uniformVec3("center", this->center)
-      ->uniform1i("total_levels", this->level_count)
       ->uniformMat4("mvp", mvp)
       ->ssbo("cascade_index", this->ssbo_index)
       ->ssbo("cascade_slab", this->ssbo_slab);
 
-    glBindVertexArray(this->mesh->vao); gl_error();
+    glBindVertexArray(this->debugLineMesh->vao); gl_error();
     glEnableVertexAttribArray(0); gl_error();
     glEnableVertexAttribArray(1); gl_error();
     glEnableVertexAttribArray(2); gl_error();
@@ -356,11 +364,21 @@ class VoxelCascade {
 
     glDrawElementsInstanced(
       GL_LINES,
-      this->mesh->faces.size(),
+      this->debugLineMesh->faces.size(),
       GL_UNSIGNED_INT,
       0,
       BRICK_VOXEL_COUNT * this->level_count
     );
     gl_error();
+  }
+
+  void debugRaytrace(glm::mat4 vp) {
+    this->debugRaytraceProgram->use()
+      ->uniformVec3("center", this->center)
+      ->uniformMat4("VP", vp)
+      ->ssbo("cascade_index", this->ssbo_index)
+      ->ssbo("cascade_slab", this->ssbo_slab);
+
+    this->debugRaytraceSurface->render(this->debugRaytraceProgram);
   }
 };

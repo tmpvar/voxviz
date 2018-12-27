@@ -2,30 +2,14 @@
 #extension GL_NV_gpu_shader5: require
 
 #include "../include/core.h"
+#include "voxel-cascade.glsl"
 
 out vec4 outColor;
 flat in vec3 color;
 flat in int vlevel;
 flat in vec3 vposition;
 
-uniform int total_levels;
 uniform vec3 center;
-
-struct Cell {
-  uint state;
-  uint start;
-  uint end;
-};
-
-struct Level {
-  Cell cells[4096];
-};
-
-struct SlabEntry {
-  uint volume;
-  ivec3 brickIndex;
-  uint32_t *brickData;
-};
 
 layout (std430, binding=0) buffer cascade_index
 {
