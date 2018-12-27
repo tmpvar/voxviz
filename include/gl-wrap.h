@@ -92,7 +92,6 @@ class SSBO {
   size_t total_bytes = 0;
   GLuint handle = 0;
   bool mapped = false;
-
 public:
 
   const enum MAP_TYPE {
@@ -153,7 +152,7 @@ public:
   }
 
   void unbind() {
-    //glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
   }
 
   size_t size() {

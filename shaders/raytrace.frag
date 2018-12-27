@@ -33,7 +33,7 @@ vec3 tx(mat4 m, vec3 v) {
 
 float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out float iterations) {
   pos -= rayDir * 4.0;
-  vec3 mapPos = vec3(floor(pos));
+  vec3 mapPos = vec3(round(pos));
   vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
   vec3 rayStep = sign(rayDir);
   vec3 sideDist = (sign(rayDir) * (mapPos - pos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
@@ -113,7 +113,7 @@ void main() {
 
   gl_FragDepth = mix(
 	  1.0,
-	  distance(tx(model, brickTranslation + pos), eye) / maxDistance,
+	  distance(tx(model, brickTranslation + pos), eye) / MAX_DISTANCE,
 	  hit
   );
 
