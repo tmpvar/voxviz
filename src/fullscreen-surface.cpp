@@ -7,8 +7,12 @@ FullscreenSurface::FullscreenSurface() {
   // a large triangle
   this->mesh
     ->vert(-1, -1, 0)
-    ->vert(4, -1, 0)
-    ->vert(-1, 4, 0);
+    ->vert( 1, -1, 0)
+    ->vert( 1,  1, 0)
+    ->vert(-1,  1, 0);
+
+  this->mesh->face(0, 1, 3)->face(3, 1, 2);
+
 
   this->mesh->upload();
 }

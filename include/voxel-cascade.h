@@ -224,6 +224,10 @@ class VoxelCascade {
     //       but are no longer filled.
     GPUCell *gpu_cells = (GPUCell *)this->ssbo_index->beginMap(SSBO::MAP_WRITE_ONLY);
 
+    // TODO: there is a pretty large memory efficiency issue here and we should probably
+    //       fix it by populating the slab via the highest level first and then walk up the
+    //       levels and populate the start/end. This likely requires each slab region to be sorted
+    //       and/or to store what level it intersects via a bitmask.
     for (int i = 0; i < level_count; i++) {
       size_t level_offset = BRICK_VOXEL_COUNT * i;    
       for (int j = 0; j < BRICK_VOXEL_COUNT; j++) {
