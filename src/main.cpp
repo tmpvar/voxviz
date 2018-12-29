@@ -434,10 +434,10 @@ int main(void) {
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
-
-  for (int x = 0; x < 16; x+=2) {
-    for (int y = 0; y < 16; y+=2) {
-      for (int z = 0; z < 16; z+=2) {
+  int floor_spacing = 2;
+  for (int x = 0; x < 16; x+=floor_spacing) {
+    for (int y = 0; y < 16; y+=floor_spacing) {
+      for (int z = 0; z < 16; z+=floor_spacing) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
@@ -696,17 +696,15 @@ int main(void) {
     if (keys[GLFW_KEY_TAB]) {
       ImGui::Begin("stats");
       double start = glfwGetTime();
-      voxelCascade->begin(currentEye);
-      // detach the cascade from the eye until we know it is
-      // working.
-      //voxelCascade->begin(glm::vec3(0.0));
+      voxelCascade->begin(camera->Position);
+
       for (auto& volume : volumeManager->volumes) {
         voxelCascade->addVolume(volume);
       }
       voxelCascade->end();
 
       voxelCascade->debugRender(VP);
-      voxelCascade->debugRaytrace(VP);
+      voxelCascade->debugRaytrace(perspectiveMatrix * viewMatrix);
       
       ImGui::Text("cascade time: %.3fms", (glfwGetTime() - start) * 1000);
       ImGui::End();
@@ -720,7 +718,6 @@ int main(void) {
       }
 
       glm::mat4 volumeModel = volume->getModelMatrix();
-      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
       raytracer->program->use()
         ->uniformMat4("MVP", VP * volumeModel)
         ->uniformMat4("model", volumeModel)
@@ -816,6 +813,8 @@ int main(void) {
 
     {
       ImGui::Begin("stats");
+      ImVec2 size = { 400, 400};
+      ImGui::SetWindowSize(size, 0);
       static float f = 0.0f;
       static int counter = 0;
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);

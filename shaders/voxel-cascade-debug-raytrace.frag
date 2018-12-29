@@ -59,7 +59,7 @@ float march_cascade(in vec3 cascadeCenter, vec3 rayDir, in int levelIdx, out vec
   }
   
   float cellSize = float(1 << (levelIdx + 1));
-  pos = cascadeCenter + floor(mapPos) * cellSize;
+  pos = cascadeCenter + floor(mapPos / cellSize) * cellSize;
   normal = mask;
   return hit;
 }
@@ -89,7 +89,7 @@ void main() {
   vec3 color = abs(normalize(ray_dir));
   float hit = 0.0;
 
-  int levelIdx = 7;
+  int levelIdx = TOTAL_VOXEL_CASCADE_LEVELS - 1;
 
   // cascade level
   hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
@@ -138,9 +138,7 @@ void main() {
   dist = min(distance(pos, center) / MAX_DISTANCE, dist);
   levelColor(color, hit, levelIdx, normal);
   levelIdx--;
-  
+
   gl_FragDepth = dist;
   outColor = vec4(color, 1.0);
-
-
 }
