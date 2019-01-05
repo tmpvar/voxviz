@@ -6,6 +6,10 @@ const chalk = require('chalk')
 const radius = 8
 const levels = 3
 
+function mix(x, y, a) {
+  return x * (1-a) + y * a
+}
+
 function createCascade(radius, levelCount) {
   const cascades = []
   for (var levelIdx = 0; levelIdx<levelCount; levelIdx++) {
@@ -86,11 +90,8 @@ function createCascade(radius, levelCount) {
       var step = 0;
       while (sentinal --) {
         const state = this.iterator.next()
-        if (state == null) {
-          return this;
-        }
         if (state.pos >= (radius) * (1<<levelCount)) {
-          break;
+          break
         }
 
         if (fn && fn(state, step)) {
@@ -127,38 +128,22 @@ function createCascade(radius, levelCount) {
       const canGoDown = this.state.level > 0 && this.state.pos < radius * lowerCellSize
       const canStep = this.state.pos < cellSize * radius
 
-      if (!canGoUp && !canGoDown && !canStep) {
-        return null
-      }
-
       const upperValue = canGoUp && that.get(this.state.pos, this.state.level + 1)
       const currentValue = that.get(this.state.pos, this.state.level)
-
 
       this.state.res = currentValue
 
       const ret = this.getState()
 
-      if (currentValue > 0) {
-        if (canGoDown) {
-          this.state.level--
-        } else {
-          this.state.pos += cellSize
-        }
-      } else if (currentValue < 0) {
-        if (canGoUp) {
-          this.state.level++
-        } else {
-          throw new Error("should never get here")
-        }
-      } else {
-        if (canGoUp && upperValue < 1) {
-          this.state.level++
-        } else if (canStep) {
-          this.state.pos += cellSize
-        }
-      }
+      const levelChange = mix(
+        (canGoUp && upperValue < 1)|0,
+        -(canGoDown|0),
+        (currentValue > 0)|0
+      )
 
+      const stepChange = (canStep && levelChange === 0 && (upperValue > 0 || !canGoUp))|0
+      this.state.level += levelChange
+      this.state.pos += stepChange * cellSize
       return ret
     },
 
