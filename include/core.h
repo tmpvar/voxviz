@@ -1,5 +1,5 @@
-#ifndef __CORE_H
-#define __CORE_H
+#ifndef _CORE_H
+#define _CORE_H
 
 #define BRICK_DIAMETER 16
 #define BRICK_RADIUS BRICK_DIAMETER / 2
