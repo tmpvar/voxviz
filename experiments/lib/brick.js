@@ -2,6 +2,7 @@ const ndarray = require("ndarray")
 const fill = require('ndarray-fill')
 const square = require('./square')
 const BRICK_DIAMETER = 4
+const BRICK_RADIUS = BRICK_DIAMETER / 2
 const BRICK_DIAMETER_SQUARED = Math.pow(BRICK_DIAMETER, 2)
 const INV_BRICK_DIAMETER = 1.0 / BRICK_DIAMETER
 
@@ -49,5 +50,6 @@ class Brick {
 
 module.exports = {
   Brick: Brick,
-  BRICK_DIAMETER: BRICK_DIAMETER
+  BRICK_DIAMETER: BRICK_DIAMETER,
+  BRICK_RADIUS: BRICK_RADIUS
 }
