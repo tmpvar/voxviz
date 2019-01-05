@@ -135,11 +135,9 @@ function createCascade(radius, levelCount) {
 
       const ret = this.getState()
 
-      const levelChange = mix(
-        (canGoUp && upperValue < 1)|0,
-        -(canGoDown|0),
-        (currentValue > 0)|0
-      )
+      const levelChange = currentValue > 0
+      ? -(canGoDown|0)
+      : (canGoUp && upperValue < 1)|0
 
       const stepChange = (canStep && levelChange === 0 && (upperValue > 0 || !canGoUp))|0
       this.state.level += levelChange
@@ -188,19 +186,24 @@ tape('empty', (t) => {
 
 tape('walk largest', (t) => {
   const c = createCascade(8, 3).set(63, 1)
-  const expect = [0, 0, 0, 0, 0, 0, 0, 0, 1]
+    const expect = [
+    { level: 2, pos: 0,  cell: 0, res:  0 },
+    { level: 2, pos: 8,  cell: 1, res:  0 },
+    { level: 2, pos: 16,  cell: 2, res:  0 },
+    { level: 2, pos: 24,  cell: 3, res:  0 },
+    { level: 2, pos: 32,  cell: 4, res:  0 },
+    { level: 2, pos: 40,  cell: 5, res:  0 },
+    { level: 2, pos: 48,  cell: 6, res:  0 },
+    { level: 2, pos: 56,  cell: 7, res:  1 },
+  ]
 
   c.print()
-  var next = 0
-  var i = 0
+  var ok = true
   c.traverse((state, i) => {
-    console.log(state, i)
-    t.equal(2, state.level)
-    t.equal(state.pos, next)
-    t.equal(state.res, expect[i])
-    next = Math.min(next + (1 << 3), 8 << 3)
-    i++
+    ok = ok && diffObject(expect[i], state)
+    ok = ok && i < expect.length
   })
+  t.ok(ok, "path matches")
   t.end()
 })
 
@@ -252,10 +255,38 @@ tape('set: 4, 20', (t) => {
   var ok = true
   c.traverse((state, i) => {
     ok = ok && diffObject(expect[i], state)
+    ok = ok && i < expect.length
   })
   t.ok(ok, "path matches")
   t.end()
 })
+
+tape('edge of a level', (t) => {
+  const c = createCascade(8, 3).set(31, 1)
+  const expect = [
+    { level: 2, pos: 0,  cell: 0, res:  0 },
+    { level: 2, pos: 8,  cell: 1, res:  0 },
+    { level: 2, pos: 16,  cell: 2, res:  0 },
+    { level: 2, pos: 24,  cell: 3, res:  1 },
+    { level: 1, pos: 24,  cell: 6, res:  0 },
+    { level: 1, pos: 28,  cell: 7, res:  1 },
+    { level: 1, pos: 32,  cell: 8, res:  -1 },
+    { level: 2, pos: 32,  cell: 4, res:  0 },
+    { level: 2, pos: 40,  cell: 5, res:  0 },
+    { level: 2, pos: 48,  cell: 6, res:  0 },
+    { level: 2, pos: 56,  cell: 7, res:  0 },
+  ]
+
+  c.print()
+  var ok = true
+  c.traverse((state, i) => {
+    ok = ok && diffObject(expect[i], state)
+    ok = ok && i < expect.length
+  })
+  t.ok(ok, "path matches")
+  t.end()
+})
+
 
 function diffObject(expect, actual) {
   var ok = true
