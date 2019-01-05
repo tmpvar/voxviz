@@ -15,12 +15,14 @@ uniform int total_levels;
 flat out vec3 color;
 flat out int vlevel;
 flat out vec3 vposition;
+out vec3 world_pos;
 
 void main() {
   float cellSize = float(1 << (level + 1));
 
   color = hsl2rgb(float(level)/float(TOTAL_VOXEL_CASCADE_LEVELS), 0.9, .4);
   vposition = translation + BRICK_RADIUS;
+  world_pos = translation + BRICK_RADIUS;
   vlevel = level;
   gl_Position = mvp * vec4(
     center + (position + translation) * cellSize,

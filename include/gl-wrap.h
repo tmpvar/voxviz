@@ -357,6 +357,97 @@ public:
   }
 };
 
+class GPUSlab {
+  GLuint64 address = 0;
+  uint32_t handle = 0;
+  uint32_t total_bytes;
+  bool mapped = false;
+
+  public:
+
+  GPUSlab(uint32_t bytes) {
+    this->resize(bytes);
+  }
+
+  GLuint64 getAddress() {
+    return this->address;
+  }
+
+  const enum MAP_TYPE {
+    MAP_READ_ONLY = GL_READ_ONLY,
+    MAP_READ_WRITE = GL_READ_WRITE,
+    MAP_WRITE_ONLY = GL_WRITE_ONLY,
+  };
+
+  GPUSlab *bind() {
+    glBindBuffer(GL_TEXTURE_BUFFER, this->handle);
+    gl_error();
+    return this;
+  }
+
+  GPUSlab *unbind() {
+    glBindBuffer(GL_TEXTURE_BUFFER, 0);
+    gl_error();
+    return this;
+  }
+
+  GPUSlab *resize(size_t bytes) {
+    if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
+      this->bind();
+      glMakeBufferNonResidentNV(GL_TEXTURE_BUFFER);
+      glDeleteBuffers(1, &this->handle);
+      this->unbind();
+    }
+
+    if (bytes == 0) {
+      return this;
+    }
+
+    glGenBuffers(1, &this->handle);
+    gl_error();
+
+    this->bind();
+
+    glBufferData(
+      GL_TEXTURE_BUFFER,
+      bytes,
+      NULL,
+      GL_STATIC_DRAW
+    );
+    gl_error();
+
+    glMakeBufferResidentNV(GL_TEXTURE_BUFFER, GL_READ_WRITE);
+    gl_error();
+
+    glGetBufferParameterui64vNV(GL_TEXTURE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &this->address);
+    gl_error();
+
+    this->total_bytes = bytes;
+    return this;
+  }
+
+  void *beginMap(MAP_TYPE m = MAP_READ_WRITE) {
+    if (this->total_bytes == 0) {
+      return nullptr;
+    }
+
+    this->bind();
+    void *out = glMapBuffer(GL_TEXTURE_BUFFER, m); gl_error();
+    this->unbind();
+    this->mapped = true;
+    return out;
+  }
+
+  void endMap() {
+    if (this->total_bytes == 0 || !this->mapped || this->handle == 0) {
+      return;
+    }
+    this->bind();
+    glUnmapBuffer(GL_TEXTURE_BUFFER); gl_error();
+    this->unbind();
+    this->mapped = false;
+  }
+};
 
 class Mesh {
 public:

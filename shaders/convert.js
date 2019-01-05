@@ -1,11 +1,14 @@
 const fs = require('fs')
 const path = require('path')
 const glob = require('glob')
+const spawn = require('child_process').spawnSync
 
 const files = glob.sync(path.join(__dirname, '*.{vert,frag,comp}'))
 const out = []
 const includeExp = /#include +['"<](.*)['">]/
 const splitExp = /\r?\n/
+
+const validatorPath = 'D:\\work\\glslang\\build\\StandAlone\\Debug\\glslangValidator.exe'
 
 const types = {
   '.frag': 'GL_FRAGMENT_SHADER',

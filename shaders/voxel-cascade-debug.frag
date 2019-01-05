@@ -8,13 +8,10 @@ out vec4 outColor;
 flat in vec3 color;
 flat in int vlevel;
 flat in vec3 vposition;
+in vec3 world_pos;
 
 uniform vec3 center;
-
-layout (std430, binding=0) buffer cascade_index
-{
-  Level levels[];
-};
+uniform Cell *cascade_index;
 
 layout (std430, binding=1) buffer cascade_slab
 {
@@ -25,15 +22,13 @@ layout (std430, binding=1) buffer cascade_slab
 void main() {
   ivec3 pos = ivec3(vposition);
   if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(BRICK_DIAMETER)))) {
-    outColor = vec4(1, 0, 1, 1.0);
+   outColor = vec4(1, 0, 1, 1.0);
     return;
   }
 
-  uint idx = pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER;
-  Cell cell = levels[vlevel].cells[idx];
-  if (cell.state > 0) {
+  if (voxel_cascade_get(cascade_index, vlevel, pos)) {
     outColor = vec4(color, 1.0);
-    gl_FragDepth = distance(vposition, center) / 10000.0f;
+    gl_FragDepth = distance(world_pos, center) / MAX_DISTANCE;
   } else {
     discard;
     outColor = vec4(.15, 0.15, 0.15, 1.0);

@@ -371,6 +371,14 @@ int main(void) {
     // maximum compute shader invocations (x * y * z)
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     printf("max computer shader invocations %i\n", work_grp_inv);
+    
+    int max_block_size;
+    glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &max_block_size);
+    printf("GL_MAX_SHADER_STORAGE_BLOCK_SIZE %i\n", max_block_size);    
+
+    int max_blocks;
+    glGetIntegerv(GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS, &max_blocks);
+    printf("GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS %i\n", max_blocks);
   }
   
   // TODO: if we want to enable multiple space overlapping volumes,

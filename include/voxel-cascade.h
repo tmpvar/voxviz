@@ -35,7 +35,7 @@ class VoxelCascade {
   size_t slab_pos = 0;
   size_t total_slab_bytes = 0;
 
-  SSBO *ssbo_index;
+  GPUSlab *gpu_cascade_index;
   SSBO *ssbo_slab;
 
   glm::vec3 center;
@@ -58,8 +58,7 @@ class VoxelCascade {
     }
 
     // Setup the GPU cascade index
-    size_t gpu_cells_bytes = BRICK_VOXEL_COUNT * level_count * sizeof(GPUCell);
-    this->ssbo_index = new SSBO(gpu_cells_bytes);
+    this->gpu_cascade_index = new GPUSlab(BRICK_VOXEL_COUNT * level_count * sizeof(GPUCell));
 
     // Setup the GPU cascade slab
     this->ssbo_slab = new SSBO(0);
@@ -222,7 +221,7 @@ class VoxelCascade {
     SlabEntry *gpu_slab = (SlabEntry *)this->ssbo_slab->beginMap(SSBO::MAP_WRITE_ONLY);
     // TODO: we need to clear this slab or we're going to get ghosting when cells were filled
     //       but are no longer filled.
-    GPUCell *gpu_cells = (GPUCell *)this->ssbo_index->beginMap(SSBO::MAP_WRITE_ONLY);
+    GPUCell *gpu_cells = (GPUCell *)this->gpu_cascade_index->beginMap(GPUSlab::MAP_WRITE_ONLY);
 
     // TODO: there is a pretty large memory efficiency issue here and we should probably
     //       fix it by populating the slab via the highest level first and then walk up the
@@ -256,7 +255,7 @@ class VoxelCascade {
       }
     }
     this->ssbo_slab->endMap();
-    this->ssbo_index->endMap();
+    this->gpu_cascade_index->endMap();
   };
 
   void setupDebugRender() {
@@ -357,7 +356,7 @@ class VoxelCascade {
     this->debugLineProgram->use()
       ->uniformVec3("center", this->center)
       ->uniformMat4("mvp", mvp)
-      ->ssbo("cascade_index", this->ssbo_index)
+      ->bufferAddress("cascade_index", this->gpu_cascade_index->getAddress())
       ->ssbo("cascade_slab", this->ssbo_slab);
 
     glBindVertexArray(this->debugLineMesh->vao); gl_error();
@@ -380,7 +379,7 @@ class VoxelCascade {
     this->debugRaytraceProgram->use()
       ->uniformVec3("center", this->center)
       ->uniformMat4("VP", vp)
-      ->ssbo("cascade_index", this->ssbo_index)
+      ->bufferAddress("cascade_index", this->gpu_cascade_index->getAddress())
       ->ssbo("cascade_slab", this->ssbo_slab);
 
     this->debugRaytraceSurface->render(this->debugRaytraceProgram);

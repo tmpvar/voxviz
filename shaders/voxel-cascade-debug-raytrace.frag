@@ -10,11 +10,7 @@ out vec4 outColor;
 in vec3 ray_dir;
 
 uniform vec3 center;
-
-layout (std430, binding=0) buffer cascade_index
-{
-  Level levels[TOTAL_VOXEL_CASCADE_LEVELS];
-};
+uniform Cell *cascade_index;
 
 layout (std430, binding=1) buffer cascade_slab
 {
@@ -23,32 +19,18 @@ layout (std430, binding=1) buffer cascade_slab
 
 #define ITERATIONS BRICK_DIAMETER * 2
 
-bool voxel_cascade_get(uint levelIdx, ivec3 pos) {
-  if (levelIdx >= TOTAL_VOXEL_CASCADE_LEVELS) {
-    return false;
-  }
-
-  Level level = levels[levelIdx];
-
-  if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(BRICK_DIAMETER)))) {
-    return false;
-  }
-
-  uint idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
-  Cell cell = level.cells[idx];
-  return cell.state > 0;
-}
-
-
-float march_cascade(in vec3 cascadeCenter, vec3 rayDir, in int levelIdx, out vec3 pos, out vec3 normal, out float iterations) {
+float march_cascade(in vec3 cascadeCenter, vec3 rayDir, in uint levelIdx, out vec3 pos, out vec3 normal, out float iterations) {
   vec3 mapPos = vec3(0.0);
   vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
   vec3 rayStep = sign(rayDir);
   vec3 sideDist = ((sign(rayDir) * 0.5) + 0.5) * deltaDist;
   vec3 mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
   float hit = 0.0;
+  pos = cascadeCenter;
+  float cellSize = float(1 << (levelIdx + 1));
+
   for (iterations = 0; iterations < ITERATIONS; iterations++) {
-    if (voxel_cascade_get(levelIdx, ivec3(floor(mapPos) + BRICK_RADIUS))) {
+    if (voxel_cascade_get(cascade_index, levelIdx, ivec3(floor(mapPos) + BRICK_RADIUS))) {
       hit = 1.0;
       break;
     }
@@ -56,15 +38,14 @@ float march_cascade(in vec3 cascadeCenter, vec3 rayDir, in int levelIdx, out vec
     mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
     sideDist += mask * deltaDist;
     mapPos += mask * rayStep;
+    pos += mask * rayStep * cellSize;
   }
-  
-  float cellSize = float(1 << (levelIdx + 1));
-  pos = cascadeCenter + floor(mapPos / cellSize) * cellSize;
+
   normal = mask;
   return hit;
 }
 
-void levelColor(in out vec3 color, float hit, int levelIdx, vec3 normal) {
+void levelColor(in out vec3 color, float hit, uint levelIdx, vec3 normal) {
   if (hit > 0.0) {
     vec3 rgb = hsl2rgb(float(levelIdx)/float(TOTAL_VOXEL_CASCADE_LEVELS), 0.9, .4);
     if (normal.x > 0) {
@@ -80,6 +61,50 @@ void levelColor(in out vec3 color, float hit, int levelIdx, vec3 normal) {
   }
 }
 
+vec3 getMapPos(in vec3 pos, uint levelIdx) {
+  float cellSize = float(1 << (levelIdx + 1));
+  return floor(pos/cellSize);
+}
+
+struct LevelTraceState {
+  float cellSize;
+  ivec3 mapPos;
+  float pos;
+  vec3 deltaDist;
+  vec3 rayStep;
+  vec3 sideDist;
+  vec3 mask;
+};
+
+float march(out vec3 pos, out uint levelIdx, out vec3 normal) {
+  float hit = 0.0;
+
+  LevelTraceState levelState[TOTAL_VOXEL_CASCADE_LEVELS];
+
+  vec3 mapPos = vec3(0.0);
+  vec3 deltaDist = abs(vec3(length(ray_dir)) / ray_dir);
+  vec3 rayStep = sign(ray_dir);
+  vec3 sideDist = ((sign(ray_dir) * 0.5) + 0.5) * deltaDist;
+  vec3 mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
+
+  pos = center;
+  float cellSize = float(1 << (levelIdx + 1));
+  uint iterations;
+  for (iterations = 0; iterations < ITERATIONS; iterations++) {
+    if (voxel_cascade_get(cascade_index, levelIdx, ivec3(floor(mapPos) + BRICK_RADIUS))) {
+      hit = 1.0;
+      break;
+    }
+
+    mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
+    sideDist += mask * deltaDist;
+    mapPos += mask * rayStep;
+    pos += mask * rayStep * cellSize;
+  }
+
+  return hit;
+}
+
 void main() {
   vec3 pos;
   vec3 normal;
@@ -87,57 +112,22 @@ void main() {
   float dist = 0.9999;
   float newDist = 0.0;
   vec3 color = abs(normalize(ray_dir));
+
   float hit = 0.0;
 
-  int levelIdx = TOTAL_VOXEL_CASCADE_LEVELS - 1;
+  for (uint i=0; i<TOTAL_VOXEL_CASCADE_LEVELS; i++) {
+    hit = max(hit, march_cascade(center, ray_dir, i, pos, normal, iterations));
+    dist = min(distance(pos, center) / MAX_DISTANCE, dist);
+    levelColor(color, hit, i, normal);
+    if (hit > 0.0) {
+      break;
+    }
+  }
 
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
-
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
-
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
-
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
-
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
-
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
-
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
-  
-  // cascade level
-  hit = march_cascade(center, ray_dir, levelIdx, pos, normal, iterations);
-  dist = min(distance(pos, center) / MAX_DISTANCE, dist);
-  levelColor(color, hit, levelIdx, normal);
-  levelIdx--;
+  if (hit == 0.0) {
+    discard;
+    return;
+  }
 
   gl_FragDepth = dist;
   outColor = vec4(color, 1.0);
