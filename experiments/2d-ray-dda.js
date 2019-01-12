@@ -8,7 +8,8 @@ const segseg = require('segseg')
 const ndarray = require('ndarray')
 const raySlab = require('ray-aabb-slab')
 const camera = require('ctx-camera')(ctx, window, {})
-
+const cameraLookAt = require('./lib/lookat')
+const drawCamera = require('./lib/render/camera')
 const grid = ndarray(new Float32Array(265), [16, 16])
 const cellRadius = 5
 
@@ -22,6 +23,8 @@ const xfBrickAABB = [
   [0, 0]
 ]
 
+const eye = [-100, 0]
+const origin = [0, 0]
 
 const lineTo = ctx.lineTo.bind(ctx)
 const moveTo = ctx.moveTo.bind(ctx)
@@ -39,19 +42,6 @@ const v2gridPos = vec2.create()
 
 fillBrick()
 
-
-// camera
-const v2tmpCam = vec2.create()
-const eye = [-100, 0]
-const origin = [0, 0]
-function cameraLookAt(mat, eye, target) {
-  vec2.subtract(v2tmpCam, target, eye)
-  mat3.identity(mat)
-
-  const rot = Math.atan2(v2tmpCam[1], v2tmpCam[0])
-  mat3.translate(mat, mat, eye)
-  mat3.rotate(mat, mat, rot)
-}
 
 // TODO: locate active cell + dda through the grid
 
@@ -129,13 +119,13 @@ function render() {
       ctx.fillStyle = "#367c17"
       cameraLookAt(view, eye, txOrigin)
       drawCameraRays(view, model, eye, txOrigin, false)
-      drawCamera(eye, txOrigin)
+      drawCamera(ctx, eye, txOrigin)
 
       // original render
       drawBrick(mat3.create())
       ctx.fillStyle = ctx.strokeStyle = "#f0f"
       drawCameraRays(view, mat3.create(), invEye, origin, true)
-      drawCamera(invEye, origin)
+      drawCamera(ctx, invEye, origin)
 
       //trace()
     camera.end();
@@ -198,7 +188,7 @@ function drawCameraRays(viewMat, modelMat, eye, origin, doMarch) {
 
       ctx.beginPath()
         ctx.moveTo(eye[0], eye[1])
-        ctx.lineTo(eye[0] + rayDir[0] * res[0], eye[1] + rayDir[1] * res[0],)
+        ctx.lineTo(eye[0] + rayDir[0] * res[0], eye[1] + rayDir[1] * res[0])
         ctx.stroke()
     }
   }
@@ -303,27 +293,6 @@ function txo(out, mat, vec) {
 }
 
 
-function drawCamera(eye, origin) {
-  var a = mat3.create()
-  cameraLookAt(a, eye, origin)
-
-  ctx.save()
-  ctx.beginPath()
-    tx(a, -5, -5, moveTo)
-    tx(a, +5, -5, lineTo)
-    tx(a, +5, +5, lineTo)
-    tx(a, -5, +5, lineTo)
-    tx(a, -5, -5, lineTo)
-
-    tx(a, +5,  +2, moveTo)
-    tx(a, +10, +5, lineTo)
-    tx(a, +10, -5, lineTo)
-    tx(a, +5,  -2, lineTo)
-
-    ctx.stroke()
-    ctx.fill()
-  ctx.restore()
-}
 
 const v2sign = vec2.create()
 function sign(out, v) {
