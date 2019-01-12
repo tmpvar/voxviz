@@ -3,9 +3,8 @@ const {mat3} = require('gl-matrix')
 const cameraLookAt = require('../lookat')
 
 module.exports = drawCamera
-
+var a = mat3.create()
 function drawCamera(ctx, eye, origin) {
-  var a = mat3.create()
   cameraLookAt(a, eye, origin)
 
   const lineTo = ctx.lineTo.bind(ctx)
@@ -18,12 +17,14 @@ function drawCamera(ctx, eye, origin) {
     tx(a, +5, +5, lineTo)
     tx(a, -5, +5, lineTo)
     tx(a, -5, -5, lineTo)
+    ctx.stroke()
+    ctx.fill()
 
-    tx(a, +5,  +2, moveTo)
-    tx(a, +10, +5, lineTo)
+  ctx.beginPath()
+    tx(a, 0,  0, moveTo)
     tx(a, +10, -5, lineTo)
-    tx(a, +5,  -2, lineTo)
-
+    tx(a, +10, +5, lineTo)
+    tx(a, 0,  0, moveTo)
     ctx.stroke()
     ctx.fill()
   ctx.restore()
