@@ -170,8 +170,6 @@ class Volume {
 
           const p = [brickIndex, [brickIndex[0] + 1, brickIndex[1] + 1]]
           if (collide(p, txVerts)) {
-            // TODO: this can be optimized by running SAT over the
-            //       aabb (stock brick) and the obb (tool brick)
             var stockBrick = this.getBrick(brickIndex, true)
             opAddBrick(stockToTool, toolBrick, stockBrick, txVerts)
           }
