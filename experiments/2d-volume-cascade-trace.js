@@ -8,7 +8,9 @@ const raySlab = require('ray-aabb-slab')
 const Volume = require('./lib/volume')
 const { BRICK_DIAMETER } = require('./lib/brick')
 const createCascade = require('./lib/voxel-cascade')
+const cameraLookAt = require('./lib/lookat')
 const drawCamera = require('./lib/render/camera')
+const drawCameraRays = require('./lib/render/camera-rays')
 const cascadeDiameter = 16
 const cascadeCount = 5
 const cascades = []
@@ -40,6 +42,7 @@ const camera = require('ctx-camera')(ctx, window, {})
 
 
 const out = vec2.create()
+const fov = Math.PI/4
 
 function render() {
   stock.rotation += 0.01
@@ -69,13 +72,29 @@ function render() {
 
     volumes.forEach((volume) => volume.render(ctx))
 
-    ctx.save()
-    ctx.scale(.1, .1)
-    ctx.fillStyle = "#999"
-    drawCamera(ctx, cascades[0].center, [
+    var target = [
       cascades[0].center[0] + Math.sin(Date.now() / 1000) * 100,
       cascades[0].center[1]+10
-    ])
+    ]
+    var eye = cascades[0].center
+    var view = mat3.create()
+    cameraLookAt(view, eye, target)
+    drawCameraRays(ctx, fov, view, mat3.create(), eye, target, (ray) => {
+      ctx.beginPath()
+      ctx.moveTo(eye[0], eye[1])
+      ctx.lineTo(
+        eye[0] + ray.dir[0] * 1000,
+        eye[1] + ray.dir[1] * 1000
+      )
+      ctx.strokeStyle = 'white'
+      ctx.stroke()
+    })
+
+
+    ctx.save()
+    ctx.scale(.25, .25)
+    ctx.fillStyle = "#999"
+    drawCamera(ctx, eye, target)
     ctx.restore()
 
   camera.end()
