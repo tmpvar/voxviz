@@ -29,7 +29,9 @@ function createCascade(level, cascadeDiameter, cascadeCount) {
     prevCellSize: Math.pow(2, level - 1),
     percent: level/(cascadeCount + 1),
     color: hsl(level/(cascadeCount + 1)),
-    center: [0, 0]
+    center: [0, 0],
+    diameter: cascadeDiameter,
+    radius: cascadeDiameter/2
   }
 
   ret.render = function(ctx) {
@@ -67,7 +69,7 @@ function createCascade(level, cascadeDiameter, cascadeCount) {
   ret.addBrick = function(cell, brick) {
     const o = this.grid.get(cell[0], cell[1])
     if (!o) {
-      this.grid.get(cell[0], cell[1], [brick])
+      this.grid.set(cell[0], cell[1], [brick])
       return
     }
     o.push(brick)
@@ -144,15 +146,7 @@ function createCascade(level, cascadeDiameter, cascadeCount) {
           vec2.normalize(np[1], p[1])
 
           if (collide(p, txVerts)) {
-            if (
-              cascadePos[0] >= floor(this.prevCellSize * cascadeDiameter) ||
-              cascadePos[1] >= floor(this.prevCellSize * cascadeDiameter) ||
-              cascadePos[0] < -floor(this.prevCellSize * cascadeDiameter) ||
-              cascadePos[1] < -floor(this.prevCellSize * cascadeDiameter)
-            )
-            {
-              continue
-            }
+            this.addBrick([x + this.radius, y + this.radius], brick)
 
             if (ctx) {
               ctx.strokeStyle = this.color
