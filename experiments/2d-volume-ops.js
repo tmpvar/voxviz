@@ -5,6 +5,8 @@ const renderGrid = require('ctx-render-grid-lines')
 const camera = require('ctx-camera')(ctx, window, {})
 const Volume = require('./lib/volume')
 const { BRICK_DIAMETER } = require('./lib/brick')
+const createKeyboard = require('./lib/keyboard')
+const keyboard = createKeyboard()
 const tx = require('./lib/tx')
 
 const fill = require('ndarray-fill')
@@ -29,38 +31,20 @@ const volumes = [
 	tool
 ]
 
-var keys = {}
-
-window.addEventListener("keydown", (e) => {
-	keys[e.keyCode] = true
-	ctx.start()
-})
-
-window.addEventListener("keyup", (e) => {
-	keys[e.keyCode] = false
-
-
-	if (!Object.keys(keys).filter((key) => keys[key]).length) {
-		ctx.stop()
-	}
-})
-
-
 function render() {
-
-	if (keys[65]) {
+	if (keyboard.keys['a']) {
 		tool.pos[0] -= 0.1
 	}
 
-	if (keys[68]) {
+	if (keyboard.keys['d']) {
 		tool.pos[0] += 0.1
 	}
 
-	if (keys[87]) {
+	if (keyboard.keys['w']) {
 		tool.pos[1] += 0.1
 	}
 
-	if (keys[83]) {
+	if (keyboard.keys['s']) {
 		tool.pos[1] -= 0.1
 	}
 
