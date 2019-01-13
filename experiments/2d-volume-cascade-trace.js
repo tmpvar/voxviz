@@ -18,7 +18,7 @@ const cascadeDiameter = 16
 const cascadeCount = 5
 const cascades = []
 for (var i = 0; i<cascadeCount; i++) {
-  cascades.push(createCascade(i+1, cascadeDiameter, cascadeCount))
+  cascades.push(createCascade(i, cascadeDiameter, cascadeCount))
 }
 
 const min = Math.min
@@ -92,6 +92,8 @@ function render() {
       cascades[i].render(ctx)
     }
 
+    volumes.forEach((volume) => volume.render(ctx))
+
     for (var i=0; i<cascadeCount; i++) {
       // TODO: consider using the previous, coarser, cascade as a source of data
       volumes.forEach((volume) => {
@@ -99,25 +101,21 @@ function render() {
       })
     }
 
-    volumes.forEach((volume) => volume.render(ctx))
-
-
-
     var view = mat3.create()
     cameraLookAt(view, eye, target)
 
     ctx.save()
     ctx.lineWidth = .15
     drawCameraRays(ctx, fov, view, mat3.create(), eye, target, (ray, idx, total) => {
-      if (idx != 8) { return }
+      // if (idx != 8) { return }
 
-      marchGrid(ctx, cascades, ray)
+      const dist = marchGrid(ctx, cascades, ray)
 
       ctx.beginPath()
       ctx.moveTo(eye[0], eye[1])
       ctx.lineTo(
-        eye[0] + ray.dir[0] * 1000,
-        eye[1] + ray.dir[1] * 1000
+        eye[0] + ray.dir[0] * dist,
+        eye[1] + ray.dir[1] * dist
       )
       ctx.strokeStyle = hsl(idx/(total + 1))
       ctx.stroke()
@@ -137,13 +135,13 @@ function step(a, b) {
 
 function marchGrid(ctx, cascades, ray) {
   const v2tmp = vec2.create()
-  const cascade = cascades[cascades.length-3]
+  const cascade = cascades[2]
   const grid = cascade.grid
   const center = cascade.center
   const cellSize = cascade.cellSize
   const pos = [
-    ray.dir[0] * 0.01,
-    ray.dir[1] * 0.01
+    ray.dir[0] * 0.00001,
+    ray.dir[1] * 0.00001
   ]
 
   const mapPos = [
@@ -172,32 +170,31 @@ function marchGrid(ctx, cascades, ray) {
   for (var i = 0.0; i < 64; i++ ) {
     var indexPosX = mapPos[0] + cascade.radius
     var indexPosY = mapPos[1] + cascade.radius
-
     if (indexPosX < 0 ||
         indexPosX >= grid.shape[0] ||
         indexPosY < 0 ||
         indexPosY >= grid.shape[1]
     )
     {
-      return false;
+      return 10000;
     }
 
     if (grid.get(indexPosX, indexPosY)) {
       ctx.fillStyle = "green"
       ctx.fillRect(
-        center[0] + mapPos[0] * cellSize + 1,
-        center[1] + mapPos[1] * cellSize + 1,
-        cellSize-2,
-        cellSize-2
+        center[0] + mapPos[0] * cellSize + 0.5,
+        center[1] + mapPos[1] * cellSize + 0.5,
+        cellSize-1,
+        cellSize-1
       )
-      return true
+      return vec2.length([mapPos[0] * cellSize, mapPos[1] * cellSize])
     } else {
-      ctx.fillStyle = cascade.color
-      ctx.fillRect(
-        center[0] + mapPos[0] * cellSize + 1,
-        center[1] + mapPos[1] * cellSize + 1,
-        cellSize-2,
-        cellSize-2
+      ctx.strokeStyle = cascade.color
+      ctx.strokeRect(
+        center[0] + mapPos[0] * cellSize + .5,
+        center[1] + mapPos[1] * cellSize + .5,
+        cellSize-1,
+        cellSize-1
       )
     }
 
@@ -210,6 +207,6 @@ function marchGrid(ctx, cascades, ray) {
     mapPos[0] += mask[0] * rayStep[0]
     mapPos[1] += mask[1] * rayStep[1]
   }
-  return false
+  return 10000
 }
 
