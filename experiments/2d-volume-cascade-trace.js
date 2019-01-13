@@ -11,6 +11,8 @@ const createCascade = require('./lib/voxel-cascade')
 const cameraLookAt = require('./lib/lookat')
 const drawCamera = require('./lib/render/camera')
 const drawCameraRays = require('./lib/render/camera-rays')
+const createKeyboard = require('./lib/keyboard')
+const keyboard = createKeyboard()
 const cascadeDiameter = 16
 const cascadeCount = 5
 const cascades = []
@@ -43,11 +45,29 @@ const camera = require('ctx-camera')(ctx, window, {})
 
 const out = vec2.create()
 const fov = Math.PI/4
+const eye = [0, 0]
+const target = [1, 0]
+const movementSpeed = .5
 
 function render() {
   stock.rotation += 0.01
   stock.pos[0] = -25
   //stock.pos[1] = -25
+
+  if (keyboard.keys['w']) {
+    eye[1] += movementSpeed
+  }
+  if (keyboard.keys['s']) {
+    eye[1] -= movementSpeed
+  }
+
+  if (keyboard.keys['a']) {
+    eye[0] -= movementSpeed
+  }
+  if (keyboard.keys['d']) {
+    eye[0] += movementSpeed
+  }
+
 
   volumes[0].pos = [Math.sin(Date.now() / 1000) * 200, Math.cos(Date.now() / 1000) * 25]
   stock.scale = [Math.abs(Math.sin(Date.now() / 1000) + 2) * 50, 1.0]
@@ -58,9 +78,13 @@ function render() {
     ctx.scale(10, -10)
     ctx.lineCap = "round"
     ctx.lineWidth= .2
-
+    ctx.pointToWorld(target, camera.mouse.pos)
     // Render cascades from course to fine
     for (var i=cascadeCount-1; i>=0; i--) {
+      cascades[i].center = [
+        eye[0],
+        eye[1]
+      ]
       cascades[i].reset()
       cascades[i].render(ctx)
 
@@ -72,11 +96,8 @@ function render() {
 
     volumes.forEach((volume) => volume.render(ctx))
 
-    var target = [
-      cascades[0].center[0] + Math.sin(Date.now() / 1000) * 100,
-      cascades[0].center[1]+10
-    ]
-    var eye = cascades[0].center
+
+
     var view = mat3.create()
     cameraLookAt(view, eye, target)
     drawCameraRays(ctx, fov, view, mat3.create(), eye, target, (ray) => {
