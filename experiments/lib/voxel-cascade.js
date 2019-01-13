@@ -25,8 +25,8 @@ function clamp(l, u, v) {
 function createCascade(level, cascadeDiameter, cascadeCount) {
   const ret = {
     grid: ndarray([], [cascadeDiameter, cascadeDiameter]),
-    cellSize: Math.pow(2, level),
-    prevCellSize: Math.pow(2, level - 1),
+    cellSize: Math.pow(2, level + 1),
+    prevCellSize: Math.pow(2, level),
     percent: level/(cascadeCount + 1),
     color: hsl(level/(cascadeCount + 1)),
     center: [0, 0],
@@ -35,8 +35,8 @@ function createCascade(level, cascadeDiameter, cascadeCount) {
   }
 
   ret.render = function(ctx) {
-    var cellSize = Math.pow(2, level)
-    var cur = cellSize * cascadeDiameter/2
+
+    var cur = this.cellSize * cascadeDiameter/2
     var cx = this.center[0]
     var cy = this.center[1]
 
@@ -51,7 +51,7 @@ function createCascade(level, cascadeDiameter, cascadeCount) {
     //   ctx.stroke()
 
     ctx.beginPath()
-      renderGrid(ctx, cellSize,
+      renderGrid(ctx, this.cellSize,
         this.center[0] - cur,
         this.center[1] - cur,
         this.center[0] + cur,
