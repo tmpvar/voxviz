@@ -10,7 +10,8 @@ const inVec = [0, 0]
 
 
 class Brick {
-  constructor(index) {
+  constructor(index, volume) {
+    this.volume = volume
     this.index = [index[0], index[1]]
     this.grid = ndarray(new Float32Array(BRICK_DIAMETER_SQUARED), [BRICK_DIAMETER, BRICK_DIAMETER])
     this.empty = true
