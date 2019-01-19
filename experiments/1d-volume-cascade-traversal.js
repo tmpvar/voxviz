@@ -46,22 +46,6 @@ function createCascade(radius, levelCount) {
       return cascades[level].data[cell]
     },
 
-    get_lowest(pos) {
-      const ret = [-1, -1]
-      for (var level=levelCount-1; level>=0; level--) {
-        var cellSize = 1 << (level + 1)
-        var cell = pos >> (level + 1)
-        if (cell >= radius || !cascades[level].data[cell]) {
-          break;
-        } else {
-          ret[0] = level;
-          ret[1] = cell;
-        }
-      }
-      return ret
-    },
-
-
     //  0 1 2 3 4 5 6 7
     // | | | | | | | |x|
     //
