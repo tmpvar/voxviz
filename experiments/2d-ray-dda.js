@@ -10,6 +10,11 @@ const raySlab = require('ray-aabb-slab')
 const camera = require('ctx-camera')(ctx, window, {})
 const cameraLookAt = require('./lib/lookat')
 const drawCamera = require('./lib/render/camera')
+
+const txo = require('./lib/txo')
+const tx = require('./lib/tx')
+const square = require('./lib/square')
+
 const grid = ndarray(new Float32Array(265), [16, 16])
 const cellRadius = 5
 
@@ -95,6 +100,7 @@ function render() {
         ctx.lineTo(grid.shape[0]/2 * cellRadius, -grid.shape[1]/2 * cellRadius - 10)
         // draw original shape oriented around origin
         square(
+          ctx,
           model,
           -grid.shape[0]/2 * cellRadius,
           -grid.shape[1]/2 * cellRadius,
@@ -223,6 +229,7 @@ function drawBrick(mat) {
       }
 
       square(
+        ctx,
         mat,
         brickAABB[0][0] + x*cellRadius+1,
         brickAABB[0][0] + y*cellRadius+1,
@@ -270,29 +277,6 @@ function fillBrick() {
     }
   }
 }
-
-
-function tx(mat, x, y, fn) {
-    vec2.set(v2tmp, x, y)
-    vec2.transformMat3(v2tmp, v2tmp, mat)
-    fn(v2tmp[0], v2tmp[1])
-}
-
-
-function square(mat, x, y, w, h) {
-  tx(mat, x, y, moveTo)
-  tx(mat, x, y + h, lineTo)
-  tx(mat, x + w, y + h, lineTo)
-  tx(mat, x + w, y, lineTo)
-  tx(mat, x, y, lineTo)
-}
-
-function txo(out, mat, vec) {
-    vec2.transformMat3(out, vec, mat)
-    return out
-}
-
-
 
 const v2sign = vec2.create()
 function sign(out, v) {
@@ -350,6 +334,7 @@ function marchGrid(mat, worldPos, dir) {
     ctx.beginPath()
     if (grid.get(gridPos[0], gridPos[1]) <= 0.0) {
       square(
+        ctx,
         mat,
         (brickAABB[0][0] + gridPos[0] * cellRadius + 1),
         (brickAABB[0][1] + gridPos[1] * cellRadius + 1),
@@ -361,6 +346,7 @@ function marchGrid(mat, worldPos, dir) {
     }
 
     square(
+      ctx,
       mat,
       brickAABB[0][0] + gridPos[0] * cellRadius + 1,
       brickAABB[0][1] + gridPos[1] * cellRadius + 1,
