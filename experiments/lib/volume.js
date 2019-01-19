@@ -61,7 +61,7 @@ class Volume {
   }
 
   addBrick(index) {
-    const brick = new Brick(index)
+    const brick = new Brick(index, this)
     this.bricks.set(hashKey(index), brick)
     return brick
   }
