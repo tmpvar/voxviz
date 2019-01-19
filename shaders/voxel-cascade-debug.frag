@@ -18,15 +18,15 @@ layout (std430, binding=1) buffer cascade_slab
   SlabEntry entry[];
 };
 
-
 void main() {
   ivec3 pos = ivec3(vposition);
   if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(BRICK_DIAMETER)))) {
-   outColor = vec4(1, 0, 1, 1.0);
+    outColor = vec4(1, 0, 1, 1.0);
     return;
   }
-
-  if (voxel_cascade_get(cascade_index, vlevel, pos)) {
+        
+  Cell found;
+  if (voxel_cascade_get(cascade_index, vlevel, pos, found)) {
     outColor = vec4(color, 1.0);
     gl_FragDepth = distance(world_pos, center) / MAX_DISTANCE;
   } else {
