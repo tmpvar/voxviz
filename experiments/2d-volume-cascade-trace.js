@@ -1,5 +1,5 @@
 
-const center = require('ctx-translate-center')
+const ctxCenter = require('ctx-translate-center')
 const glmatrix = require('gl-matrix')
 const vec2 = glmatrix.vec2
 const mat3 = glmatrix.mat3
@@ -10,6 +10,7 @@ const { BRICK_DIAMETER, BRICK_RADIUS } = require('./lib/brick')
 const createCascade = require('./lib/voxel-cascade')
 const cameraLookAt = require('./lib/lookat')
 const drawCamera = require('./lib/render/camera')
+const txo = require('./lib/txo')
 const drawCameraRays = require('./lib/render/camera-rays')
 const hsl = require('./lib/hsl')
 const createKeyboard = require('./lib/keyboard')
@@ -77,7 +78,7 @@ function render() {
   ctx.clear()
   console.clear()
   camera.begin()
-    center(ctx)
+    ctxCenter(ctx)
     ctx.scale(10, -10)
     ctx.lineCap = "round"
     ctx.lineWidth= .2
@@ -133,6 +134,55 @@ function step(a, b) {
   return b < a ? 0.0 : 1.0
 }
 
+
+function rayCell(ctx, center, target, cell, ray) {
+  if (!cell) {
+    return
+  }
+  var d = Infinity
+  const invModel = mat3.create()
+  const origin = vec2.create()
+
+  for (var i=0; i<cell.length; i++) {
+    var brick = cell[i]
+    var volume = brick.volume
+    mat3.invert(invModel, volume.modelMatrix)
+    var invOrigin = txo([0, 0], invModel, ray.origin)
+    var invTarget = txo([0, 0], invModel, target)
+    var invDir = [
+      invTarget[0] - invOrigin[0],
+      invTarget[1] - invOrigin[1]
+    ]
+
+    vec2.normalize(invDir, invDir)
+    invDir[0] = 1 / invDir[0]
+    invDir[1] = 1 / invDir[1]
+
+
+    var aabb = [
+      brick.index,
+      [
+        brick.index[0] + 1,
+        brick.index[1] + 1
+      ]
+    ]
+    var out = [0, 0]
+    ctx.beginPath()
+      ctx.strokeStyle = "yellow"
+      ctx.moveTo(invOrigin[0], invOrigin[1])
+      ctx.lineTo(invTarget[0], invTarget[1])
+      // ctx.moveTo(center[0], center[1])
+      // ctx.lineTo(target[0], target[1])
+      ctx.stroke()
+
+    if (raySlab(invOrigin, invDir, aabb, out)) {
+      d = Math.min(vec2.distance(ray.origin, out), d)
+    }
+
+  }
+  return d
+}
+
 function marchGrid(ctx, cascades, ray) {
   const v2tmp = vec2.create()
   const cascade = cascades[2]
@@ -179,15 +229,19 @@ function marchGrid(ctx, cascades, ray) {
       return 10000;
     }
 
-    if (grid.get(indexPosX, indexPosY)) {
-      ctx.fillStyle = "green"
-      ctx.fillRect(
-        center[0] + mapPos[0] * cellSize + 0.5,
-        center[1] + mapPos[1] * cellSize + 0.5,
-        cellSize-1,
-        cellSize-1
-      )
-      return vec2.length([mapPos[0] * cellSize, mapPos[1] * cellSize])
+    var cell = grid.get(indexPosX, indexPosY)
+    if (cell) {
+      return rayCell(ctx, center, pos, cell, ray)
+
+      // ctx.strokeStyle = "green"
+      // ctx.strokeRect(
+      //   center[0] + mapPos[0] * cellSize + 0.5,
+      //   center[1] + mapPos[1] * cellSize + 0.5,
+      //   cellSize-1,
+      //   cellSize-1
+      // )
+      // return vec2.length([mapPos[0] * cellSize, mapPos[1] * cellSize])
+      return
     } else {
       ctx.strokeStyle = cascade.color
       ctx.strokeRect(
@@ -206,6 +260,9 @@ function marchGrid(ctx, cascades, ray) {
 
     mapPos[0] += mask[0] * rayStep[0]
     mapPos[1] += mask[1] * rayStep[1]
+
+    pos[0] += mask[0] * ray.dir[0] * cellSize
+    pos[1] += mask[1] * ray.dir[1] * cellSize
   }
   return 10000
 }
