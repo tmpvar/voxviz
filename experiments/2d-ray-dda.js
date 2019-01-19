@@ -10,6 +10,7 @@ const raySlab = require('ray-aabb-slab')
 const camera = require('ctx-camera')(ctx, window, {})
 const cameraLookAt = require('./lib/lookat')
 const drawCamera = require('./lib/render/camera')
+const drawCameraRays = require('./lib/render/camera-rays')
 
 const txo = require('./lib/txo')
 const tx = require('./lib/tx')
@@ -44,6 +45,8 @@ const v2tmp2 = vec2.create()
 const v2dir = vec2.create()
 const v2offset = vec2.create()
 const v2gridPos = vec2.create()
+
+const fov = Math.PI/16
 
 fillBrick()
 
@@ -124,13 +127,13 @@ function render() {
       ctx.strokeStyle = "#4eb721"
       ctx.fillStyle = "#367c17"
       cameraLookAt(view, eye, txOrigin)
-      drawCameraRays(view, model, eye, txOrigin, false)
+      trace(view, model, eye, txOrigin, false)
       drawCamera(ctx, eye, txOrigin)
 
       // original render
       drawBrick(mat3.create())
       ctx.fillStyle = ctx.strokeStyle = "#f0f"
-      drawCameraRays(view, mat3.create(), invEye, origin, true)
+      trace(view, mat3.create(), invEye, origin, true)
       drawCamera(ctx, invEye, origin)
 
       //trace()
@@ -141,72 +144,43 @@ function hsl(p, a) {
   return `hsla(${p*360}, 100%, 46%, ${a||1})`
 }
 
-function drawCameraRays(viewMat, modelMat, eye, origin, doMarch) {
-  var dx = origin[0] - eye[0]
-  var dy = origin[1] - eye[1]
-  var dir = [dx, dy]
-  var nDir = vec2.normalize(vec2.create(), dir)
-
-  var numRays = 64;
-  var fov = Math.PI/16
-  var start = -fov/2
-  var step = fov/numRays
-  var rayDir = vec2.fromValues(1, 0)
-  var zero = [0, 0]
-  var invRayDir = vec2.create()
-  for (var i=0; i<numRays; i++) {
-    vec2.rotate(rayDir, dir, zero, start + i * step)
-    vec2.normalize(rayDir, rayDir)
-    vec2.set(invRayDir, 1/rayDir[0], 1/rayDir[1])
-
+function trace(viewMat, modelMat, eye, origin, doMarch) {
+  drawCameraRays(fov, eye, origin, (ray, rayIdx, totalRays) => {
     var res = [0, 0]
-    raySlab(eye, invRayDir, brickAABB, res)
+    raySlab(eye, ray.invDir, brickAABB, res)
     ctx.beginPath()
       ctx.arc(
-        eye[0] + rayDir[0] * res[0],
-        eye[1] + rayDir[1] * res[0],
+        eye[0] + ray.dir[0] * res[0],
+        eye[1] + ray.dir[1] * res[0],
         1,
         0,
         Math.PI*2
       )
     ctx.stroke()
 
+
     if (!doMarch) {
         ctx.beginPath()
           ctx.moveTo(eye[0], eye[1])
-          ctx.lineTo(rayDir[0] * 6000, rayDir[1] * 6000)
+          ctx.lineTo(ray.dir[0] * 6000, ray.dir[1] * 6000)
           ctx.stroke()
-          continue
-
+        return
     }
 
-
-    var isect = false
     // if the ray completely misses don't bother marching the grid
     if (isFinite(res[0]) && res[0]) {
-      ctx.strokeStyle = hsl(i/numRays)
+      ctx.strokeStyle = hsl(rayIdx/totalRays)
       if (doMarch) {
-        vec2.set(v2gridPos, eye[0] + rayDir[0] * res[0], eye[1] + rayDir[1] * res[0])
-        //ctx.save()
-        isect = marchGrid(modelMat, v2gridPos, nDir)
-        //ctx.restore()
+        vec2.set(v2gridPos, eye[0] + ray.dir[0] * res[0], eye[1] +  ray.dir[1] * res[0])
+        marchGrid(modelMat, v2gridPos, ray.nDir)
       }
 
       ctx.beginPath()
         ctx.moveTo(eye[0], eye[1])
-        ctx.lineTo(eye[0] + rayDir[0] * res[0], eye[1] + rayDir[1] * res[0])
+        ctx.lineTo(eye[0] +  ray.dir[0] * res[0], eye[1] +  ray.dir[1] * res[0])
         ctx.stroke()
     }
-  }
-/*
-  if (!isFinite(res[0]) || !isect) {
-    ctx.strokeStyle = "#d65757"
-    res[0] = 6000
-    vec2.set(v2gridPos, eye[0] + v2dir[0] * res[0], eye[1] + v2dir[1] * res[0])
-  } else {
-    ctx.strokeStyle = "#4eb721"
-  }
-  */
+  })
 }
 
 function drawBrick(mat) {

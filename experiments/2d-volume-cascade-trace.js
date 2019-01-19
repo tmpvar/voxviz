@@ -105,9 +105,12 @@ function render() {
     var view = mat3.create()
     cameraLookAt(view, eye, target)
 
+    var model = mat3.create()
+    mat3.translate(model, model, eye)
+
     ctx.save()
     ctx.lineWidth = .15
-    drawCameraRays(ctx, fov, view, mat3.create(), eye, target, (ray, idx, total) => {
+    drawCameraRays(fov, eye, target, (ray, idx, total) => {
       // if (idx != 8) { return }
 
       const dist = marchGrid(ctx, cascades, ray)

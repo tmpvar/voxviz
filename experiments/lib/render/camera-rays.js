@@ -3,7 +3,7 @@ const raySlab = require('ray-aabb-slab')
 
 module.exports = drawCameraRays
 
-function drawCameraRays(ctx, fov, viewMat, modelMat, eye, target, march) {
+function drawCameraRays(fov, eye, target, march) {
   var dx = target[0] - eye[0]
   var dy = target[1] - eye[1]
   var dir = [dx, dy]
@@ -23,6 +23,7 @@ function drawCameraRays(ctx, fov, viewMat, modelMat, eye, target, march) {
 
     var ray = {
       dir: rayDir,
+      nDir: nDir,
       invDir: invRayDir,
       origin: eye
     }
