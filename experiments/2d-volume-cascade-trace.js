@@ -32,16 +32,18 @@ const abs = Math.abs
 const stock = new Volume([0, 0])
 stock.addBrick([0, 0]).fill((x, y) => {
   const v = 1.0 + (x + y * BRICK_DIAMETER) / Math.pow(BRICK_DIAMETER, 2)
-  return v
+  return x%2 == 0 && y%2 === 0 ? v : 0;
 }).empty = false
+stock.scale = [10, 10]
 
-const volumes = [new Volume([10, 0]), new Volume([0, 0]), stock]
-
-volumes[0].addBrick([0, 0]).fill((x, y) => {
-  return 1;
+const longOne = new Volume([10, 0])
+longOne.addBrick([0, 0]).fill((x, y) => {
+   return 1;
 }).empty = false
+longOne.scale = [10, 1]
 
-volumes[0].scale = [10, 10]
+const volumes = [longOne, stock]
+
 
 const ctx = require('fc')(render, 1)
 const camera = require('ctx-camera')(ctx, window, {})
@@ -54,9 +56,11 @@ const target = [1, 0]
 const movementSpeed = .5
 
 function render() {
-  stock.rotation += 0.01
-  stock.pos[0] = -25
+  //stock.rotation += 0.01
+  //stock.pos[0] = -25
   //stock.pos[1] = -25
+  stock.pos = [Math.sin(Date.now() / 1000) * 20, Math.cos(Date.now() / 1000) * 25]
+  //stock.scale = [Math.abs(Math.sin(Date.now() / 1000) + 2) * 50, 1.0]
 
   if (keyboard.keys['w']) {
     eye[1] += movementSpeed
@@ -73,8 +77,6 @@ function render() {
   }
 
 
-  //volumes[0].pos = [Math.sin(Date.now() / 1000) * 200, Math.cos(Date.now() / 1000) * 25]
-  stock.scale = [Math.abs(Math.sin(Date.now() / 1000) + 2) * 50, 1.0]
   ctx.clear()
   console.clear()
   camera.begin()
@@ -113,8 +115,19 @@ function render() {
     drawCameraRays(fov, eye, target, (ray, idx, total) => {
       // if (idx != 8) { return }
 
-      const dist = marchGrid(ctx, cascades, ray)
+      ctx.beginPath()
+      ctx.moveTo(eye[0], eye[1])
+      ctx.lineTo(
+        eye[0] + ray.dir[0] * 1000,
+        eye[1] + ray.dir[1] * 1000
+      )
+      ctx.strokeStyle = "#444"
+      ctx.stroke()
 
+      const dist = marchGrid(ctx, cascades, ray)
+      if (!isFinite(dist)) {
+        return
+      }
       ctx.beginPath()
       ctx.moveTo(eye[0], eye[1])
       ctx.lineTo(
@@ -135,55 +148,6 @@ function render() {
 
 function step(a, b) {
   return b < a ? 0.0 : 1.0
-}
-
-
-function rayCell(ctx, center, target, cell, ray) {
-  if (!cell) {
-    return
-  }
-  var d = Infinity
-  const invModel = mat3.create()
-  const origin = vec2.create()
-
-  for (var i=0; i<cell.length; i++) {
-    var brick = cell[i]
-    var volume = brick.volume
-    mat3.invert(invModel, volume.modelMatrix)
-    var invOrigin = txo([0, 0], invModel, ray.origin)
-    var invTarget = txo([0, 0], invModel, target)
-    var invDir = [
-      invTarget[0] - invOrigin[0],
-      invTarget[1] - invOrigin[1]
-    ]
-
-    vec2.normalize(invDir, invDir)
-    invDir[0] = 1 / invDir[0]
-    invDir[1] = 1 / invDir[1]
-
-
-    var aabb = [
-      brick.index,
-      [
-        brick.index[0] + 1,
-        brick.index[1] + 1
-      ]
-    ]
-    var out = [0, 0]
-    ctx.beginPath()
-      ctx.strokeStyle = "yellow"
-      ctx.moveTo(invOrigin[0], invOrigin[1])
-      ctx.lineTo(invTarget[0], invTarget[1])
-      // ctx.moveTo(center[0], center[1])
-      // ctx.lineTo(target[0], target[1])
-      ctx.stroke()
-
-    if (raySlab(invOrigin, invDir, aabb, out)) {
-      d = Math.min(vec2.distance(ray.origin, out), d)
-    }
-
-  }
-  return d
 }
 
 function marchGrid(ctx, cascades, ray) {
@@ -220,7 +184,7 @@ function marchGrid(ctx, cascades, ray) {
   const mask = [0, 0]
 
   // // dda
-  for (var i = 0.0; i < 64; i++ ) {
+  for (var i = 0.0; i < 16; i++ ) {
     var indexPosX = mapPos[0] + cascade.radius
     var indexPosY = mapPos[1] + cascade.radius
     if (indexPosX < 0 ||
@@ -229,30 +193,23 @@ function marchGrid(ctx, cascades, ray) {
         indexPosY >= grid.shape[1]
     )
     {
-      return 10000;
+      return 0;
     }
+
+    ctx.strokeStyle = cascade.color
+    ctx.strokeRect(
+      center[0] + mapPos[0] * cellSize + .5,
+      center[1] + mapPos[1] * cellSize + .5,
+      cellSize-1,
+      cellSize-1
+    )
 
     var cell = grid.get(indexPosX, indexPosY)
     if (cell) {
-      return rayCell(ctx, center, pos, cell, ray)
-
-      // ctx.strokeStyle = "green"
-      // ctx.strokeRect(
-      //   center[0] + mapPos[0] * cellSize + 0.5,
-      //   center[1] + mapPos[1] * cellSize + 0.5,
-      //   cellSize-1,
-      //   cellSize-1
-      // )
-      // return vec2.length([mapPos[0] * cellSize, mapPos[1] * cellSize])
-      return
-    } else {
-      ctx.strokeStyle = cascade.color
-      ctx.strokeRect(
-        center[0] + mapPos[0] * cellSize + .5,
-        center[1] + mapPos[1] * cellSize + .5,
-        cellSize-1,
-        cellSize-1
-      )
+      var d = rayCell(ctx, center, cell, ray)
+      if (isFinite(d)) {
+        return d
+      }
     }
 
     mask[0] = (sideDist[0] <= sideDist[1]) | 0
@@ -261,12 +218,89 @@ function marchGrid(ctx, cascades, ray) {
     sideDist[0] += mask[0] * deltaDist[0]
     sideDist[1] += mask[1] * deltaDist[1]
 
-    mapPos[0] += mask[0] * rayStep[0]
+    mapPos[0] += mask[0] * rayStep[0],
     mapPos[1] += mask[1] * rayStep[1]
-
-    pos[0] += mask[0] * ray.dir[0] * cellSize
-    pos[1] += mask[1] * ray.dir[1] * cellSize
   }
-  return 10000
+  return 0
 }
 
+function rayCell(ctx, center, cell, ray) {
+  var d = Infinity
+  if (!cell) {
+    return d
+  }
+
+  const invModel = mat3.create()
+  const origin = vec2.create()
+
+  for (var i=0; i<cell.length; i++) {
+    var brick = cell[i]
+    var volume = brick.volume
+    mat3.invert(invModel, volume.modelMatrix)
+    var invOrigin = txo([0, 0], invModel, ray.origin)
+    var txTarget = txo([0, 0], invModel, [
+      ray.origin[0] + ray.dir[0],
+      ray.origin[1] + ray.dir[1]
+    ])
+
+    var txDir = [
+      txTarget[0] - invOrigin[0],
+      txTarget[1] - invOrigin[1]
+    ]
+
+    var invDir = [
+      1 / txDir[0],
+      1 / txDir[1]
+    ]
+
+    var aabb = [
+      brick.index,
+      [
+        brick.index[0] + 1,
+        brick.index[1] + 1
+      ]
+    ]
+
+    var out = [0, 0]
+    ctx.beginPath()
+    if (raySlab(invOrigin, invDir, aabb, out)) {
+      // TODO: march the brick and search for termination. Only update
+      // d if ray terminates.
+      if (out[0] > 0) {
+        d = Math.min(out[0], d)
+      }
+      return d
+
+      // ctx.strokeStyle = "yellow"
+      // ctx.moveTo(invOrigin[0], invOrigin[1])
+      // ctx.lineTo(
+      //   invOrigin[0] + txDir[0] * out[0],
+      //   invOrigin[1] + txDir[1] * out[0]
+      // )
+      // ctx.stroke()
+
+      // ctx.beginPath()
+      //   ctx.arc(
+      //      invOrigin[0] + txDir[0] * out[0],
+      //      invOrigin[1] + txDir[1] * out[0],
+      //      .5,
+      //      0,
+      //      Math.PI*2
+      //   )
+      //   ctx.fillStyle = "#f0f"
+      //   ctx.strokeStyle = "#f0f"
+      //   ctx.fill()
+      //   ctx.stroke()
+
+    } else {
+      // ctx.strokeStyle = "red"
+      // ctx.moveTo(invOrigin[0], invOrigin[1])
+      // ctx.lineTo(
+      //   invOrigin[0] + txDir[0] * 1000,
+      //   invOrigin[1] + txDir[1] * 1000
+      // )
+      // ctx.stroke()
+    }
+  }
+  return d
+}
