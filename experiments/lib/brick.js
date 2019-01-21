@@ -60,10 +60,6 @@ class Brick {
     const v2tmp = vec2.create()
     const grid = this.grid
 
-    // const pos = [
-    //   (ray.origin[0] - ray.dir[0] * 0.00001),
-    //   (ray.origin[1] - ray.dir[1] * 0.00001)
-    // ]
     const pos = [
       ray.origin[0] * BRICK_DIAMETER,
       ray.origin[1] * BRICK_DIAMETER
@@ -105,7 +101,7 @@ class Brick {
       {
         var value = grid.get(indexPosX, indexPosY)
         if (fn && fn([indexPosX, indexPosY], value)) {
-          break
+          return true;
         }
       }
 
@@ -118,7 +114,7 @@ class Brick {
       mapPos[0] += mask[0] * rayStep[0],
       mapPos[1] += mask[1] * rayStep[1]
     }
-    return 0
+    return false
   }
 
   transformRay(ray) {

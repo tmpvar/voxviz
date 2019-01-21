@@ -56,12 +56,16 @@ const eye = [0, -20]
 const target = [1, 0]
 const movementSpeed = .5
 
+//stock.rotation += 0.7
+stock.pos[0] = 10
+
+
 function render() {
-  stock.rotation += 0.01
+  //stock.rotation += 0.01
   //stock.pos[0] = -25
   //stock.pos[1] = -25
-  stock.pos = [Math.sin(Date.now() / 1000) * 20, Math.cos(Date.now() / 1000) * 25]
-  longOne.scale = [Math.abs(Math.sin(Date.now() / 1000) + 2) * 50, 1.0]
+  //stock.pos = [Math.sin(Date.now() / 1000) * 20, Math.cos(Date.now() / 1000) * 25]
+  //longOne.scale = [Math.abs(Math.sin(Date.now() / 1000) + 2) * 50, 1.0]
 
   if (keyboard.keys['w']) {
     eye[1] += movementSpeed
@@ -205,9 +209,10 @@ function marchGrid(ctx, cascades, ray) {
 
     var cell = grid.get(indexPosX, indexPosY)
     if (cell) {
-      var d = rayCell(ctx, center, cell, ray)
-      if (isFinite(d)) {
-        return d
+      var closest = rayCell(ctx, center, cell, ray)
+
+      if (closest.terminated) {
+        return closest.tmin
       }
     }
 
@@ -224,35 +229,41 @@ function marchGrid(ctx, cascades, ray) {
 }
 
 function rayCell(ctx, center, cell, ray) {
-  var d = Infinity
-  if (!cell) {
-    return d
+  const closest = {
+    tmin: Infinity,
+    tmax: -Infinity,
+    brick: null,
+    terminated: false
   }
+
+  if (!cell) {
+    return closest
+  }
+
+  const aabb = [[0, 0], [0, 0]]
 
   for (var i=0; i<cell.length; i++) {
     var brick = cell[i]
-    var aabb = [
-      brick.index,
-      [
-        brick.index[0] + 1,
-        brick.index[1] + 1
-      ]
-    ]
+    aabb[0][0] = brick.index[0]
+    aabb[0][1] = brick.index[1]
+    aabb[1][0] = brick.index[0] + 1
+    aabb[1][1] = brick.index[1] + 1
 
     const txRay = brick.transformRay(ray)
 
     var out = [0, 0]
     ctx.beginPath()
     if (raySlab(txRay.origin, txRay.invDir, aabb, out)) {
+      // FIXME: we should be able to trace rays from inside of a brick.
       if (out[0] < 0) {
-        return d
+        return closest
       }
 
       txRay.origin[0] += txRay.dir[0] * out[0]
       txRay.origin[1] += txRay.dir[1] * out[0]
 
-      brick.dda(txRay, (pos, value) => {
-
+      // TODO: support partial hits / accumulation
+      var hit = brick.dda(txRay, (pos, value) => {
         ctx.beginPath()
         ctx.strokeStyle = value ? "green" : "red"
         square(
@@ -268,9 +279,20 @@ function rayCell(ctx, center, cell, ray) {
         return !!value
       })
 
+      if (closest.tmin > out[0]) {
+        closest.tmin = out[0]
+        closest.brick = brick
+      }
 
-      d = Math.min(out[0], d)
+      if (closest.tmax < out[1]) {
+        closest.tmax = out[1]
+      }
+
+      if (hit) {
+        closest.terminated = true
+        return closest
+      }
     }
   }
-  return d
+  return closest
 }
