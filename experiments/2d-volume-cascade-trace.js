@@ -11,6 +11,7 @@ const createCascade = require('./lib/voxel-cascade')
 const cameraLookAt = require('./lib/lookat')
 const drawCamera = require('./lib/render/camera')
 const txo = require('./lib/txo')
+const square = require('./lib/square')
 const drawCameraRays = require('./lib/render/camera-rays')
 const hsl = require('./lib/hsl')
 const createKeyboard = require('./lib/keyboard')
@@ -42,7 +43,7 @@ longOne.addBrick([0, 0]).fill((x, y) => {
 }).empty = false
 longOne.scale = [10, 1]
 
-const volumes = [longOne, stock]
+const volumes = [stock, longOne]
 
 
 const ctx = require('fc')(render, 1)
@@ -56,11 +57,11 @@ const target = [1, 0]
 const movementSpeed = .5
 
 function render() {
-  //stock.rotation += 0.01
+  stock.rotation += 0.01
   //stock.pos[0] = -25
   //stock.pos[1] = -25
   stock.pos = [Math.sin(Date.now() / 1000) * 20, Math.cos(Date.now() / 1000) * 25]
-  //stock.scale = [Math.abs(Math.sin(Date.now() / 1000) + 2) * 50, 1.0]
+  longOne.scale = [Math.abs(Math.sin(Date.now() / 1000) + 2) * 50, 1.0]
 
   if (keyboard.keys['w']) {
     eye[1] += movementSpeed
@@ -113,8 +114,6 @@ function render() {
     ctx.save()
     ctx.lineWidth = .15
     drawCameraRays(fov, eye, target, (ray, idx, total) => {
-      // if (idx != 8) { return }
-
       ctx.beginPath()
       ctx.moveTo(eye[0], eye[1])
       ctx.lineTo(
@@ -230,29 +229,8 @@ function rayCell(ctx, center, cell, ray) {
     return d
   }
 
-  const invModel = mat3.create()
-  const origin = vec2.create()
-
   for (var i=0; i<cell.length; i++) {
     var brick = cell[i]
-    var volume = brick.volume
-    mat3.invert(invModel, volume.modelMatrix)
-    var invOrigin = txo([0, 0], invModel, ray.origin)
-    var txTarget = txo([0, 0], invModel, [
-      ray.origin[0] + ray.dir[0],
-      ray.origin[1] + ray.dir[1]
-    ])
-
-    var txDir = [
-      txTarget[0] - invOrigin[0],
-      txTarget[1] - invOrigin[1]
-    ]
-
-    var invDir = [
-      1 / txDir[0],
-      1 / txDir[1]
-    ]
-
     var aabb = [
       brick.index,
       [
@@ -261,45 +239,37 @@ function rayCell(ctx, center, cell, ray) {
       ]
     ]
 
+    const txRay = brick.transformRay(ray)
+
     var out = [0, 0]
     ctx.beginPath()
-    if (raySlab(invOrigin, invDir, aabb, out)) {
-      // TODO: march the brick and search for termination. Only update
-      // d if ray terminates.
-      if (out[0] > 0) {
-        d = Math.min(out[0], d)
+    if (raySlab(txRay.origin, txRay.invDir, aabb, out)) {
+      if (out[0] < 0) {
+        return d
       }
-      return d
 
-      // ctx.strokeStyle = "yellow"
-      // ctx.moveTo(invOrigin[0], invOrigin[1])
-      // ctx.lineTo(
-      //   invOrigin[0] + txDir[0] * out[0],
-      //   invOrigin[1] + txDir[1] * out[0]
-      // )
-      // ctx.stroke()
+      txRay.origin[0] += txRay.dir[0] * out[0]
+      txRay.origin[1] += txRay.dir[1] * out[0]
 
-      // ctx.beginPath()
-      //   ctx.arc(
-      //      invOrigin[0] + txDir[0] * out[0],
-      //      invOrigin[1] + txDir[1] * out[0],
-      //      .5,
-      //      0,
-      //      Math.PI*2
-      //   )
-      //   ctx.fillStyle = "#f0f"
-      //   ctx.strokeStyle = "#f0f"
-      //   ctx.fill()
-      //   ctx.stroke()
+      brick.dda(txRay, (pos, value) => {
 
-    } else {
-      // ctx.strokeStyle = "red"
-      // ctx.moveTo(invOrigin[0], invOrigin[1])
-      // ctx.lineTo(
-      //   invOrigin[0] + txDir[0] * 1000,
-      //   invOrigin[1] + txDir[1] * 1000
-      // )
-      // ctx.stroke()
+        ctx.beginPath()
+        ctx.strokeStyle = value ? "green" : "red"
+        square(
+          ctx,
+          brick.volume.modelMatrix,
+          (pos[0])/BRICK_DIAMETER,
+          (pos[1])/BRICK_DIAMETER,
+          1/BRICK_DIAMETER,
+          1/BRICK_DIAMETER
+        )
+        ctx.closePath()
+        ctx.stroke()
+        return !!value
+      })
+
+
+      d = Math.min(out[0], d)
     }
   }
   return d

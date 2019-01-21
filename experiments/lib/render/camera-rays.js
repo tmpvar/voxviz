@@ -9,8 +9,7 @@ function drawCameraRays(fov, eye, target, march) {
   var dir = [dx, dy]
   var nDir = vec2.normalize(vec2.create(), dir)
 
-  var numRays = 16;
-  // var fov = Math.PI/16
+  var numRays = 64;
   var start = -fov/2
   var step = fov/numRays
   var rayDir = vec2.fromValues(1, 0)
