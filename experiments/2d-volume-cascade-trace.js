@@ -1,3 +1,12 @@
+/*
+TODO:
+- traverse the cascade
+- bounce rays off of voxels (cascade->brick->voxel->bounce->brick->cascade) which may be tricky
+  because the rays are marched in brick space and we'll need to convert them back to world space.
+- [optimization] bricks that overlap multiple cascade cells (on the same level) should move
+  the ray origin to the cell edge prior to dda.
+*/
+
 
 const ctxCenter = require('ctx-translate-center')
 const glmatrix = require('gl-matrix')
@@ -23,6 +32,8 @@ for (var i = 0; i<cascadeCount; i++) {
   cascades.push(createCascade(i, cascadeDiameter, cascadeCount))
 }
 
+const paused = 1
+
 const min = Math.min
 const max = Math.max
 const floor = Math.floor
@@ -45,15 +56,14 @@ longOne.scale = [10, 1]
 
 const volumes = [stock, longOne]
 
-
-const ctx = require('fc')(render, 1)
+const ctx = require('fc')(render, !paused)
 const camera = require('ctx-camera')(ctx, window, {})
 
 
 const out = vec2.create()
 const fov = Math.PI/4
-const eye = [0, -20]
-const target = [1, 0]
+const eye = [20, 25]
+const target = [5, 00]
 const movementSpeed = .5
 
 //stock.rotation += 0.7
@@ -89,7 +99,7 @@ function render() {
     ctx.scale(10, -10)
     ctx.lineCap = "round"
     ctx.lineWidth= .2
-    ctx.pointToWorld(target, camera.mouse.pos)
+    !paused && ctx.pointToWorld(target, camera.mouse.pos)
     // Render cascades from course to fine
     for (var i=cascadeCount-1; i>=0; i--) {
       cascades[i].center = [
@@ -105,7 +115,7 @@ function render() {
     for (var i=0; i<cascadeCount; i++) {
       // TODO: consider using the previous, coarser, cascade as a source of data
       volumes.forEach((volume) => {
-        cascades[i].addVolume(ctx, volume.modelMatrix, volume)
+        cascades[i].addVolume(null, volume.modelMatrix, volume)
       })
     }
 
@@ -118,6 +128,9 @@ function render() {
     ctx.save()
     ctx.lineWidth = .15
     drawCameraRays(fov, eye, target, (ray, idx, total) => {
+      if (idx != 32) return
+      ray.level = cascadeCount - 1
+
       ctx.beginPath()
       ctx.moveTo(eye[0], eye[1])
       ctx.lineTo(
@@ -153,21 +166,39 @@ function step(a, b) {
   return b < a ? 0.0 : 1.0
 }
 
+function insideCascadeRadius(pos, cascade, isLower) {
+  if (!cascade) {
+    return false
+  }
+
+  const x = isLower ? shift(pos[0], 1) : pos[0]
+  const y = isLower ? shift(pos[1], 1) : pos[1]
+
+  return abs(x) < cascade.radius && abs(y) < cascade.radius
+}
+
+function shift(x, dir) {
+  const s = sign(x)
+  const n = dir < 0 ? (Math.abs(x) >> 1) : (Math.abs(x) << 1)
+  return s * n
+}
+
+function moveIndexPos(pos, dir) {
+  pos[0] = shift(pos[0], dir)
+  pos[1] = shift(pos[1], dir)
+}
+
 function marchGrid(ctx, cascades, ray) {
   const v2tmp = vec2.create()
-  const cascade = cascades[2]
-  const grid = cascade.grid
-  const center = cascade.center
-  const cellSize = cascade.cellSize
   const pos = [
     ray.dir[0] * 0.00001,
     ray.dir[1] * 0.00001
   ]
-
   const mapPos = [
-    floor(pos[0]),
-    floor(pos[1])
+    floor(ray.dir[0]),
+    floor(ray.dir[1])
   ]
+
 
   var length = vec2.length(ray.dir)
   const deltaDist = [
@@ -180,52 +211,133 @@ function marchGrid(ctx, cascades, ray) {
     sign(ray.dir[1])
   ]
 
+  var t = 0
+
   const sideDist = [
-    (sign(ray.dir[0]) * (mapPos[0] - pos[0]) + (sign(ray.dir[0]) * 0.5) + 0.5) * deltaDist[0],
-    (sign(ray.dir[1]) * (mapPos[1] - pos[1]) + (sign(ray.dir[1]) * 0.5) + 0.5) * deltaDist[1]
+    (rayStep[0] * (mapPos[0] - ray.dir[0]) + (rayStep[0] * 0.5) + 0.5) * deltaDist[0],
+    (rayStep[1] * (mapPos[1] - ray.dir[1]) + (rayStep[1] * 0.5) + 0.5) * deltaDist[1]
   ]
   const mask = [0, 0]
 
-  // // dda
-  for (var i = 0.0; i < 16; i++ ) {
+  // dda
+  const maxSteps = cascades.length*16
+  for (var i = 0.0; i < maxSteps; i++ ) {
+
+    var cascade = cascades[ray.level]
+    var lowerCascade = cascades[ray.level-1]
+    var upperCascade = cascades[ray.level+1]
+
+    ctx.beginPath()
+    ctx.arc(
+      cascade.center[0] + pos[0],
+      cascade.center[1] + pos[1],
+      .5 * ray.level,
+      0,
+      Math.PI*2
+    )
+    ctx.strokeStyle = cascade.color
+    ctx.stroke()
+
+
     var indexPosX = mapPos[0] + cascade.radius
     var indexPosY = mapPos[1] + cascade.radius
     if (indexPosX < 0 ||
-        indexPosX >= grid.shape[0] ||
+        indexPosX >= cascade.grid.shape[0] ||
         indexPosY < 0 ||
-        indexPosY >= grid.shape[1]
+        indexPosY >= cascade.grid.shape[1]
     )
     {
+      ctx.strokeStyle = 'red'
+      ctx.strokeRect(
+        cascade.center[0] + mapPos[0] * cascade.cellSize + .5,
+        cascade.center[1] + mapPos[1] * cascade.cellSize + .5,
+        cascade.cellSize-1,
+        cascade.cellSize-1
+      )
       return 0;
     }
 
     ctx.strokeStyle = cascade.color
     ctx.strokeRect(
-      center[0] + mapPos[0] * cellSize + .5,
-      center[1] + mapPos[1] * cellSize + .5,
-      cellSize-1,
-      cellSize-1
+      cascade.center[0] + mapPos[0] * cascade.cellSize + .5,
+      cascade.center[1] + mapPos[1] * cascade.cellSize + .5,
+      cascade.cellSize-1,
+      cascade.cellSize-1
     )
 
-    var cell = grid.get(indexPosX, indexPosY)
-    if (cell) {
-      var closest = rayCell(ctx, center, cell, ray)
+
+    var currentValue = cascade.grid.get(indexPosX, indexPosY)
+    var upperValue = upperCascade && upperCascade.grid.get(
+      // shift(mapPos[0], -1) + upperCascade.radius,
+      // shift(mapPos[1], -1) + upperCascade.radius
+      floor(pos[0] / upperCascade.cellSize) + upperCascade.radius,
+      floor(pos[1] / upperCascade.cellSize) + upperCascade.radius
+    )
+
+    var canGoDown = ray.level > 0 && insideCascadeRadius(mapPos, lowerCascade, true) && !!currentValue
+    var canGoUp = !currentValue && upperCascade && !upperValue
+    //var canStep = insideCascadeRadius(mapPos, cascade, false)
+    var levelChange = 0
+    if (canGoDown) {
+      levelChange = -1
+    } else if (canGoUp) {
+      levelChange = 1
+    }
+
+    console.group('cycle (level: ' + ray.level + ')')
+    console.log('up: %s, down: %s, current: %s, upper: %s', canGoUp, canGoDown, !!currentValue, !!upperValue)
+    console.log('pos(%s, %s); mapPos(%s, %s)', f(pos[0]), f(pos[1]), f(mapPos[0]), f(mapPos[1]))
+
+    if (levelChange !== 0) {
+      console.group('level')
+      console.log('level %s (%s); mapPos(%s, %s); pos(%s, %s)', ray.level,  levelChange > 0 ? '^' : 'v', mapPos[0], mapPos[1], f(pos[0]), f(pos[1]))
+      ray.level += levelChange
+      mapPos[0] = floor(pos[0] / cascades[ray.level].cellSize)
+      mapPos[1] = floor(pos[1] / cascades[ray.level].cellSize)
+      console.log('level %s; mapPos(%s, %s); pos(%s, %s)', ray.level, mapPos[0], mapPos[1], f(pos[0]), f(pos[1]))
+
+      console.groupEnd()
+      console.groupEnd()
+      continue
+    }
+
+
+    if (currentValue) {
+      var closest = rayCell(ctx, cascade.center, currentValue, ray)
 
       if (closest.terminated) {
+        console.log('ray terminated')
+        console.groupEnd()
         return closest.tmin
       }
     }
 
+    console.group('step')
+    console.log('STEP pos(%s, %s); mapPos(%s, %s); level:%s', f(pos[0]), f(pos[1]), f(mapPos[0]), f(mapPos[1]), ray.level)
     mask[0] = (sideDist[0] <= sideDist[1]) | 0
     mask[1] = (sideDist[1] <= sideDist[0]) | 0
 
     sideDist[0] += mask[0] * deltaDist[0]
     sideDist[1] += mask[1] * deltaDist[1]
 
-    mapPos[0] += mask[0] * rayStep[0],
+    mapPos[0] += mask[0] * rayStep[0]
     mapPos[1] += mask[1] * rayStep[1]
+
+    var lt = min(deltaDist[0], deltaDist[1]) * cascade.cellSize
+
+    pos[0] += ray.dir[0] * lt
+    pos[1] += ray.dir[1] * lt
+
+    console.log('STEP pos(%s, %s); mapPos(%s, %s); level:%s', f(pos[0]), f(pos[1]), f(mapPos[0]), f(mapPos[1]), ray.level)
+    console.groupEnd()
+    console.groupEnd()
+
   }
   return 0
+}
+
+function f(x) {
+  return Number(x).toFixed(2)
 }
 
 function rayCell(ctx, center, cell, ray) {
