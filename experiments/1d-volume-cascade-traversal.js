@@ -3,7 +3,7 @@ const fill = require('ndarray-fill')
 const tape = require('tape')
 const chalk = require('chalk')
 
-const radius = 8
+const radius = 4
 const levels = 3
 
 function mix(x, y, a) {
@@ -15,7 +15,7 @@ function createCascade(radius, levelCount) {
   for (var levelIdx = 0; levelIdx<levelCount; levelIdx++) {
     cascades.push({
       size: 1 << (levelIdx + 1),
-      data: new Uint8Array(radius)
+      data: new Uint8Array(radius * 2)
     })
   }
 
@@ -55,16 +55,35 @@ function createCascade(radius, levelCount) {
     //     0       1       2       3       4      5       6        7
     // |       |   x   |       |   x   |       |       |   x   |       |
     print() {
+      var indices = []
+      for (var i=-radius; i<=radius; i++) {
+        indices.push(i)
+      }
+
+      const center = radius * cascades[levelCount - 1].size
+
       for (var level=0; level<levelCount; level++) {
         var cascade = cascades[level]
-        var indices = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-        var spacing = 1 << (level + 1)
-        console.log(indices.join((' ').repeat(spacing - 1)))
+        console.log(center, center - cascade.size*radius)
+        var spacing = 1 << (level + 2)
+        var prefix = (' ').repeat(
+          Math.max((center - cascade.size * radius) * 2, 0)
+        )
+
+
+        console.log(prefix + indices.map((idx, i) => {
+          const s = String(i)
+          return i === 0
+          ? idx
+          : (' ').repeat(spacing - Math.floor((s.length - 1)/2)) + idx
+        }).join(''))
+
         var values = [];
-        for (var i=0; i<radius; i++) {
+        for (var i=-radius; i<radius; i++) {
           values.push('|' + (' ').repeat(spacing/2 - 1) + (cascade.data[i] ? 'x' : ' ') + (' ').repeat(spacing/2 - 1))
         }
-        console.log(values.join('') + '|')
+
+        console.log(prefix + ' ' + values.join('') + '|')
       }
       return this
     },
@@ -245,8 +264,8 @@ tape('set: 4, 20', (t) => {
   t.end()
 })
 
-tape('edge of a level', (t) => {
-  const c = createCascade(8, 3).set(31, 1)
+tape.only('edge of a level', (t) => {
+  const c = createCascade(radius, 3).set(31, 1)
   const expect = [
     { level: 2, pos: 0,  cell: 0, res:  0 },
     { level: 2, pos: 8,  cell: 1, res:  0 },

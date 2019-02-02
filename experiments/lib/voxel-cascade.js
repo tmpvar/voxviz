@@ -96,7 +96,6 @@ function createCascade(level, cascadeDiameter, cascadeCount) {
     const radius = cascadeDiameter/2
 
     volume.bricks.forEach((brick) => {
-      ctx.beginPath()
       const txVerts = verts.map((vert, i) => {
         const out = vec2.create()
         vec2.transformMat3(
