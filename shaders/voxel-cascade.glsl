@@ -9,6 +9,7 @@ struct Cell {
 struct SlabEntry {
   uint volume;
   ivec3 brickIndex;
+  mat4 transform;
   uint32_t *brickData;
 };
 

@@ -41,6 +41,7 @@ include_directories(
   deps/imgui
   deps/imgui/examples
   deps/catch2/include
+  deps/roaring-bitmaps
 )
 
 file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp shaders/*.glsl)
@@ -71,15 +72,20 @@ add_executable(
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
   include/voxel-cascade.h
+  include/uniform-grid.h
 
   ${SHADER_FILES}
 
-  #imgui
+  # imgui
   deps/imgui/imgui.cpp
   deps/imgui/imgui_demo.cpp
   deps/imgui/imgui_draw.cpp
   deps/imgui/examples/imgui_impl_glfw.cpp
   deps/imgui/examples/imgui_impl_opengl3.cpp
+
+  # roaring bitmaps
+  deps/roaring-bitmaps/roaring.c
+  deps/roaring-bitmaps/roaring.h
 )
 
 source_group("shaders" FILES ${SHADER_FILES})
@@ -94,4 +100,5 @@ target_link_libraries(
 	qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
+  ${ROARING_LIBRARY}
  )

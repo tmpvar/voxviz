@@ -331,6 +331,7 @@ public:
   }
 
   glm::mat4 getModelMatrix() {
+    // TODO: remove all public accessors and track the dirty state
     //    q3Transform tx = this->physicsBody->GetTransform();
 
     glm::mat4 model = glm::mat4(1.0f);

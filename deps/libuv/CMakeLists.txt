@@ -338,25 +338,25 @@ target_compile_options(uv_a PRIVATE ${uv_cflags})
 target_include_directories(uv_a PRIVATE include src)
 target_link_libraries(uv_a ${uv_libraries})
 
-if(BUILD_TESTING)
-  include(CTest)
-  add_executable(uv_run_tests ${uv_test_sources})
-  target_compile_definitions(uv_run_tests PRIVATE ${uv_defines})
-  target_compile_options(uv_run_tests PRIVATE ${uv_cflags})
-  target_include_directories(uv_run_tests PRIVATE include)
-  target_link_libraries(uv_run_tests uv ${uv_test_libraries})
-  add_test(NAME uv_test
-           COMMAND uv_run_tests
-           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-  add_executable(uv_run_tests_a ${uv_test_sources})
-  target_compile_definitions(uv_run_tests_a PRIVATE ${uv_defines})
-  target_compile_options(uv_run_tests_a PRIVATE ${uv_cflags})
-  target_include_directories(uv_run_tests_a PRIVATE include)
-  target_link_libraries(uv_run_tests_a uv_a ${uv_test_libraries})
-  add_test(NAME uv_test_a
-           COMMAND uv_run_tests_a
-           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-endif()
+# if(BUILD_TESTING)
+#   include(CTest)
+#   add_executable(uv_run_tests ${uv_test_sources})
+#   target_compile_definitions(uv_run_tests PRIVATE ${uv_defines})
+#   target_compile_options(uv_run_tests PRIVATE ${uv_cflags})
+#   target_include_directories(uv_run_tests PRIVATE include)
+#   target_link_libraries(uv_run_tests uv ${uv_test_libraries})
+#   add_test(NAME uv_test
+#            COMMAND uv_run_tests
+#            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+#   add_executable(uv_run_tests_a ${uv_test_sources})
+#   target_compile_definitions(uv_run_tests_a PRIVATE ${uv_defines})
+#   target_compile_options(uv_run_tests_a PRIVATE ${uv_cflags})
+#   target_include_directories(uv_run_tests_a PRIVATE include)
+#   target_link_libraries(uv_run_tests_a uv_a ${uv_test_libraries})
+#   add_test(NAME uv_test_a
+#            COMMAND uv_run_tests_a
+#            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# endif()
 
 if(UNIX)
   # Now for some gibbering horrors from beyond the stars...

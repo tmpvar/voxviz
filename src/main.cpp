@@ -11,6 +11,7 @@
 #include "volume.h"
 #include "volume-manager.h"
 #include "voxel-cascade.h"
+#include "uniform-grid.h"
 
 #include <shaders/built.h>
 #include <iostream>
@@ -352,6 +353,9 @@ int main(void) {
   // VOXEL CASCADE
   VoxelCascade *voxelCascade = new VoxelCascade(TOTAL_VOXEL_CASCADE_LEVELS);
 
+  // UniformGrid
+  //UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(256), 32);
+  UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(128), 1);
 
   { // query up the workgroups
     int work_grp_size[3], work_grp_inv;
@@ -402,16 +406,20 @@ int main(void) {
   );
   */
 
-  Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
-  Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
+  Volume *tool = new Volume(glm::vec3(0.0, 0, 0.0));
+  Brick *toolBrick = tool->AddBrick(glm::ivec3(0, 0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
   
+  //tool->scale.x = 10.0;
+  //tool->scale.y = 10.0;
+  //tool->scale.z = 10.0;
+
   
 
-  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(2, 0, 0), &boxDef);
-  toolBrick2->createGPUMemory();
-  toolBrick2->fillConst(0xFFFFFFFF);
+  //Brick *toolBrick2 = tool->AddBrick(glm::ivec3(2, 0, 0), &boxDef);
+  //toolBrick2->createGPUMemory();
+  //toolBrick2->fillConst(0xFFFFFFFF);
   
   
   volumeManager->addVolume(tool);
@@ -435,17 +443,14 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
-  tool->scale.x = 10.0;
-  tool->scale.y = 10.0;
-  tool->scale.z = 10.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
-  volumeManager->addVolume(floor);
+  //volumeManager->addVolume(floor);
   int floor_spacing = 2;
-  for (int x = 0; x < 16; x+=floor_spacing) {
+  for (int x = 0; x < 64; x+=floor_spacing) {
     for (int y = 0; y < 16; y+=floor_spacing) {
-      for (int z = 0; z < 16; z+=floor_spacing) {
+      for (int z = 0; z < 64; z+=floor_spacing) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
@@ -700,8 +705,30 @@ int main(void) {
       ImGui::End();
     }
     
-    // Voxel Cascade
-    if (keys[GLFW_KEY_TAB]) {
+    
+    if (true ||keys[GLFW_KEY_TAB]) {
+      // Uniform Grid
+
+      ImGui::Begin("stats");
+      double start = glfwGetTime();
+      if (uniformGrid->begin(camera->Position)) {
+        for (auto& volume : volumeManager->volumes) {
+          uniformGrid->addVolume(volume);
+        }
+        
+        uniformGrid->end();
+        
+      }
+      else {
+
+      }
+      uniformGrid->debugRaytrace(perspectiveMatrix * viewMatrix, currentEye);
+
+      ImGui::Text("uniformgrid time: %.3fms", (glfwGetTime() - start) * 1000);
+      ImGui::End();
+
+      /*
+      // Voxel Cascade
       ImGui::Begin("stats");
       double start = glfwGetTime();
       voxelCascade->begin(camera->Position);
@@ -715,40 +742,41 @@ int main(void) {
       voxelCascade->debugRaytrace(perspectiveMatrix * viewMatrix);
       
       ImGui::Text("cascade time: %.3fms", (glfwGetTime() - start) * 1000);
-      ImGui::End();
-    }
+      ImSGui::End();
+      */
+    } //else {
 
 
-    //Normal Render Everything approach
-    for (auto& volume : volumeManager->volumes) {
-      if (volume->bricks.size() == 0) {
-        continue;
-      }
+      //Normal Render Everything approach
+      for (auto& volume : volumeManager->volumes) {
+        if (volume->bricks.size() == 0) {
+          continue;
+        }
 
-      glm::mat4 volumeModel = volume->getModelMatrix();
-      raytracer->program->use()
-        ->uniformMat4("MVP", VP * volumeModel)
-        ->uniformMat4("model", volumeModel)
-        ->uniformVec3("eye", currentEye)
-        ->uniformFloat("maxDistance", max_distance)
-        ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformVec4("material", volume->material);
+        glm::mat4 volumeModel = volume->getModelMatrix();
+        raytracer->program->use()
+          ->uniformMat4("MVP", VP * volumeModel)
+          ->uniformMat4("model", volumeModel)
+          ->uniformVec3("eye", currentEye)
+          ->uniformFloat("maxDistance", max_distance)
+          ->uniform1i("showHeat", raytracer->showHeat)
+          ->uniformVec4("material", volume->material);
 
-      gl_error();
-      size_t activeBricks = volume->bind();
-      //raytracer->render(volume, raytracer->program);
+        gl_error();
+        size_t activeBricks = volume->bind();
+        //raytracer->render(volume, raytracer->program);
 
-      glDrawElementsInstanced(
-        GL_TRIANGLES,
-        volume->mesh->faces.size(),
-        GL_UNSIGNED_INT,
-        0,
-        //volume->bricks.size()
-        activeBricks
-      );
-      gl_error();
-    }
-    
+        glDrawElementsInstanced(
+          GL_TRIANGLES,
+          volume->mesh->faces.size(),
+          GL_UNSIGNED_INT,
+          0,
+          //volume->bricks.size()
+          activeBricks
+        );
+        gl_error();
+      //}
+    }    
 
     //volumeManager->volumes[0]->rotation.x += 0.0001;
     //volumeManager->volumes[1]->scale.z = 1.0 + abs(sin(time / 1000.0)) * 10.0;

@@ -4,14 +4,16 @@
 #include <glm/glm.hpp>
 #include <collision/aabb-obb.h>
 #include "aabb.h"
+#include "roaring.h"
 
 struct SlabEntry {
   uint32_t volume;
   glm::ivec3 brickIndex;
+  glm::mat4 transform;
   uint64_t brickData;
 };
 
-struct GPUCell { 
+struct GPUCell {
   uint32_t state; // 0 empty, 0x01 has something
   uint32_t start;
   uint32_t end;
@@ -19,10 +21,13 @@ struct GPUCell {
 
 struct CPUCell {
   vector<Brick *> bricks;
+  bool occupied;
 };
 
 struct CPULevel {
   CPUCell **cells;
+  roaring_bitmap_t *occupancy_mask;
+  size_t total_cells;
 };
 
 class VoxelCascade {
