@@ -7,10 +7,9 @@ struct Cell {
 };
 
 struct SlabEntry {
-  uint volume;
-  ivec3 brickIndex;
-  mat4 transform;
-  uint32_t *brickData;
+  mat4 transform;       // 64 (16)
+  ivec4 brickIndex;     // 16 (4)
+  uint32_t *brickData;  // 8 (2)
 };
 
 struct VoxelCascadeTraversalState {

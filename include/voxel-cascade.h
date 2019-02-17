@@ -7,10 +7,12 @@
 #include "roaring.h"
 
 struct SlabEntry {
-  uint32_t volume;
-  glm::ivec3 brickIndex;
   glm::mat4 transform;
+  glm::ivec4 brickIndex;
   uint64_t brickData;
+  //uint8_t _padding[8];
+  //uint32_t volume;
+  
 };
 
 struct GPUCell {
@@ -159,7 +161,6 @@ class VoxelCascade {
           glm::ceil(glm::vec3(upper) / float(cellSize)) * float(cellSize)
         );
 
-        /*
         start.x = max(start.x, level_lower.x);
         start.y = max(start.y, level_lower.y);
         start.z = max(start.z, level_lower.z);
@@ -167,7 +168,6 @@ class VoxelCascade {
         end.x = min(end.x, level_upper.x);
         end.y = min(end.y, level_upper.y);
         end.z = min(end.z, level_upper.z);
-        */
 
         for (int x = start.x; x <= end.x; x+= cellSize) {
           pos.x = x;
@@ -247,9 +247,9 @@ class VoxelCascade {
           for (auto& brick : cpu_cell->bricks) {
             if (this->slab_pos < this->slab_size) {
               SlabEntry entry;
-              entry.brickData = brick->bufferAddress;
-              entry.brickIndex = brick->index;
-              entry.volume = 0;
+              //entry.brickData = brick->bufferAddress;
+              entry.brickIndex = glm::ivec4(brick->index, 0);
+              //entry.volume = 0;
               if (gpu_slab != nullptr) {
                 memcpy(&gpu_slab[this->slab_pos], &entry, sizeof(entry));
               }
@@ -362,7 +362,7 @@ class VoxelCascade {
       ->uniformVec3("center", this->center)
       ->uniformMat4("mvp", mvp)
       ->bufferAddress("cascade_index", this->gpu_cascade_index->getAddress())
-      ->ssbo("cascade_slab", this->ssbo_slab);
+      ->ssbo("cascade_slab", this->ssbo_slab, 1);
 
     glBindVertexArray(this->debugLineMesh->vao); gl_error();
     glEnableVertexAttribArray(0); gl_error();
@@ -385,7 +385,7 @@ class VoxelCascade {
       ->uniformVec3("center", this->center)
       ->uniformMat4("VP", vp)
       ->bufferAddress("cascade_index", this->gpu_cascade_index->getAddress())
-      ->ssbo("cascade_slab", this->ssbo_slab);
+      ->ssbo("cascade_slab", this->ssbo_slab, 1);
 
     this->debugRaytraceSurface->render(this->debugRaytraceProgram);
   }

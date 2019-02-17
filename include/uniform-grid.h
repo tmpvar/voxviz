@@ -43,8 +43,8 @@ class UniformGrid {
     this->cpu_grid->occupancy_mask = roaring_bitmap_create();
 
     for (int j = 0; j < total_cells; j++) {
-      this->cpu_grid->cells[j] = new CPUCell;
-      this->cpu_grid->cells[j]->occupied = false;
+      this->cpu_grid->cells[j] = nullptr;
+      //this->cpu_grid->cells[j]->occupied = false;
     }
 
     // Setup a container to manage the grid on the gpu
@@ -141,12 +141,13 @@ class UniformGrid {
 
       for (auto& brick : cpu_cell->bricks) {
         if (this->slab_pos < this->slab_size) {
-          SlabEntry entry;
           gpu_slab[this->slab_pos].brickData = brick->bufferAddress;
-          gpu_slab[this->slab_pos].brickIndex = brick->index;
-          gpu_slab[this->slab_pos].transform = brick->volume->getModelMatrix();
+          gpu_slab[this->slab_pos].brickIndex = glm::ivec4(brick->index, 0);
+          glm::mat4 mat = brick->volume->getModelMatrix();
+          
+          memcpy((void *)&gpu_slab[this->slab_pos].transform, (void *)glm::value_ptr(mat), sizeof(mat));
           // TODO: populate this with the index into a global volume slab
-          gpu_slab[this->slab_pos].volume = 0;
+          //gpu_slab[this->slab_pos].volume = 0;
         }
         this->slab_pos++;
       }
@@ -185,7 +186,7 @@ class UniformGrid {
     };
 
     glm::vec3 v3CellSize = glm::vec3(cellSize);
-    glm::vec3 radius = v3CellSize * glm::vec3(this->dims) / glm::vec3(2);
+    glm::vec3 radius = glm::vec3(this->dims) / glm::vec3(2);
     glm::vec3 pos;
     Brick *brick;
 
@@ -233,29 +234,31 @@ class UniformGrid {
         offset = offsets[i];
 
         txVerts[i] = txPoint(mat, brick->index + offset);
-        lower.x = min(txVerts[i].x, float(lower.x));
-        lower.y = min(txVerts[i].y, float(lower.y));
-        lower.z = min(txVerts[i].z, float(lower.z));
+        lower.x = min(txVerts[i].x - this->center.x, float(lower.x));
+        lower.y = min(txVerts[i].y - this->center.y, float(lower.y));
+        lower.z = min(txVerts[i].z - this->center.z, float(lower.z));
 
-        upper.x = max(txVerts[i].x, float(upper.x));
-        upper.y = max(txVerts[i].y, float(upper.y));
-        upper.z = max(txVerts[i].z, float(upper.z));
+        upper.x = max(txVerts[i].x - this->center.x, float(upper.x));
+        upper.y = max(txVerts[i].y - this->center.y, float(upper.y));
+        upper.z = max(txVerts[i].z - this->center.z, float(upper.z));
       }
       
-      glm::vec3 level_lower = this->center - radius;
-      glm::vec3 level_upper = this->center + radius;
+      glm::vec3 level_lower = this->center - radius * v3CellSize;
+      glm::vec3 level_upper = this->center + radius * v3CellSize;
 
       // TODO: ensure the start/end lies within the current level
       if (!aabb_overlaps_component(level_lower, level_upper, lower, upper)) {
         continue;
       }
 
+      glm::vec3 offset = glm::vec3(this->dims) / glm::vec3(2);
+
       glm::ivec3 start = glm::ivec3(
-        glm::floor((glm::vec3(lower) - glm::vec3(this->center) + glm::vec3(this->dims) / glm::vec3(2)) / float(cellSize))
+        glm::floor(glm::vec3(lower) / v3CellSize)
       );
 
       glm::ivec3 end = glm::ivec3(
-        glm::ceil((glm::vec3(upper) - glm::vec3(this->center) + glm::vec3(this->dims) / glm::vec3(2)) / float(cellSize))
+        glm::ceil(glm::vec3(upper) / v3CellSize)
       );
 
       for (int x = start.x; x <= end.x; x += 1) {
@@ -265,22 +268,22 @@ class UniformGrid {
           for (int z = start.z; z <= end.z; z += 1) {
             pos.z = z;
 
-            for (int vertIdx = 0; vertIdx < 8; vertIdx++) {
-              aabbVerts[vertIdx] = (pos + offsets[vertIdx]) * v3CellSize;
-            }
+            //for (int vertIdx = 0; vertIdx < 8; vertIdx++) {
+            //  aabbVerts[vertIdx] = (pos + offsets[vertIdx]) * v3CellSize;
+            //}
 
             // TODO: test if current cell intersects the obb
-            bool isect = collision_aabb_obb(
-              aabbVerts,
-              txVerts
-            );
+            //bool isect = collision_aabb_obb(
+            //  aabbVerts,
+            //  txVerts
+            //);
 
-            if (true || isect) {
+            //if (true || isect) {
               this->addBrickToCell(
                 brick,
-                glm::ivec3(glm::floor(pos + glm::vec3(radius) / v3CellSize))
+                glm::ivec3(glm::floor(pos + radius))
               );
-            }
+            //}
           }
         }
       }
@@ -301,7 +304,13 @@ class UniformGrid {
 
     int idx = (pos.x + pos.y * this->dims.x + pos.z * this->dims.x * this->dims.y);
 
+    if (this->cpu_grid->cells[idx] == nullptr) {
+      this->cpu_grid->cells[idx] = new CPUCell;
+      this->cpu_grid->cells[idx]->occupied = false;
+    }
+
     CPUCell *cell = this->cpu_grid->cells[idx];
+    
     cell->bricks.push_back(brick);
     
     if (!cell->occupied) {
@@ -315,10 +324,11 @@ class UniformGrid {
     this->debugRaytraceProgram->use()
       ->uniformVec3("center", this->center)
       ->uniformVec3ui("dims", this->dims)
+      ->uniformFloat("cellSize", this->cell_size)
       ->uniformVec3("eye", eye)
       ->uniformMat4("VP", vp)
       ->bufferAddress("uniformGridIndex", this->gpu_grid->getAddress())
-      ->ssbo("uniformGridSlab", this->gpu_slab);
+      ->ssbo("uniformGridSlab", this->gpu_slab, 1);
 
     this->debugRaytraceSurface->render(this->debugRaytraceProgram);
   }
