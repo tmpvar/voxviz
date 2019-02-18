@@ -68,14 +68,13 @@ bool dda_cursor_step(in out DDACursor cursor, out vec3 normal, out Cell cell) {
 
   if (hit) {
     normal = cursor.mask;  
-    return true;
   }
 
   vec3 sideDist = cursor.sideDist;
   cursor.mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
   cursor.sideDist +=  cursor.mask *  cursor.deltaDist;
   cursor.mapPos +=  cursor.mask *  cursor.rayStep;
-  return false;
+  return hit;
 }
 
 // TODO: found_distance and found_normal are temporary debugging.
