@@ -17,5 +17,4 @@
 //#define RENDER_DYNAMIC 1
 
 //#define FULLSCREEN
-
 #endif

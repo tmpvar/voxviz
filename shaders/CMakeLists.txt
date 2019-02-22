@@ -11,7 +11,7 @@ add_custom_command(
 add_custom_command(
   OUTPUT
     built.h
-  COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/convert.js ${CMAKE_CURRENT_BINARY_DIR}/built.h
+  COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/convert.js -o ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS always_rebuild
 )
 
