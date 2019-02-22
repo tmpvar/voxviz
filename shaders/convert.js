@@ -107,7 +107,8 @@ class Shaders {
       // when a shader changes we need to mark it as dirty. Every subsequent program that tries
       // to use the old program needs to be rebuilt. This dirty state needs to persist across
       // potentially many frames.
-
+      #ifdef SHADER_HOTRELOAD
+      printf("starting shader hot-reload disk watcher\n")
       uv_fs_event_init(uv_default_loop(), &shader_watcher_handle);
       uv_fs_event_start(
         &shader_watcher_handle,
@@ -115,6 +116,7 @@ class Shaders {
         "${spath(outBase)}",
         UV_FS_EVENT_RECURSIVE
       );
+      #endif
     }
 
     static Shader *get(const std::string file) {

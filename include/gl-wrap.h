@@ -296,6 +296,7 @@ public:
   }
 
   Program *use() {
+    #ifdef SHADER_HOTRELOAD
     for (auto& it : this->shader_versions) {
       Shader *shader = it.first;
       size_t version = it.second;
@@ -306,6 +307,7 @@ public:
         break;
       }
     }
+    #endif
 
     static int used = 0;
     glUseProgram(this->handle);

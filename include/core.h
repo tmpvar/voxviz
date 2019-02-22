@@ -14,6 +14,7 @@
 #define TOTAL_COMMAND_QUEUES 16
 
 #define RENDER_STATIC 1
+#define SHADER_HOTRELOAD 1
 //#define RENDER_DYNAMIC 1
 
 //#define FULLSCREEN
