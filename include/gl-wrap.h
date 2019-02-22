@@ -12,6 +12,11 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <utility>
+#include <string>
+#include <fstream>
+#include <streambuf>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -62,8 +67,11 @@ public:
   GLuint handle;
   GLuint type;
   string name;
-
-  Shader(const char *src, const char *name, const GLuint type) {
+  string filename;
+  size_t version;
+  Shader(const char *src, const char *filename, const char *name, const GLuint type) {
+    this->version = 1;
+    this->filename = filename;
     // this->src = src;
     this->type = type;
     this->handle = glCreateShader(type);
@@ -80,6 +88,43 @@ public:
     glCompileShader(this->handle);
     gl_error();
     gl_shader_log(this->handle);
+  }
+
+  bool reload() {
+    std::cout << "reloading shader: " << this->name << std::endl;
+    std::ifstream t(this->filename);
+    std::string str;
+
+    t.seekg(0, std::ios::end);
+    str.reserve(t.tellg());
+    t.seekg(0, std::ios::beg);
+
+    str.assign((std::istreambuf_iterator<char>(t)),
+      std::istreambuf_iterator<char>());
+    const GLchar *source = (const GLchar *)str.c_str();
+    GLuint new_handle = glCreateShader(this->type);
+    glShaderSource(new_handle, 1, &source, NULL);
+    std::cout << "Compile "
+      << shader_type(type)
+      << " Shader: "
+      << name
+      << std::endl;
+
+    glCompileShader(new_handle);
+    gl_ok(glGetError());
+
+    GLint isCompiled = 0;
+    glGetShaderiv(new_handle, GL_COMPILE_STATUS, &isCompiled);
+    
+    if (!isCompiled) {
+      gl_shader_log(new_handle);
+      return false;
+    }
+
+    glDeleteShader(this->handle);
+    this->handle = new_handle;
+    this->version++;
+    return true;
   }
 
   ~Shader() {
@@ -165,6 +210,8 @@ class Program {
   map<string, GLint> uniforms;
   map<string, GLint> attributes;
   map<string, GLint> resource_indices;
+  map<Shader *, size_t> shader_versions;
+  map<string, GLuint> outputs;
   GLuint texture_index;
   string compositeName;
 public:
@@ -204,7 +251,8 @@ public:
     return ret;
   }
 
-  Program *add(const Shader *shader) {
+  Program *add(Shader *shader) {
+    this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
     this->compositeName += " " + shader->name;
     glAttachShader(this->handle, shader->handle);
     gl_error();
@@ -219,7 +267,46 @@ public:
     return this;
   }
 
+  void rebuild() {
+    glDeleteProgram(this->handle);
+    this->resource_indices.clear();
+    this->attributes.clear();
+    this->outputs.clear();
+    this->uniforms.clear();
+    
+    this->handle = glCreateProgram();
+    this->compositeName = "";
+    for (auto const& v : this->shader_versions) {
+      Shader *shader = v.first;
+      this->add(shader);
+    }
+
+    for (auto const& o : this->outputs) {
+      string name = o.first;
+      GLuint location = o.second;
+      this->output(name, location);
+    }
+
+    this->link();
+
+    for (auto const& v : this->shader_versions) {
+      Shader *shader = v.first;
+      this->shader_versions[shader] = shader->version;
+    }
+  }
+
   Program *use() {
+    for (auto& it : this->shader_versions) {
+      Shader *shader = it.first;
+      size_t version = it.second;
+      if (version != shader->version) {
+        std::cout << "rebuild program before use: " << this->compositeName << std::endl;
+        this->rebuild();
+
+        break;
+      }
+    }
+
     static int used = 0;
     glUseProgram(this->handle);
     this->texture_index = 0;
@@ -229,6 +316,9 @@ public:
   }
 
   Program *output(string name, const GLuint location = 0) {
+    if (this->outputs.find(name) == this->outputs.end()) {
+      this->outputs.emplace(name, location);
+    }
     glBindFragDataLocation(this->handle, location, name.c_str());
     return this;
   }
@@ -597,7 +687,7 @@ public:
     glDeleteTextures(1, &texture_position);
     glDeleteTextures(1, &texture_depth);
 
-    // ensure we return the main render target back to 
+    // ensure we return the main render target back to
     // the screen (aka 0)
     this->unbind();
 

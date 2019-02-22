@@ -89,13 +89,12 @@ void gl_shader_log(GLuint shader) {
     return;
   }
   printf("  failed to compile!\n");
-  return;
+
   glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &m);
   char *s = (char *)malloc(m * sizeof(char));
   glGetShaderInfoLog(shader, m, &l, s);
   printf("shader log:\n%s\n", s);
   free(s);
-  //}
 }
 
 

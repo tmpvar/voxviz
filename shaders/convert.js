@@ -8,7 +8,7 @@ const sourceGlob = path.join(__dirname, '*.{vert,frag,comp}')
 const files = glob.sync(sourceGlob)
 const includeExp = /#include +['"<](.*)['">]/
 const splitExp = /\r?\n/
-const outBase = argv.o
+const outBase = path.resolve(process.cwd(), argv.o)
 
 const types = {
   '.frag': 'GL_FRAGMENT_SHADER',
@@ -31,6 +31,7 @@ if (argv.w) {
       return
     }
 
+    p = path.normalize(p)
     console.log('CHANGE', p)
     // is this a leaf?
     if (dependencyMap[p]) {
@@ -66,14 +67,20 @@ function processFile(file) {
   return lines
 }
 
+function spath(p) {
+  return p.replace(/\\/g, '\\\\')
+}
+
 const init = files.map((file) => {
+  file = path.normalize(file);
+  const outFile = path.join(outBase, path.basename(file))
   const lines = processFile(file)
   const type = types[path.extname(file)]
   if (!type) {
     throw new Error(file + " could not be associated with a shader type")
   }
   const relpath = path.relative(__dirname, file)
-  return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.filter(Boolean).map(outputLine).join('\n') + `, "${relpath}", ${type});\n`
+  return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.filter(Boolean).map(outputLine).join('\n') + `, "${spath(outFile)}", "${relpath}", ${type});\n`
 }).join('\n      ')
 
 const s = `
@@ -84,11 +91,30 @@ const s = `
 
 #include "gl-wrap.h"
 
+#include <stdio.h>
+#include <uv.h>
+
+static void on_change(uv_fs_event_t *handle, const char *path, int events, int status);
+static uv_fs_event_t shader_watcher_handle;
+
 class Shaders {
   public:
     static std::map<std::string, Shader *> instances;
     static void init() {
       ${init}
+
+      // TODO: setup some libuv junk here and start watching the build dir for changes.
+      // when a shader changes we need to mark it as dirty. Every subsequent program that tries
+      // to use the old program needs to be rebuilt. This dirty state needs to persist across
+      // potentially many frames.
+
+      uv_fs_event_init(uv_default_loop(), &shader_watcher_handle);
+      uv_fs_event_start(
+        &shader_watcher_handle,
+        on_change,
+        "${spath(outBase)}",
+        UV_FS_EVENT_RECURSIVE
+      );
     }
 
     static Shader *get(const std::string file) {
@@ -104,6 +130,16 @@ class Shaders {
 };
 
 std::map<std::string, Shader *> Shaders::instances;
+
+static void on_change(uv_fs_event_t *handle, const char *path, int events, int status) {
+  if (events & UV_CHANGE) {
+    Shader *shader = Shaders::get(path);
+    if (shader != nullptr) {
+      shader->reload();
+    }
+    printf("CHANGE: %s\\n", path);
+  }
+}
 #endif
 `
 fs.writeFileSync(path.join(outBase, 'built.h'), s + '\n')
@@ -120,7 +156,7 @@ function processIncludes(file, deps, lines) {
         out.push(line)
       }
       const includeFile = path.join(baseDir, path.normalize(matches[1]))
-      deps.push(includeFile)
+      deps.push(path.normalize(includeFile))
       const includeLines = fs.readFileSync(includeFile, "utf8").split(splitExp)
       const includes = processIncludes(includeFile, deps, includeLines)
       Array.prototype.push.apply(out, includes)

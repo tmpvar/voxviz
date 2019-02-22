@@ -231,8 +231,7 @@ int main(void) {
   float camera_z = sqrtf(dsquare * 3.0f) * 1.5f;
 
   // libuv junk
-  uv_loop_t* loop = uv_default_loop();
-  uv_pipe_init(loop, &stdin_pipe, 0);
+  uv_pipe_init(uv_default_loop(), &stdin_pipe, 0);
   uv_pipe_open(&stdin_pipe, 0);
   uv_read_start((uv_stream_t*)&stdin_pipe, alloc_buffer, read_stdin);
   // libuv junk
@@ -792,7 +791,7 @@ int main(void) {
       total_affected -= 1000;
     }
 
-    uv_run(loop, UV_RUN_NOWAIT);
+    uv_run(uv_default_loop(), UV_RUN_NOWAIT);
     glfwPollEvents();
   }
 
