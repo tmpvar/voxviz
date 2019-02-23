@@ -8,7 +8,7 @@ struct Cell {
 };
 
 struct SlabEntry {
-  mat4 transform;       // 64 (16)
+  mat4 invTransform;       // 64 (16)
   ivec4 brickIndex;     // 16 (4)
   uint32_t *brickData;  // 8 (2)
   uint8_t _padding[8];

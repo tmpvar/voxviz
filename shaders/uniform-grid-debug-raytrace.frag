@@ -23,7 +23,7 @@ layout (std430, binding=1) buffer uniformGridSlab
   SlabEntry entry[];
 };
 
-#define ITERATIONS 16
+#define ITERATIONS 256
 
 vec3 tx(mat4 m, vec3 v) {
   vec4 tmp = m * vec4(v, 1.0);
@@ -99,7 +99,7 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
     SlabEntry e = entry[i];
 
     // TODO: cache the inverse of this matrix in entry memory.
-    mat4 xform = inverse(e.transform);
+    mat4 xform = e.invTransform;
     vec3 invEye = tx(xform, eye);
     vec3 invDir = normalize(tx(xform, ray_dir));
 
@@ -124,7 +124,7 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
         pos,
         invDir,
         found_center,
-        found_normal,
+        fn,
         found_iterations
       );
 
@@ -132,11 +132,18 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
       // traversing the grid cell and potentially miss all of the other bricks which
       // will result in a miss overall.
       if (brick_hit > 0.0) {
+        found_normal = fn;
+        // TODO: instead of returning instantly here, we need to store the closest
+        //       brick entry along with its found_distance / surface pos. This way
+        //       we don't get weird popping artifacts when bricks that are lower in
+        //       index but higher in distance overlap another brick.
         return true;
       }
     }
   }
-  return hit;
+  // always return false here because even though we intersected a brick via
+  // ray->aabb we did not hit an actual voxel.
+  return false;
 }
 
 void main() {
@@ -152,7 +159,7 @@ void main() {
     bool stepResult = dda_cursor_step(cursor, found_normal, found_cell);
 
     if (stepResult) {
-      color = found_normal;
+      //color = found_normal;
       if (cell_test(found_cell, found_distance, found_normal)) {
         color = found_normal;
         break;

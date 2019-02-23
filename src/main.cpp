@@ -353,7 +353,7 @@ int main(void) {
 
   // UniformGrid
   //UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(256), 32);
-  UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(16),128);
+  UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(128),2);
 
   { // query up the workgroups
     int work_grp_size[3], work_grp_inv;
@@ -444,9 +444,9 @@ int main(void) {
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
-  //volumeManager->addVolume(floor);
+  volumeManager->addVolume(floor);
   int floor_spacing = 2;
-  for (int x = 0; x < 64; x+=floor_spacing) {
+  for (int x = 0; x < 16; x+=floor_spacing) {
     for (int y = 0; y < 16; y+=floor_spacing) {
       for (int z = 0; z < 64; z+=floor_spacing) {
         floor->AddBrick(glm::ivec3(x, y, z));
@@ -816,10 +816,10 @@ int main(void) {
     //floor->rotation.z += 0.001;
     //tool->rotation.z += 0.001;
     //tool->rotation.y += 0.002;
-    //tool->rotation.z += deltaTime * 1.0;
-    //tool->scale.x = 1.0 + fabs(sinf(float(time) / 10.0) * 20.0);
-    //tool->scale.y = 1.0 + fabs(sinf(float(time) / 5.0) * 20.0);
-    //tool->scale.z = 1.0 + fabs(sinf(float(time) / 2.0) * 20.0);
+    tool->rotation.z += deltaTime * 1.0;
+    tool->scale.x = 1.0 + fabs(sinf(float(time) / 10.0) * 20.0);
+    tool->scale.y = 1.0 + fabs(sinf(float(time) / 5.0) * 20.0);
+    tool->scale.z = 1.0 + fabs(sinf(float(time) / 2.0) * 20.0);
     
     /*fbo->unbind();
     

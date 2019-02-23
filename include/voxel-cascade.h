@@ -7,7 +7,7 @@
 #include "roaring.h"
 
 struct SlabEntry {
-  glm::mat4 transform; // 16 * 4
+  glm::mat4 invTransform; // 16 * 4
   glm::ivec4 brickIndex; // 16
   uint64_t brickData; // 8
   uint8_t _padding[8]; // 8
