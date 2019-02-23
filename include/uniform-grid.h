@@ -88,7 +88,7 @@ class UniformGrid {
     );
 
     if (true || cameraDirty) {
-      this->center = gridCenter;
+      this->center = glm::floor(gridCenter / cellSize);
       this->dirty = true;
     }
 
@@ -129,15 +129,17 @@ class UniformGrid {
     memset(gpu_cells, 0, sizeof(GPUCell) * this->total_cells);
     roaring_uint32_iterator_t *i = roaring_create_iterator(this->cpu_grid->occupancy_mask);
     size_t occupied_cells = 0;
+    this->slab_pos = 0;
     while (i->has_value) {
       occupied_cells ++;
       uint32_t j = i->current_value;
       CPUCell *cpu_cell = this->cpu_grid->cells[j];
+      GPUCell *gpu_cell = &gpu_cells[j];
       size_t brick_count = cpu_cell->bricks.size();
 
-      gpu_cells[j].state = 1;
-      gpu_cells[j].start = this->slab_pos;
-      gpu_cells[j].end = this->slab_pos + brick_count;
+      gpu_cell->state = 1;
+      gpu_cell->start = this->slab_pos;
+      gpu_cell->end = this->slab_pos + brick_count;
 
       for (auto& brick : cpu_cell->bricks) {
         if (this->slab_pos < this->slab_size) {
@@ -169,9 +171,9 @@ class UniformGrid {
 
     glm::vec3 txVerts[8];
     glm::vec3 aabbVerts[8];
-    glm::ivec3 lower(INT_MAX);
-    glm::ivec3 upper(INT_MIN);
-    glm::ivec3 offset;
+    glm::vec3 lower(FLT_MAX);
+    glm::vec3 upper(FLT_MIN);
+    glm::vec3 offset;
 
     glm::vec3 offsets[8] = {
       glm::vec3(0.0, 1.0, 0.0),
@@ -193,54 +195,25 @@ class UniformGrid {
     //glm::ivec3 offset = txPoint(mat, brick->index + offset);
     for (auto& it : volume->bricks) {
       brick = it.second;
-      lower.x = INT_MAX;
-      lower.y = INT_MAX;
-      lower.z = INT_MAX;
+      lower.x = FLT_MAX;
+      lower.y = FLT_MAX;
+      lower.z = FLT_MAX;
 
-      upper.x = INT_MIN;
-      upper.y = INT_MIN;
-      upper.z = INT_MIN;
-
-      /*glm::vec3 brickIndex = glm::vec3(brick->index);
-      glm::vec3 txBrickCenter = txPoint(mat, brickIndex + glm::vec3(0.5));
-      glm::vec3 txBrickLower = txPoint(mat, brickIndex);
-
-      float dist = glm::distance(txBrickCenter, txBrickLower);
-      upper = txBrickCenter + glm::vec3(dist);
-      lower = txBrickCenter - glm::vec3(dist);
-      */
-
-      /*for (uint8_t i = 0; i < 8; i++) {
-        offset = offsets[i];
-        glm::vec3 dir = glm::vec3(
-          offset.x > 0 ? 1.0 : -1.0,
-          offset.y > 0 ? 1.0 : -1.0,
-          offset.z > 0 ? 1.0 : -1.0
-        );
-
-        glm::vec3 v = txBrickCenter + dir * txBrickUpper;
-
-        lower.x = min(v.x, float(lower.x));
-        lower.y = min(v.y, float(lower.y));
-        lower.z = min(v.z, float(lower.z));
-
-        upper.x = max(v.x, float(upper.x));
-        upper.y = max(v.y, float(upper.y));
-        upper.z = max(v.z, float(upper.z));
-      }*/
-     
+      upper.x = -FLT_MAX;
+      upper.y = -FLT_MAX;
+      upper.z = -FLT_MAX;
       
       for (uint8_t i = 0; i < 8; i++) {
         offset = offsets[i];
 
-        txVerts[i] = txPoint(mat, brick->index + offset);
-        lower.x = min(txVerts[i].x - this->center.x, float(lower.x));
-        lower.y = min(txVerts[i].y - this->center.y, float(lower.y));
-        lower.z = min(txVerts[i].z - this->center.z, float(lower.z));
+        txVerts[i] = txPoint(mat, glm::vec3(brick->index) + offset);
+        lower.x = min(txVerts[i].x, lower.x);
+        lower.y = min(txVerts[i].y, lower.y);
+        lower.z = min(txVerts[i].z, lower.z);
 
-        upper.x = max(txVerts[i].x - this->center.x, float(upper.x));
-        upper.y = max(txVerts[i].y - this->center.y, float(upper.y));
-        upper.z = max(txVerts[i].z - this->center.z, float(upper.z));
+        upper.x = max(txVerts[i].x, upper.x);
+        upper.y = max(txVerts[i].y, upper.y);
+        upper.z = max(txVerts[i].z, upper.z);
       }
       
       glm::vec3 level_lower = this->center - radius * v3CellSize;
@@ -251,21 +224,19 @@ class UniformGrid {
         continue;
       }
 
-      glm::vec3 offset = glm::vec3(this->dims) / glm::vec3(2);
-
       glm::ivec3 start = glm::ivec3(
-        glm::floor(glm::vec3(lower) / v3CellSize)
+        glm::floor(lower / v3CellSize)
       );
 
       glm::ivec3 end = glm::ivec3(
-        glm::ceil(glm::vec3(upper) / v3CellSize)
+        glm::ceil(upper / v3CellSize)
       );
 
-      for (int x = start.x; x <= end.x; x += 1) {
+      for (int x = start.x; x < end.x; x += 1) {
         pos.x = x;
-        for (int y = start.y; y <= end.y; y += 1) {
+        for (int y = start.y; y < end.y; y += 1) {
           pos.y = y;
-          for (int z = start.z; z <= end.z; z += 1) {
+          for (int z = start.z; z < end.z; z += 1) {
             pos.z = z;
 
             //for (int vertIdx = 0; vertIdx < 8; vertIdx++) {
@@ -281,7 +252,7 @@ class UniformGrid {
             //if (true || isect) {
               this->addBrickToCell(
                 brick,
-                glm::ivec3(glm::floor(pos + radius))
+                glm::ivec3(glm::floor(pos - this->center + radius))
               );
             //}
           }

@@ -4,12 +4,14 @@ struct Cell {
   uint state;
   uint start;
   uint end;
+  uint _padding;
 };
 
 struct SlabEntry {
   mat4 transform;       // 64 (16)
   ivec4 brickIndex;     // 16 (4)
   uint32_t *brickData;  // 8 (2)
+  uint8_t _padding[8];
 };
 
 struct VoxelCascadeTraversalState {
@@ -52,7 +54,7 @@ bool voxel_cascade_next(in Cell *cascade_index, inout VoxelCascadeTraversalState
   bool canGoUp = state.level < TOTAL_VOXEL_CASCADE_LEVELS;
   bool canGoDown = state.level > 0 && all(lessThan(state.index >> 1, uvec3(BRICK_DIAMETER)));
   bool canStep = all(lessThan(state.index, uvec3(BRICK_DIAMETER)));
- 
+
   state.empty = !voxel_cascade_get(
     cascade_index,
     state.level,

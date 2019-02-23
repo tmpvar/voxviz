@@ -3,6 +3,7 @@
 in vec3 position;
 
 uniform mat4 VP;
+uniform float cellSize;
 
 out vec3 ray_dir;
 
@@ -11,7 +12,7 @@ void main() {
 
   vec4 far = inv * vec4(position.x, position.y, 1.0, 1.0);
   far /= far.w;
-  vec4 near = inv * vec4(position.x, position.y, -1.0, 1.0);
+  vec4 near = inv * vec4(position.x, position.y, 0.1, 1.0);
   near /= near.w;
   ray_dir = normalize(far.xyz - near.xyz);
 

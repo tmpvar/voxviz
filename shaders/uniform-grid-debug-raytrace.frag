@@ -1,4 +1,4 @@
-#version 430 core
+#version 450 core
 #extension GL_NV_gpu_shader5: require
 
 #include "../include/core.h"
@@ -23,7 +23,7 @@ layout (std430, binding=1) buffer uniformGridSlab
   SlabEntry entry[];
 };
 
-#define ITERATIONS 256
+#define ITERATIONS 16
 
 vec3 tx(mat4 m, vec3 v) {
   vec4 tmp = m * vec4(v, 1.0);
@@ -48,13 +48,23 @@ struct DDACursor {
   vec3 deltaDist;
 };
 
-DDACursor dda_cursor_create(in const vec3 pos, in const vec3 rayDir) {
+DDACursor dda_cursor_create(
+  in const vec3 pos,
+  in const vec3 gridCenter,
+  in const vec3 gridRadius,
+  in const vec3 rayDir
+) {
   DDACursor cursor;
-  cursor.mapPos = floor(pos);
+  vec3 gp = (pos / cellSize) + gridRadius - gridCenter;
+  cursor.mapPos = floor(gp);
   cursor.deltaDist = abs(vec3(length(rayDir)) / rayDir);
   cursor.rayStep = sign(rayDir);
-  cursor.sideDist = ((cursor.rayStep * 0.5) + 0.5) * cursor.deltaDist;
-  cursor.mask = step(cursor.sideDist.xyz,cursor. sideDist.yzx) * step(cursor.sideDist.xyz, cursor.sideDist.zxy);
+  vec3 p = (cursor.mapPos - gp);
+  cursor.sideDist = (
+    cursor.rayStep * p + (cursor.rayStep * 0.5) + 0.5
+  ) * cursor.deltaDist;
+  cursor.mask = step(cursor.sideDist.xyz, cursor.sideDist.yzx) *
+                step(cursor.sideDist.xyz, cursor.sideDist.zxy);
   return cursor;
 }
 
@@ -67,32 +77,32 @@ bool dda_cursor_step(in out DDACursor cursor, out vec3 normal, out Cell cell) {
   );
 
   if (hit) {
-    normal = cursor.mask;  
+    normal = cursor.mask;
   }
 
   vec3 sideDist = cursor.sideDist;
-  cursor.mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
-  cursor.sideDist +=  cursor.mask *  cursor.deltaDist;
-  cursor.mapPos +=  cursor.mask *  cursor.rayStep;
+  cursor.mask = step(sideDist.xyz, sideDist.yzx) *
+                step(sideDist.xyz, sideDist.zxy);
+  cursor.sideDist += cursor.mask * cursor.deltaDist;
+  cursor.mapPos += cursor.mask * cursor.rayStep;
   return hit;
 }
 
 // TODO: found_distance and found_normal are temporary debugging.
 bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
-  const uint max_iterations = cell.end - cell.start;
-  for (uint i=0; i<32; i++) {
-    if (i >= max_iterations) {
-      break;
-    }
-    uint index = i + cell.start;
-    SlabEntry e = entry[index];
+  bool hit = false;
+  const uint start = cell.start;
+  const uint end = cell.end;
+  uint i = 0;
+
+  for (uint i = start; i<end; i++) {
+    SlabEntry e = entry[i];
 
     // TODO: cache the inverse of this matrix in entry memory.
     mat4 xform = inverse(e.transform);
     vec3 invEye = tx(xform, eye);
     vec3 invDir = normalize(tx(xform, ray_dir));
 
-    bool hit = false;
     vec3 brickCenter = vec3(e.brickIndex) + vec3(0.5);
     hit = ailaWaldHitAABox(
       brickCenter,
@@ -103,15 +113,12 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
       found_distance,
       found_normal // TODO: this is probably not needed for our purposes
     );
-    
 
     if (hit) {
-      found_normal = hsl2rgb(found_distance / 100.0, .9, .4);//vec3(abs(found_distance/10.0));
-      //return true;
       vec3 pos = ((invEye + invDir * found_distance) - vec3(e.brickIndex)) * vec3(BRICK_DIAMETER);
       vec3 found_center;
       float found_iterations;
-      
+      vec3 fn;
       float brick_hit = voxel_march(
         e.brickData,
         pos,
@@ -121,16 +128,15 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
         found_iterations
       );
 
+      // if we hit a voxel we need to return immediately, otherwise we'll continue
+      // traversing the grid cell and potentially miss all of the other bricks which
+      // will result in a miss overall.
       if (brick_hit > 0.0) {
-        //found_normal = vec3(1.0);
         return true;
-      } else {
-        found_normal = vec3(1.0);
       }
-      //return true;
     }
   }
-  return false;
+  return hit;
 }
 
 void main() {
@@ -139,20 +145,22 @@ void main() {
   Cell found_cell;
   vec3 found_normal;
   float found_distance;
-  DDACursor cursor = dda_cursor_create(gridRadius, ray_dir);
+  vec3 r = gridRadius;
+  DDACursor cursor = dda_cursor_create(eye, center, r, ray_dir);
 
   for (uint i = 0; i<ITERATIONS; i++) {
-    if (dda_cursor_step(cursor, found_normal, found_cell)) {
-      color = vec3(1.0, 0.0, 1.0);//found_normal;
+    bool stepResult = dda_cursor_step(cursor, found_normal, found_cell);
+
+    if (stepResult) {
+      color = found_normal;
       if (cell_test(found_cell, found_distance, found_normal)) {
-        //color = vec3(1.0, 1.0, 1.0);
         color = found_normal;
         break;
       }
     }
   }
 
-  gl_FragDepth = found_distance / MAX_DISTANCE;
+  //gl_FragDepth = found_distance / MAX_DISTANCE;
 
   outColor = vec4(color, 1.0);
 }

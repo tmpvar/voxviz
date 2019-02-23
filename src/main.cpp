@@ -353,7 +353,7 @@ int main(void) {
 
   // UniformGrid
   //UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(256), 32);
-  UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(128),8);
+  UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(16),128);
 
   { // query up the workgroups
     int work_grp_size[3], work_grp_inv;
@@ -415,7 +415,7 @@ int main(void) {
 
   
 
-  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(4, 0, 0), &boxDef);
+  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(-4, 0, 0), &boxDef);
   toolBrick2->createGPUMemory();
   toolBrick2->fillConst(0xFFFFFFFF);
   
@@ -516,22 +516,22 @@ int main(void) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 100.0 : 1.0);
+    float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 100.0 : 10.0);
     if (keys[GLFW_KEY_W]) {
-      camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
+      camera->ProcessKeyboard(Camera_Movement::FORWARD, speed * deltaTime);
       //camera->translate(0.0f, 0.0f, 10.0f);
     }
 
     if (keys[GLFW_KEY_S]) {
-      camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed);
+      camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed * deltaTime);
     }
 
     if (keys[GLFW_KEY_A]) {
-      camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
+      camera->ProcessKeyboard(Camera_Movement::LEFT, speed * deltaTime);
     }
 
     if (keys[GLFW_KEY_D]) {
-      camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
+      camera->ProcessKeyboard(Camera_Movement::RIGHT, speed * deltaTime);
     }
 
     if (keys[GLFW_KEY_H]) {
@@ -706,9 +706,42 @@ int main(void) {
       }
       ImGui::End();
     }
-    
-    
+
+
+
+    //Normal Render Everything approach
     if (keys[GLFW_KEY_TAB]) {
+      for (auto& volume : volumeManager->volumes) {
+        if (volume->bricks.size() == 0) {
+          continue;
+        }
+
+        glm::mat4 volumeModel = volume->getModelMatrix();
+        raytracer->program->use()
+          ->uniformMat4("MVP", VP * volumeModel)
+          ->uniformMat4("model", volumeModel)
+          ->uniformVec3("eye", currentEye)
+          ->uniformFloat("maxDistance", max_distance)
+          ->uniform1i("showHeat", raytracer->showHeat)
+          ->uniformVec4("material", volume->material);
+
+        gl_error();
+        size_t activeBricks = volume->bind();
+        //raytracer->render(volume, raytracer->program);
+
+        glDrawElementsInstanced(
+          GL_TRIANGLES,
+          volume->mesh->faces.size(),
+          GL_UNSIGNED_INT,
+          0,
+          //volume->bricks.size()
+          activeBricks
+        );
+        gl_error();
+      }
+     }
+    
+    //if (keys[GLFW_KEY_TAB]) {
       // Uniform Grid
 
       ImGui::Begin("stats");
@@ -749,39 +782,11 @@ int main(void) {
       ImGui::Text("cascade time: %.3fms", (glfwGetTime() - start) * 1000);
       ImSGui::End();
       */
-    } else {
+   // } else {
 
 
-      //Normal Render Everything approach
-      for (auto& volume : volumeManager->volumes) {
-        if (volume->bricks.size() == 0) {
-          continue;
-        }
 
-        glm::mat4 volumeModel = volume->getModelMatrix();
-        raytracer->program->use()
-          ->uniformMat4("MVP", VP * volumeModel)
-          ->uniformMat4("model", volumeModel)
-          ->uniformVec3("eye", currentEye)
-          ->uniformFloat("maxDistance", max_distance)
-          ->uniform1i("showHeat", raytracer->showHeat)
-          ->uniformVec4("material", volume->material);
-
-        gl_error();
-        size_t activeBricks = volume->bind();
-        //raytracer->render(volume, raytracer->program);
-
-        glDrawElementsInstanced(
-          GL_TRIANGLES,
-          volume->mesh->faces.size(),
-          GL_UNSIGNED_INT,
-          0,
-          //volume->bricks.size()
-          activeBricks
-        );
-        gl_error();
-      }
-    }    
+    //}    
 
     //volumeManager->volumes[0]->rotation.x += 0.0001;
     //volumeManager->volumes[1]->scale.z = 1.0 + abs(sin(time / 1000.0)) * 10.0;
@@ -811,7 +816,7 @@ int main(void) {
     //floor->rotation.z += 0.001;
     //tool->rotation.z += 0.001;
     //tool->rotation.y += 0.002;
-    tool->rotation.z += deltaTime * 1.0;
+    //tool->rotation.z += deltaTime * 1.0;
     //tool->scale.x = 1.0 + fabs(sinf(float(time) / 10.0) * 20.0);
     //tool->scale.y = 1.0 + fabs(sinf(float(time) / 5.0) * 20.0);
     //tool->scale.z = 1.0 + fabs(sinf(float(time) / 2.0) * 20.0);

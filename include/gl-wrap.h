@@ -17,6 +17,8 @@
 #include <fstream>
 #include <streambuf>
 
+#include "core.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -150,7 +152,11 @@ public:
   }
 
   SSBO *resize(size_t bytes) {
-    if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
+    if (bytes == this->total_bytes) {
+      return this;
+    }
+
+    if (this->total_bytes != 0 && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
     }
 
