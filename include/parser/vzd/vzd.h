@@ -71,10 +71,10 @@ public:
       ifs.read((char*)&color, 3);
       cout << "Material Color: r:" << unsigned(color[0]) << " g:" << unsigned(color[1]) << " b:" << unsigned(color[2]) << endl;
       
-      volume->material.r = color[0] / 255.0f;
-      volume->material.g = color[1] / 255.0f;
-      volume->material.b = color[2] / 255.0f;
-      volume->material.a = 1.0;
+      volume->material.color.r = color[0] / 255.0f;
+      volume->material.color.g = color[1] / 255.0f;
+      volume->material.color.b = color[2] / 255.0f;
+      volume->material.color.a = 1.0;
 
       // Voxel size in bytes
       // TODO: if this is not 1 byte then we need to propagate this up

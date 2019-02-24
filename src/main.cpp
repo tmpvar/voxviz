@@ -349,7 +349,7 @@ int main(void) {
     ->link();
 
   // VOXEL CASCADE
-  VoxelCascade *voxelCascade = new VoxelCascade(TOTAL_VOXEL_CASCADE_LEVELS);
+  //VoxelCascade *voxelCascade = new VoxelCascade(TOTAL_VOXEL_CASCADE_LEVELS);
 
   // UniformGrid
   //UniformGrid *uniformGrid = new UniformGrid(glm::uvec3(256), 32);
@@ -405,6 +405,10 @@ int main(void) {
   */
 
   Volume *tool = new Volume(glm::vec3(0.0, 1.0, 0.0));
+  tool->material.color = glm::vec4(
+    // r, g, b, nop
+    1, 0.388, 0.2, 0.0
+  );
   Brick *toolBrick = tool->AddBrick(glm::ivec3(0, 1.0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
@@ -434,7 +438,10 @@ int main(void) {
   ));
 
   Volume *floor = new Volume(glm::vec3(0.0));
-  floor->material = glm::vec4(0.67, 0.71, 0.78, 1.0);
+  floor->material.color = glm::vec4(
+    // r, g, b, nop
+    1.0, 1.0, 1.0, 0.0
+  );
   //Brick *floorBrick = floor->AddBrick(glm::ivec3(1, 0, 0));
   //floorBrick->createGPUMemory();
   //floorBrick->fillConst(1.0);
@@ -722,8 +729,7 @@ int main(void) {
           ->uniformMat4("model", volumeModel)
           ->uniformVec3("eye", currentEye)
           ->uniformFloat("maxDistance", max_distance)
-          ->uniform1i("showHeat", raytracer->showHeat)
-          ->uniformVec4("material", volume->material);
+          ->uniform1i("showHeat", raytracer->showHeat);
 
         gl_error();
         size_t activeBricks = volume->bind();
@@ -818,12 +824,12 @@ int main(void) {
     //floor->rotation.z += 0.001;
     //tool->rotation.z += 0.001;
     //tool->rotation.y += 0.002;
-    tool->rotation.z += deltaTime * 1.0;
+    //tool->rotation.z += deltaTime * 1.0;
 
     tool->scale.x = 1.0 + fabs(sinf(float(time) / 100.0) * 20.0);
     tool->scale.y = 1.0 + fabs(sinf(float(time) / 50.0) * 20.0);
     tool->scale.z = 1.0 + fabs(sinf(float(time) / 20.0) * 20.0);
-    tool->position.z = 1.0 + sinf(float(time) / 20.0) * 20.0;
+    //tool->position.z = 1.0 + sinf(float(time) / 20.0) * 20.0;
     
     /*fbo->unbind();
     

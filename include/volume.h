@@ -97,6 +97,10 @@ static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
   );
 }
 
+struct VolumeMaterial {
+  glm::vec4 color;
+};
+
 
 class Volume {
 protected:
@@ -106,7 +110,7 @@ public:
   glm::vec3 rotation;
   glm::vec3 position;
   glm::vec3 scale;
-  glm::vec4 material;
+  VolumeMaterial material;
   std::queue<VolumeOperation *> operation_queue;
   aabb_t *aabb;
   size_t activeBricks;

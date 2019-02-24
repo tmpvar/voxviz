@@ -18,6 +18,12 @@ class UniformGrid {
 
   size_t slab_pos;
   size_t slab_size;
+
+  size_t volume_material_pos;
+  size_t volume_material_size;
+  SSBO *volume_material_cache;
+  VolumeMaterial *volume_material_mapped;
+
   bool dirty;
 
   glm::uvec3 dims;
@@ -31,6 +37,10 @@ class UniformGrid {
   UniformGrid(glm::uvec3 dims, float cell_size) {
     this->slab_size = 0;
     this->slab_pos = 0;
+
+    this->volume_material_pos = 0;
+    this->volume_material_size = 0;
+
     this->dims = dims;
     this->dirty = true;
 
@@ -53,6 +63,8 @@ class UniformGrid {
     // setup a container to manage the grid cell contents on the gpu
     this->gpu_slab = new SSBO(0);
 
+    // volume materials
+    this->volume_material_cache = new SSBO(0);
 
     // setup debug rendering 
     this->debugRaytraceSurface = new FullscreenSurface();
@@ -71,7 +83,7 @@ class UniformGrid {
   };
 
   bool begin(glm::vec3 gridCenter) {
-  this->dirty = true;
+  //this->dirty = true;
     // TODO: if the incoming grid center (aka camera position)
     // is in the same cell as the previous frame, then we don't need
     // to clear and regen the grid.
@@ -102,6 +114,12 @@ class UniformGrid {
     }
     this->slab_pos = 0;
 
+    if (this->volume_material_pos > this->volume_material_size) {
+      this->volume_material_size = (size_t)(ceilf(this->volume_material_pos / 1024.0f) * 1024);
+      this->volume_material_cache->resize(sizeof(VolumeMaterial) * this->volume_material_size);
+      this->dirty = true;
+    }
+    this->volume_material_pos = 0;
 
     if (!this->dirty) {
       return false;
@@ -109,16 +127,25 @@ class UniformGrid {
 
     roaring_uint32_iterator_t *i = roaring_create_iterator(this->cpu_grid->occupancy_mask);
     while (i->has_value) {
+      for (auto& brickEntry : this->cpu_grid->cells[i->current_value]->bricks) {
+        delete brickEntry;
+      }
+
       this->cpu_grid->cells[i->current_value]->bricks.clear();
       this->cpu_grid->cells[i->current_value]->occupied = false;
       roaring_advance_uint32_iterator(i);
     }
     roaring_free_uint32_iterator(i);
     roaring_bitmap_clear(this->cpu_grid->occupancy_mask);
+
+    this->volume_material_mapped = (VolumeMaterial *)this->volume_material_cache->beginMap(SSBO::MAP_WRITE_ONLY);
+
     return true;
   };
 
   void end() {
+    this->volume_material_cache->endMap();
+
     // Push each cell's bricks into contiguous memory while keeping the index to populate
     // the GPUCell's memory.
     this->gpu_slab->resize(this->slab_size * sizeof(SlabEntry));
@@ -141,11 +168,12 @@ class UniformGrid {
       gpu_cell->start = this->slab_pos;
       gpu_cell->end = this->slab_pos + brick_count;
 
-      for (auto& brick : cpu_cell->bricks) {
+      for (auto& brickEntry : cpu_cell->bricks) {
         if (this->slab_pos < this->slab_size) {
+          Brick *brick = brickEntry->brick;
           gpu_slab[this->slab_pos].brickData = brick->bufferAddress;
           gpu_slab[this->slab_pos].brickIndex = glm::ivec4(brick->index, 0);
-          
+          gpu_slab[this->slab_pos].volume_index = brickEntry->volume_index;
           glm::mat4 transform = brick->volume->getModelMatrix();
           glm::mat4 invTransform = glm::inverse(transform);
           memcpy(
@@ -197,6 +225,18 @@ class UniformGrid {
     glm::vec3 radius = glm::vec3(this->dims) / glm::vec3(2);
     glm::vec3 pos;
     Brick *brick;
+
+    // update the gpu volume material cache
+    if (this->volume_material_pos < this->volume_material_size) {
+      memcpy(
+        (void *)&this->volume_material_mapped[this->volume_material_pos],
+        (void *)&volume->material,
+        sizeof(VolumeMaterial)
+      );
+    }
+    size_t volume_index = this->volume_material_pos;
+    this->volume_material_pos++;
+
 
     //glm::ivec3 offset = txPoint(mat, brick->index + offset);
     for (auto& it : volume->bricks) {
@@ -258,6 +298,7 @@ class UniformGrid {
             //if (true || isect) {
               this->addBrickToCell(
                 brick,
+                volume_index,
                 glm::ivec3(glm::floor(pos - this->center + radius))
               );
             //}
@@ -267,7 +308,7 @@ class UniformGrid {
     }
   };
 
-  void addBrickToCell(Brick *brick, glm::ivec3 pos) {
+  void addBrickToCell(Brick *brick, size_t volume_index, glm::ivec3 pos) {
     if (
       pos.x < 0 ||
       pos.y < 0 ||
@@ -287,8 +328,10 @@ class UniformGrid {
     }
 
     CPUCell *cell = this->cpu_grid->cells[idx];
-    
-    cell->bricks.push_back(brick);
+    CPUCellBrick *b = new CPUCellBrick;
+    b->brick = brick;
+    b->volume_index = volume_index;
+    cell->bricks.push_back(b);
     
     if (!cell->occupied) {
       roaring_bitmap_add(this->cpu_grid->occupancy_mask, idx);
@@ -305,7 +348,8 @@ class UniformGrid {
       ->uniformVec3("eye", eye)
       ->uniformMat4("VP", vp)
       ->bufferAddress("uniformGridIndex", this->gpu_grid->getAddress())
-      ->ssbo("uniformGridSlab", this->gpu_slab, 1);
+      ->ssbo("uniformGridSlab", this->gpu_slab, 1)
+      ->ssbo("volumeMaterialSlab", this->volume_material_cache, 2);
 
     this->debugRaytraceSurface->render(this->debugRaytraceProgram);
   }

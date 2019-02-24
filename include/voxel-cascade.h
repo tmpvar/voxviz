@@ -10,9 +10,7 @@ struct SlabEntry {
   glm::mat4 invTransform; // 16 * 4
   glm::ivec4 brickIndex; // 16
   uint64_t brickData; // 8
-  uint8_t _padding[8]; // 8
-  //uint32_t volume;
-  
+  uint32_t volume_index; // 4
 };
 
 struct GPUCell {
@@ -22,8 +20,14 @@ struct GPUCell {
   uint32_t padding;
 };
 
+
+struct CPUCellBrick {
+  Brick *brick;
+  size_t volume_index;
+};
+
 struct CPUCell {
-  vector<Brick *> bricks;
+  vector<CPUCellBrick *> bricks;
   bool occupied;
 };
 
@@ -32,7 +36,7 @@ struct CPULevel {
   roaring_bitmap_t *occupancy_mask;
   size_t total_cells;
 };
-
+/*
 class VoxelCascade {
   int level_count;
 
@@ -217,6 +221,8 @@ class VoxelCascade {
     int idx = (pos.x + pos.y * BRICK_DIAMETER + pos.z * BRICK_DIAMETER * BRICK_DIAMETER);
 
     CPUCell *cell = this->levels[levelIdx].cells[idx];
+    CPUCellBrick b;
+    b.brick = brick;
     cell->bricks.push_back(brick);
   };
 
@@ -391,3 +397,4 @@ class VoxelCascade {
     this->debugRaytraceSurface->render(this->debugRaytraceProgram);
   }
 };
+*/

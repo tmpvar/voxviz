@@ -23,6 +23,11 @@ layout (std430, binding=1) buffer uniformGridSlab
   SlabEntry entry[];
 };
 
+layout (std430, binding=2) buffer volumeMaterialSlab
+{
+  VolumeMaterial volume_material[];
+};
+
 #define ITERATIONS 96
 
 vec3 tx(mat4 m, vec3 v) {
@@ -151,7 +156,8 @@ bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float foun
         found_distance = min(found_distance, aabb_distance);
         //if (d < found_distance) {
           //found_distance = min(found_distance, d);
-          found_normal = fn;
+          found_normal = volume_material[e.volume_index].color.rgb;
+          //found_normal = fn;
         //}
 
         // TODO: instead of returning instantly here, we need to store the closest
@@ -178,17 +184,20 @@ void main() {
   DDACursor cursor = dda_cursor_create(eye, center, gridRadius, ray_dir);
   bool hit = false;
   for (uint i = 0; i<ITERATIONS; i++) {
-    bool stepResult = dda_cursor_step(cursor, found_normal, found_cell);
+    vec3 no;
+    bool stepResult = dda_cursor_step(cursor, no, found_cell);
 
     if (stepResult) {
-      //color = found_normal;
       if (cell_test(found_cell, eye, ray_dir, found_distance, found_normal)) {
         color = found_normal;
         hit = true;
+
         break;
       }
     }
   }
+  outColor = vec4(color, 1.0);
+  return;
 
   //color = vec3(found_distance / 10.0);
   vec3 shadow_ray_dir = normalize(reflect(ray_dir, found_normal));
@@ -200,16 +209,17 @@ void main() {
   }
 
   if (hit) {
-    color = vec3(1.0);
-    if (found_normal.x != 0.0) {
-      color *= 0.25;
-    }
-    if (found_normal.y != 0.0) {
-      color *= 0.5;
-    }
-    if (found_normal.z != 0.0) {
-      color *= 0.75;
-    }
+
+    // color = vec3(1.0);
+    // if (found_normal.x != 0.0) {
+    //   color *= 0.25;
+    // }
+    // if (found_normal.y != 0.0) {
+    //   color *= 0.5;
+    // }
+    // if (found_normal.z != 0.0) {
+    //   color *= 0.75;
+    // }
 
     vec3 shadow_found_normal;
     Cell shadow_found_cell;
