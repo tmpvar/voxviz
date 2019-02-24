@@ -94,6 +94,7 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
   const uint start = cell.start;
   const uint end = cell.end;
   uint i = 0;
+  found_distance = 100000.0;
 
   for (uint i = start; i<end; i++) {
     SlabEntry e = entry[i];
@@ -104,26 +105,35 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
     vec3 invDir = normalize(tx(xform, ray_dir));
 
     vec3 brickCenter = vec3(e.brickIndex) + vec3(0.5);
-    hit = ailaWaldHitAABox(
+    float aabb_distance;
+    vec3 noop;
+    bool aabb_hit = ailaWaldHitAABox(
       brickCenter,
       vec3(0.5),
       invEye,
       invDir,
       1.0 / invDir,
-      found_distance,
-      found_normal // TODO: this is probably not needed for our purposes
+      aabb_distance,
+      noop
     );
 
-    if (hit) {
-      vec3 pos = ((invEye + invDir * found_distance) - vec3(e.brickIndex)) * vec3(BRICK_DIAMETER);
-      vec3 found_center;
+    if (aabb_hit) {
+      // TODO: temporary shadow testing
+
+      if (hit && aabb_distance > found_distance) {
+        continue;
+      }
+
+
+
+      vec3 pos = ((invEye + invDir * aabb_distance) - vec3(e.brickIndex)) * vec3(BRICK_DIAMETER);
+      vec3 out_pos = pos;
       float found_iterations;
       vec3 fn;
       float brick_hit = voxel_march(
         e.brickData,
-        pos,
+        out_pos,
         invDir,
-        found_center,
         fn,
         found_iterations
       );
@@ -132,18 +142,24 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
       // traversing the grid cell and potentially miss all of the other bricks which
       // will result in a miss overall.
       if (brick_hit > 0.0) {
-        found_normal = fn;
+        float d = distance(out_pos - pos, invEye);
+        found_distance = min(found_distance, aabb_distance);
+        //if (d < found_distance) {
+          //found_distance = min(found_distance, d);
+          found_normal = fn;
+        //}
+
         // TODO: instead of returning instantly here, we need to store the closest
         //       brick entry along with its found_distance / surface pos. This way
         //       we don't get weird popping artifacts when bricks that are lower in
         //       index but higher in distance overlap another brick.
-        return true;
+        hit = true;
       }
     }
   }
   // always return false here because even though we intersected a brick via
   // ray->aabb we did not hit an actual voxel.
-  return false;
+  return hit;
 }
 
 void main() {
@@ -152,9 +168,9 @@ void main() {
   Cell found_cell;
   vec3 found_normal;
   float found_distance;
-  vec3 r = gridRadius;
-  DDACursor cursor = dda_cursor_create(eye, center, r, ray_dir);
 
+  DDACursor cursor = dda_cursor_create(eye, center, gridRadius, ray_dir);
+  bool hit = false;
   for (uint i = 0; i<ITERATIONS; i++) {
     bool stepResult = dda_cursor_step(cursor, found_normal, found_cell);
 
@@ -162,11 +178,52 @@ void main() {
       //color = found_normal;
       if (cell_test(found_cell, found_distance, found_normal)) {
         color = found_normal;
+        hit = true;
         break;
       }
     }
   }
 
+  //color = vec3(found_distance / 10.0);
+  vec3 shadow_ray_dir = normalize(reflect(ray_dir, found_normal));
+  vec3 shadow_ray_origin = eye + ray_dir * found_distance + shadow_ray_dir;
+
+  if (hit) {
+    color = abs(vec3(found_distance) / 10.0);
+    color = found_normal;
+  }
+
+  if (false && hit) {
+    vec3 shadow_found_normal;
+    Cell shadow_found_cell;
+    float shadow_found_distance;
+    DDACursor shadow_cursor = dda_cursor_create(
+      shadow_ray_origin,
+      center,
+      gridRadius,
+      shadow_ray_dir
+    );
+
+    for (uint i = 0; i<ITERATIONS; i++) {
+      bool shadowStepResult = dda_cursor_step(
+        shadow_cursor,
+        shadow_found_normal,
+        shadow_found_cell
+      );
+
+      if (shadowStepResult) {
+        // color = vec3(1.0, 0.0, 1.0);
+
+        //color = shadow_found_normal;
+        if (cell_test(shadow_found_cell, shadow_found_distance, shadow_found_normal)) {
+          color = vec3(1.0, 0.0, 1.0);
+          //color = shadow_ray_dir;
+          //color = vec3(shadow_found_distance / 10.0);
+          break;
+        }
+      }
+    }
+  }
   //gl_FragDepth = found_distance / MAX_DISTANCE;
 
   outColor = vec4(color, 1.0);

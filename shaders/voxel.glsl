@@ -28,15 +28,15 @@ void voxel_set(uint32_t *vol, ivec3 pos, bool v) {
   vol[word] |= v ? (cur | mask) : (cur & ~mask);
 }
 
-float voxel_march(uint32_t *volume, in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out float iterations) {
-  pos -= rayDir * 4.0;
-  vec3 mapPos = vec3(floor(pos));
+float voxel_march(uint32_t *volume, in out vec3 pos, vec3 rayDir, out vec3 normal, out float iterations) {
+  vec3 mapPos = vec3(floor(pos - rayDir * 0.001));
   vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
   vec3 rayStep = sign(rayDir);
   vec3 sideDist = (sign(rayDir) * (mapPos - pos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
   vec3 mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
 
   float hit = 0.0;
+  float t = 0.0;
   for (int iterations = 0; iterations < VOXEL_BRICK_ITERATIONS; iterations++) {
     if (hit > 0.0 || voxel_get(volume, ivec3(mapPos))) {
       hit = 1.0;
@@ -46,9 +46,10 @@ float voxel_march(uint32_t *volume, in out vec3 pos, vec3 rayDir, out vec3 cente
     mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
     sideDist += mask * deltaDist;
     mapPos += mask * rayStep;
+    t += length(mask * sideDist);
   }
 
-  pos = floor(mapPos);
+  pos += t * rayDir;
   normal = mask;
   return hit;
 }

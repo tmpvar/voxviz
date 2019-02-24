@@ -404,8 +404,8 @@ int main(void) {
   );
   */
 
-  Volume *tool = new Volume(glm::vec3(0.0, 0, 0.0));
-  Brick *toolBrick = tool->AddBrick(glm::ivec3(-2, 0, 0), &boxDef);
+  Volume *tool = new Volume(glm::vec3(0.0, 0.0, 0.0));
+  Brick *toolBrick = tool->AddBrick(glm::ivec3(8, 1.0, 8), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
   
@@ -415,7 +415,7 @@ int main(void) {
 
   
 
-  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(-4, 0, 0), &boxDef);
+  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(7, 1, 8), &boxDef);
   toolBrick2->createGPUMemory();
   toolBrick2->fillConst(0xFFFFFFFF);
   
@@ -445,10 +445,10 @@ int main(void) {
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
-  int floor_spacing = 2;
+  int floor_spacing = 1;
   for (int x = 0; x < 16; x+=floor_spacing) {
-    for (int y = 0; y < 16; y+=floor_spacing) {
-      for (int z = 0; z < 64; z+=floor_spacing) {
+    for (int y = 0; y < 1; y+=floor_spacing) {
+      for (int z = 0; z < 16; z+=floor_spacing) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
@@ -460,9 +460,9 @@ int main(void) {
     i++;
     Brick *brick = it.second;
     brick->createGPUMemory();
-    i % 5 > 0 ? brick->fillConst(0xFFFFFFFF) : brick->fill(fillSphereProgram);
+    //i % 5 > 0 ? brick->fillConst(0xFFFFFFFF) : brick->fill(fillSphereProgram);
     //brick->fill(fillSphereProgram);
-   // brick->fill(fillAllProgram);
+    brick->fillConst(0xFFFFFFFF);
   }
 
 
@@ -816,10 +816,11 @@ int main(void) {
     //floor->rotation.z += 0.001;
     //tool->rotation.z += 0.001;
     //tool->rotation.y += 0.002;
-    tool->rotation.z += deltaTime * 1.0;
-    tool->scale.x = 1.0 + fabs(sinf(float(time) / 10.0) * 20.0);
-    tool->scale.y = 1.0 + fabs(sinf(float(time) / 5.0) * 20.0);
-    tool->scale.z = 1.0 + fabs(sinf(float(time) / 2.0) * 20.0);
+    //tool->rotation.z += deltaTime * 1.0;
+
+    //tool->scale.x = 1.0 + fabs(sinf(float(time) / 10.0) * 20.0);
+    //tool->scale.y = 1.0 + fabs(sinf(float(time) / 5.0) * 20.0);
+    //tool->scale.z = 1.0 + fabs(sinf(float(time) / 2.0) * 20.0);
     
     /*fbo->unbind();
     
