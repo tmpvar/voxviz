@@ -117,7 +117,14 @@ bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float foun
       noop
     );
 
-    if (aabb_hit) {
+    bool inside = all(greaterThanEqual(ray_origin, vec3(e.brickIndex))) &&
+                  all(lessThanEqual(ray_origin, vec3(e.brickIndex) + vec3(1.0)));
+
+    if (inside) {
+      aabb_distance = 0.0;
+    }
+
+    if (aabb_hit || inside) {
       // TODO: temporary shadow testing
 
       if (hit && aabb_distance > found_distance) {
@@ -185,7 +192,7 @@ void main() {
 
   //color = vec3(found_distance / 10.0);
   vec3 shadow_ray_dir = normalize(reflect(ray_dir, found_normal));
-  vec3 shadow_ray_origin = eye + ray_dir * found_distance + shadow_ray_dir * 0.1 - found_normal * 0.001;
+  vec3 shadow_ray_origin = eye + ray_dir * found_distance + shadow_ray_dir * 0.00001;
 
   if (hit) {
     color = abs(vec3(0.0, found_distance, 1.0) / 10.0);

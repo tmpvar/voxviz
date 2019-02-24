@@ -446,9 +446,9 @@ int main(void) {
 
   volumeManager->addVolume(floor);
   int floor_spacing = 1;
-  for (int x = 0; x < 16; x+=floor_spacing) {
+  for (int x = -16; x < 16; x+=floor_spacing) {
     for (int y = 0; y < 1; y+=floor_spacing) {
-      for (int z = 0; z < 16; z+=floor_spacing) {
+      for (int z = -16; z < 16; z+=floor_spacing) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
