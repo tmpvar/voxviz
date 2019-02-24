@@ -94,7 +94,7 @@ bool dda_cursor_step(in out DDACursor cursor, out vec3 normal, out Cell cell) {
 }
 
 // TODO: found_distance and found_normal are temporary debugging.
-bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float found_distance, out vec3 found_normal) {
+bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float found_distance, out vec3 found_normal, out VolumeMaterial found_material) {
   bool hit = false;
   const uint start = cell.start;
   const uint end = cell.end;
@@ -156,8 +156,8 @@ bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float foun
         found_distance = min(found_distance, aabb_distance);
         //if (d < found_distance) {
           //found_distance = min(found_distance, d);
-          found_normal = volume_material[e.volume_index].color.rgb;
-          //found_normal = fn;
+          found_material = volume_material[e.volume_index];
+          found_normal = fn;
         //}
 
         // TODO: instead of returning instantly here, we need to store the closest
@@ -178,6 +178,7 @@ void main() {
   vec3 gridRadius = vec3(dims) / 2.0;
   Cell found_cell;
   vec3 found_normal;
+  VolumeMaterial found_material;
   float found_distance;
   vec3 ray_dir = normalize(in_ray_dir);
 
@@ -188,7 +189,7 @@ void main() {
     bool stepResult = dda_cursor_step(cursor, no, found_cell);
 
     if (stepResult) {
-      if (cell_test(found_cell, eye, ray_dir, found_distance, found_normal)) {
+      if (cell_test(found_cell, eye, ray_dir, found_distance, found_normal, found_material)) {
         color = found_normal;
         hit = true;
 
@@ -196,8 +197,6 @@ void main() {
       }
     }
   }
-  outColor = vec4(color, 1.0);
-  return;
 
   //color = vec3(found_distance / 10.0);
   vec3 shadow_ray_dir = normalize(reflect(ray_dir, found_normal));
@@ -205,23 +204,12 @@ void main() {
 
   if (hit) {
     color = abs(vec3(0.0, found_distance, 1.0) / 10.0);
-    color = found_normal;
+    color = found_material.color.rgb;
   }
 
   if (hit) {
-
-    // color = vec3(1.0);
-    // if (found_normal.x != 0.0) {
-    //   color *= 0.25;
-    // }
-    // if (found_normal.y != 0.0) {
-    //   color *= 0.5;
-    // }
-    // if (found_normal.z != 0.0) {
-    //   color *= 0.75;
-    // }
-
     vec3 shadow_found_normal;
+    VolumeMaterial shadow_found_material;
     Cell shadow_found_cell;
     float shadow_found_distance;
     DDACursor shadow_cursor = dda_cursor_create(
@@ -247,7 +235,8 @@ void main() {
           shadow_ray_origin,
           shadow_ray_dir,
           shadow_found_distance,
-          shadow_found_normal
+          shadow_found_normal,
+          shadow_found_material
         );
 
         if (shadow_ray_cell_hit) {
@@ -256,7 +245,7 @@ void main() {
           color = vec3(shadow_found_distance / 10.0, found_distance / 10.0, 0);
           color = vec3(1.0);
           color = shadow_found_normal;
-
+          color = shadow_found_material.color.rgb;
           //color = abs(normalize(cross(vec3(1.0, 1.0, 1.0), shadow_found_normal)));
           //color = shadow_found_normal;
           //color = found_normal * 0.25;
