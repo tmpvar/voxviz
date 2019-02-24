@@ -5,7 +5,7 @@ in vec3 position;
 uniform mat4 VP;
 uniform float cellSize;
 
-out vec3 ray_dir;
+out vec3 in_ray_dir;
 
 void main() {
   mat4 inv = inverse(VP);
@@ -14,7 +14,7 @@ void main() {
   far /= far.w;
   vec4 near = inv * vec4(position.x, position.y, 0.1, 1.0);
   near /= near.w;
-  ray_dir = normalize(far.xyz - near.xyz);
+  in_ray_dir = far.xyz - near.xyz;
 
   gl_Position = vec4(position, 1.0);
 }

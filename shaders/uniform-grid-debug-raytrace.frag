@@ -9,7 +9,7 @@
 
 out vec4 outColor;
 
-in vec3 ray_dir;
+in vec3 in_ray_dir;
 
 uniform vec3 center;
 uniform vec3 eye;
@@ -89,7 +89,7 @@ bool dda_cursor_step(in out DDACursor cursor, out vec3 normal, out Cell cell) {
 }
 
 // TODO: found_distance and found_normal are temporary debugging.
-bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
+bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float found_distance, out vec3 found_normal) {
   bool hit = false;
   const uint start = cell.start;
   const uint end = cell.end;
@@ -101,7 +101,7 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
 
     // TODO: cache the inverse of this matrix in entry memory.
     mat4 xform = e.invTransform;
-    vec3 invEye = tx(xform, eye);
+    vec3 invOrigin = tx(xform, ray_origin);
     vec3 invDir = normalize(tx(xform, ray_dir));
 
     vec3 brickCenter = vec3(e.brickIndex) + vec3(0.5);
@@ -110,7 +110,7 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
     bool aabb_hit = ailaWaldHitAABox(
       brickCenter,
       vec3(0.5),
-      invEye,
+      invOrigin,
       invDir,
       1.0 / invDir,
       aabb_distance,
@@ -124,9 +124,7 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
         continue;
       }
 
-
-
-      vec3 pos = ((invEye + invDir * aabb_distance) - vec3(e.brickIndex)) * vec3(BRICK_DIAMETER);
+      vec3 pos = ((invOrigin + invDir * aabb_distance) - vec3(e.brickIndex)) * vec3(BRICK_DIAMETER);
       vec3 out_pos = pos;
       float found_iterations;
       vec3 fn;
@@ -142,7 +140,7 @@ bool cell_test(in Cell cell, out float found_distance, out vec3 found_normal) {
       // traversing the grid cell and potentially miss all of the other bricks which
       // will result in a miss overall.
       if (brick_hit > 0.0) {
-        float d = distance(out_pos - pos, invEye);
+        float d = distance(out_pos - pos, invOrigin);
         found_distance = min(found_distance, aabb_distance);
         //if (d < found_distance) {
           //found_distance = min(found_distance, d);
@@ -168,6 +166,7 @@ void main() {
   Cell found_cell;
   vec3 found_normal;
   float found_distance;
+  vec3 ray_dir = normalize(in_ray_dir);
 
   DDACursor cursor = dda_cursor_create(eye, center, gridRadius, ray_dir);
   bool hit = false;
@@ -176,7 +175,7 @@ void main() {
 
     if (stepResult) {
       //color = found_normal;
-      if (cell_test(found_cell, found_distance, found_normal)) {
+      if (cell_test(found_cell, eye, ray_dir, found_distance, found_normal)) {
         color = found_normal;
         hit = true;
         break;
@@ -186,14 +185,25 @@ void main() {
 
   //color = vec3(found_distance / 10.0);
   vec3 shadow_ray_dir = normalize(reflect(ray_dir, found_normal));
-  vec3 shadow_ray_origin = eye + ray_dir * found_distance + shadow_ray_dir;
+  vec3 shadow_ray_origin = eye + ray_dir * found_distance + shadow_ray_dir * 0.1 - found_normal * 0.001;
 
   if (hit) {
-    color = abs(vec3(found_distance) / 10.0);
+    color = abs(vec3(0.0, found_distance, 1.0) / 10.0);
     color = found_normal;
   }
 
-  if (false && hit) {
+  if (hit) {
+    color = vec3(1.0);
+    if (found_normal.x != 0.0) {
+      color *= 0.25;
+    }
+    if (found_normal.y != 0.0) {
+      color *= 0.5;
+    }
+    if (found_normal.z != 0.0) {
+      color *= 0.75;
+    }
+
     vec3 shadow_found_normal;
     Cell shadow_found_cell;
     float shadow_found_distance;
@@ -215,10 +225,24 @@ void main() {
         // color = vec3(1.0, 0.0, 1.0);
 
         //color = shadow_found_normal;
-        if (cell_test(shadow_found_cell, shadow_found_distance, shadow_found_normal)) {
-          color = vec3(1.0, 0.0, 1.0);
+        bool shadow_ray_cell_hit = cell_test(
+          shadow_found_cell,
+          shadow_ray_origin,
+          shadow_ray_dir,
+          shadow_found_distance,
+          shadow_found_normal
+        );
+
+        if (shadow_ray_cell_hit) {
+          //color = vec3(1.0, 0.0, 1.0);
           //color = shadow_ray_dir;
-          //color = vec3(shadow_found_distance / 10.0);
+          color = vec3(shadow_found_distance / 10.0, found_distance / 10.0, 0);
+          color = vec3(1.0);
+          color = shadow_found_normal;
+
+          //color = abs(normalize(cross(vec3(1.0, 1.0, 1.0), shadow_found_normal)));
+          //color = shadow_found_normal;
+          //color = found_normal * 0.25;
           break;
         }
       }

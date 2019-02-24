@@ -460,9 +460,9 @@ int main(void) {
     i++;
     Brick *brick = it.second;
     brick->createGPUMemory();
-    //i % 5 > 0 ? brick->fillConst(0xFFFFFFFF) : brick->fill(fillSphereProgram);
+    i % 5 > 0 ? brick->fillConst(0xFFFFFFFF) : brick->fill(fillSphereProgram);
     //brick->fill(fillSphereProgram);
-    brick->fillConst(0xFFFFFFFF);
+    //brick->fillConst(0xFFFFFFFF);
   }
 
 
