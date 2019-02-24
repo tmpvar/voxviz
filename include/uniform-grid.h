@@ -145,9 +145,15 @@ class UniformGrid {
         if (this->slab_pos < this->slab_size) {
           gpu_slab[this->slab_pos].brickData = brick->bufferAddress;
           gpu_slab[this->slab_pos].brickIndex = glm::ivec4(brick->index, 0);
-          glm::mat4 mat = glm::inverse(brick->volume->getModelMatrix());
           
-          memcpy((void *)&gpu_slab[this->slab_pos].invTransform, (void *)glm::value_ptr(mat), sizeof(mat));
+          glm::mat4 transform = brick->volume->getModelMatrix();
+          glm::mat4 invTransform = glm::inverse(transform);
+          memcpy(
+            (void *)&gpu_slab[this->slab_pos].invTransform,
+            (void *)glm::value_ptr(invTransform),
+            sizeof(invTransform)
+          );
+          
           // TODO: populate this with the index into a global volume slab
           //gpu_slab[this->slab_pos].volume = 0;
         }

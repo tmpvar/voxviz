@@ -23,7 +23,7 @@ layout (std430, binding=1) buffer uniformGridSlab
   SlabEntry entry[];
 };
 
-#define ITERATIONS 256
+#define ITERATIONS 96
 
 vec3 tx(mat4 m, vec3 v) {
   vec4 tmp = m * vec4(v, 1.0);
@@ -102,7 +102,7 @@ bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float foun
     // TODO: cache the inverse of this matrix in entry memory.
     mat4 xform = e.invTransform;
     vec3 invOrigin = tx(xform, ray_origin);
-    vec3 invDir = normalize(tx(xform, ray_dir));
+    vec3 invDir = normalize(vec4(xform * vec4(ray_dir, 0.0)).xyz);
 
     vec3 brickCenter = vec3(e.brickIndex) + vec3(0.5);
     float aabb_distance;
@@ -117,8 +117,8 @@ bool cell_test(in Cell cell, in vec3 ray_origin, in vec3 ray_dir, out float foun
       noop
     );
 
-    bool inside = all(greaterThanEqual(ray_origin, vec3(e.brickIndex))) &&
-                  all(lessThanEqual(ray_origin, vec3(e.brickIndex) + vec3(1.0)));
+    bool inside = all(greaterThanEqual(invOrigin, vec3(e.brickIndex))) &&
+                  all(lessThanEqual(invOrigin, vec3(e.brickIndex) + vec3(1.0)));
 
     if (inside) {
       aabb_distance = 0.0;
