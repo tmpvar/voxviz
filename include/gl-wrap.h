@@ -6,6 +6,7 @@
 #define GL_GLEXT_PROTOTYPES
 #endif
 
+#include "core.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
