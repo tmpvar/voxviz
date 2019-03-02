@@ -409,6 +409,8 @@ int main(void) {
     // r, g, b, nop
     1, 0.388, 0.2, 0.0
   );
+  tool->material.roughness = 1.0;
+
   Brick *toolBrick = tool->AddBrick(glm::ivec3(0, 1.0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
@@ -440,8 +442,9 @@ int main(void) {
   Volume *floor = new Volume(glm::vec3(0.0));
   floor->material.color = glm::vec4(
     // r, g, b, nop
-    1.0, 1.0, 1.0, 0.0
+    0.6
   );
+  floor->material.roughness = 0.0;
   //Brick *floorBrick = floor->AddBrick(glm::ivec3(1, 0, 0));
   //floorBrick->createGPUMemory();
   //floorBrick->fillConst(1.0);
@@ -472,6 +475,16 @@ int main(void) {
     //brick->fillConst(0xFFFFFFFF);
   }
 
+  Volume *light = new Volume(glm::vec3(10.0, 10.0, 10.0));
+  light->material.color = glm::vec4(0.0, 0.0, 1.0, 0.0);
+  light->material.emission = 1.0;
+  light->material.roughness = 1.0;
+  Brick *lightBrick = light->AddBrick(glm::ivec3(0));
+  lightBrick->createGPUMemory();
+  lightBrick->fillConst(0xFFFFFFFF);
+  volumeManager->addVolume(light);
+  light->scale.x = 100;
+  light->scale.z = 100;
 
   bodyDef.bodyType = eDynamicBody;
 

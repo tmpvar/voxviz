@@ -99,6 +99,10 @@ static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
 
 struct VolumeMaterial {
   glm::vec4 color;
+  float emission;
+  float roughness;
+  float opacity;
+  float absorption;
 };
 
 

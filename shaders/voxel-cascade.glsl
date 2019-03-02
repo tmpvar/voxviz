@@ -8,14 +8,19 @@ struct Cell {
 };
 
 struct SlabEntry {
-  mat4 invTransform;       // 64 (16)
-  ivec4 brickIndex;     // 16 (4)
-  uint32_t *brickData;  // 8 (2)
-  uint32_t volume_index;
+  mat4 invTransform;      // 64 (16)
+  ivec4 brickIndex;       // 16 (4)
+  uint32_t *brickData;    // 8 (2)
+  uint32_t volume_index;  // 4
+  //uint8_t _padding[4];    // 4
 };
 
 struct VolumeMaterial {
   vec4 color;
+  float emission;
+  float roughness;
+  float opacity;
+  float absorption;
 };
 
 struct VoxelCascadeTraversalState {

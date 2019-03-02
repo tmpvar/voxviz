@@ -11,6 +11,7 @@ struct SlabEntry {
   glm::ivec4 brickIndex; // 16
   uint64_t brickData; // 8
   uint32_t volume_index; // 4
+  //uint8_t _padding[4]; // 4
 };
 
 struct GPUCell {
