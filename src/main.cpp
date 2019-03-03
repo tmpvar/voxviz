@@ -391,6 +391,7 @@ int main(void) {
     bodyDef
   );*/
 
+  /*
   VOXParser::parse(
     "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
     volumeManager,
@@ -411,7 +412,7 @@ int main(void) {
   
   
   volumeManager->addVolume(tool);
-
+  */
   q3Transform tx;
   q3Identity(tx);
   boxDef.SetRestitution(0.5);
@@ -431,21 +432,23 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
-  tool->scale.x = 1.0;
-  tool->scale.y = 1.0;
-  tool->scale.z = 1.0;
+ // tool->scale.x = 1.0;
+ // tool->scale.y = 1.0;
+ // tool->scale.z = 1.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
 
-  for (int x = 0; x < 32; x++) {
-    for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 32; z++) {
-        floor->AddBrick(glm::ivec3(x, y, z));
-      }
-    }
-  }
+  //for (int x = 0; x < 32; x++) {
+  //  for (int y = 0; y < 32; y++) {
+  //    for (int z = 0; z < 32; z++) {
+  //      floor->AddBrick(glm::ivec3(x, y, z));
+  //    }
+  //  }
+  //}
+
+  floor->AddBrick(glm::ivec3(0));
 
   //fillAllProgram->use()->uniform1ui("val", 0xFFFFFFFF);
   size_t i = 0;
@@ -453,7 +456,7 @@ int main(void) {
     i++;
     Brick *brick = it.second;
     brick->createGPUMemory();
-    i % 5 > 0 ? brick->fillConst(0xFFFFFFFF) : brick->fill(fillSphereProgram);
+    brick->fill(fillSphereProgram);
     //brick->fill(fillSphereProgram);
    // brick->fill(fillAllProgram);
   }
@@ -554,7 +557,7 @@ int main(void) {
     mouse[1] = ypos;
 
     camera->ProcessMouseMovement((float)delta[0], (float)-delta[1]);
-    
+    /*
     if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
       int axis_count;
       const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
@@ -576,7 +579,7 @@ int main(void) {
         new_tool_pos.z * 10.0f,
         new_tool_pos.y * 10.0f
       );
-    }
+    }*/
     
 
     viewMatrix = camera->GetViewMatrix();
@@ -633,7 +636,14 @@ int main(void) {
       }
     }
 
+
+
     for (auto& volume : volumeManager->volumes) {
+      for (auto& it : floor->bricks) {
+        Brick *brick = it.second;
+        brick->fill(fillSphereProgram);
+      }
+
       if (volume->bricks.size() == 0) {
         continue;
       }
@@ -699,8 +709,8 @@ int main(void) {
     
     physicsScene->Step();
     //floor->rotation.z += 0.001;
-    tool->rotation.z += 0.001;
-    tool->rotation.y += 0.002;
+    //tool->rotation.z += 0.001;
+    //tool->rotation.y += 0.002;
     //tool->rotation.x += 0.005;
     
     /*fbo->unbind();
@@ -727,6 +737,7 @@ int main(void) {
 
     // Tool based boolean operations
     // opCut
+    /*
     if (state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER] > 0.1) {
       for (auto& volume : volumeManager->volumes) {
         if (volume == tool) {
@@ -740,19 +751,20 @@ int main(void) {
     if (state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] || keys[GLFW_KEY_SPACE]) {
       floor->booleanOp(tool, true, brickAddProgram);
     }
-
+    */
 
     {
       static float f = 0.0f;
       static int counter = 0;
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGui::Text("camera pos(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
-      ImGui::Text(
+      /*ImGui::Text(
         "tool pos(%.3f, %.3f, %.3f)",
         tool->position.x,
         tool->position.y,
         tool->position.z
       );
+      */
       ImGui::Text("%i floor bricks", floor->bricks.size());
     }
 
