@@ -22,6 +22,8 @@ add_subdirectory(deps/glfw)
 set(GLM_TEST_ENABLE OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glm)
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1)
+
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/libuv)
 
 SET(qu3e_build_demo OFF CACHE BOOL "" FORCE)
