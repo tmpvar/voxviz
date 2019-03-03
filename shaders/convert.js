@@ -88,7 +88,7 @@ const s = `
 #define SHADER_H
 
 #include <map>
-
+#include "core.h"
 #include "gl-wrap.h"
 
 #include <stdio.h>
