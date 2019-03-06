@@ -324,7 +324,7 @@ int main(void) {
     glm::vec3(10, 40, 30)
   );
 
-  int time = 0;
+  unsigned int time = 0;
 
 #if RENDER_STATIC == 1
   //update_volumes(raytracer, compute, time);
@@ -489,63 +489,176 @@ int main(void) {
   ImGui::CreateContext();
   const float movementSpeed = 0.01f;
   GLFWgamepadstate state;
-  while (!glfwWindowShouldClose(window)) {
 
+
+  // Voxel space
+  //const glm::uvec3 voxelSpaceDims = glm::uvec3(2000, 400, 3000);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(500, 100, 500);
+
+
+
+  uint64_t voxelSpaceBytes =
+    static_cast<uint64_t>(voxelSpaceDims.x) *
+    static_cast<uint64_t>(voxelSpaceDims.y) *
+    static_cast<uint64_t>(voxelSpaceDims.z);
+  SSBO *voxelSpaceSSBO = new SSBO(voxelSpaceBytes);
+
+  Program *fillVoxelSpace = new Program();
+  fillVoxelSpace->add(Shaders::get("voxel-space-fill.comp"))->link();
+
+  {
+    fillVoxelSpace
+      ->use()
+      ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+      ->uniform1ui("time", time)
+      ->uniformVec3ui("dims", voxelSpaceDims);
+
+    glDispatchCompute(
+      voxelSpaceDims.x / 100,
+      voxelSpaceDims.y / 10,
+      voxelSpaceDims.z / 1
+    );
+    gl_error();
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+  }
+
+  Program *raytraceVoxelSpace = new Program();
+  raytraceVoxelSpace
+    ->add(Shaders::get("voxel-space-raytrace.vert"))
+    ->add(Shaders::get("voxel-space-raytrace.frag"))
+    ->output("outColor")
+    ->link();
+
+
+  uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(0, 10, 0)
+  );
+
+
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\monument\\monu1.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(300, 10, 200)
+  );
+
+
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\monument\\monu2.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(200, 10, 300)
+  );
+
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\monument\\monu3.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(200, 10, 100)
+  );
+
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\monument\\monu4.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(0, 10, 100)
+  );
+
+
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\monument\\monu5.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(100, 10, 0)
+  );
+
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\monument\\monu6.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(100, 10, 100)
+  );
+
+
+  VOXParser::parse(
+    "D:\\work\\voxel-model\\vox\\monument\\monu16.vox",
+    buf,
+    voxelSpaceDims,
+    glm::uvec3(300, 10, 100)
+  );
+
+
+
+  voxelSpaceSSBO->endMap();
+  double deltaTime = 0.0;
+  double lastTime = glfwGetTime();
+  while (!glfwWindowShouldClose(window)) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
-    if (keys[GLFW_KEY_W]) {
-      camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
-      //camera->translate(0.0f, 0.0f, 10.0f);
-    }
+    double nowTime = glfwGetTime();
+    deltaTime = nowTime - lastTime;
+    lastTime = nowTime;
 
-    if (keys[GLFW_KEY_S]) {
-      camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed);
-    }
+    // Handle inputs
+    {
+      float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 15000.0 : 5000.0) * deltaTime;
+      if (keys[GLFW_KEY_W]) {
+        camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
+        //camera->translate(0.0f, 0.0f, 10.0f);
+      }
 
-    if (keys[GLFW_KEY_A]) {
-      camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
-    }
+      if (keys[GLFW_KEY_S]) {
+        camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed);
+      }
 
-    if (keys[GLFW_KEY_D]) {
-      camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
-    }
+      if (keys[GLFW_KEY_A]) {
+        camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
+      }
 
-    if (keys[GLFW_KEY_H]) {
-      raytracer->showHeat = 1;
-    }
-    else {
-      raytracer->showHeat = 0;
-    }
+      if (keys[GLFW_KEY_D]) {
+        camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
+      }
 
-    float debug = keys[GLFW_KEY_1] ? 1.0f : 0.0f;
-
-    if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
-      if (!fullscreen) {
-        const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        glfwSetWindowSize(window, mode->width, mode->height);
-        glfwSetWindowPos(window, 0, 0);
-        glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
-        glViewport(0, 0, mode->width, mode->height);
-        fullscreen = true;
+      if (keys[GLFW_KEY_H]) {
+        raytracer->showHeat = 1;
       }
       else {
-        glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
-        glfwSetWindowPos(window, 100, 100);
-        glfwSetWindowMonitor(window, NULL, 100, 100, windowDimensions[0], windowDimensions[1], GLFW_DONT_CARE);
-        glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
-        fullscreen = false;
+        raytracer->showHeat = 0;
       }
-      prevKeys[GLFW_KEY_ENTER] = false;
 
-      delete fbo;
-      delete shadowFBO;
-      glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
-      fbo = new FBO(windowDimensions[0], windowDimensions[1]);
-      shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
+      float debug = keys[GLFW_KEY_1] ? 1.0f : 0.0f;
 
+      if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
+        if (!fullscreen) {
+          const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+          glfwSetWindowSize(window, mode->width, mode->height);
+          glfwSetWindowPos(window, 0, 0);
+          glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
+          glViewport(0, 0, mode->width, mode->height);
+          fullscreen = true;
+        }
+        else {
+          glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
+          glfwSetWindowPos(window, 100, 100);
+          glfwSetWindowMonitor(window, NULL, 100, 100, windowDimensions[0], windowDimensions[1], GLFW_DONT_CARE);
+          glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
+          fullscreen = false;
+        }
+        prevKeys[GLFW_KEY_ENTER] = false;
+
+        delete fbo;
+        delete shadowFBO;
+        glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
+        fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+        shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
+
+      }
     }
 
     // mouse look like free-fly/fps
@@ -557,30 +670,6 @@ int main(void) {
     mouse[1] = ypos;
 
     camera->ProcessMouseMovement((float)delta[0], (float)-delta[1]);
-    /*
-    if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
-      int axis_count;
-      const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
-      const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
-      const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
-      const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
-      tool->move(
-        fabs(x) > 0.1 ? x * movementSpeed : 0,
-        fabs(y) > 0.1 ? -y * movementSpeed : 0,
-        fabs(z) > 0.1 ? z * movementSpeed : 0
-      );
-    }
-
-    if (tool_position_queue.size() > 0) {
-      glm::vec3 new_tool_pos = glm::abs(tool_position_queue.front());
-      tool_position_queue.pop();
-      tool->position = glm::vec3(
-        new_tool_pos.x * 10.0f,
-        new_tool_pos.z * 10.0f,
-        new_tool_pos.y * 10.0f
-      );
-    }*/
-    
 
     viewMatrix = camera->GetViewMatrix();
 
@@ -590,32 +679,6 @@ int main(void) {
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
-
-    /*
-    shadowFBO->bind();
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glCullFace(GL_BACK);
-    glEnable(GL_CULL_FACE);
-    glClearDepth(1.0);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    gl_error();
-
-    shadowmap->begin();
-    shadowmap->program
-      ->use()
-      ->uniformMat4("MVP", shadowmap->depthMVP)
-      ->uniformVec3("eye", shadowmap->eye)
-      ->uniform1i("showHeat", raytracer->showHeat)
-      ->uniformFloat("maxDistance", max_distance);
-
-      raytracer->render(shadowmap->program);
-    shadowmap->end();
-    shadowFBO->unbind();
-    */
-    
-    //fbo->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -627,144 +690,46 @@ int main(void) {
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    for (int i = 0; i < 512; i++) {
-      if (volumeManager->tick()) {
-        break;
-      }
-    }
+    // Fill the voxel space volume
+    if (false && time % 10 == 0) {
+      fillVoxelSpace
+        ->use()
+        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->uniform1ui("time", time)
+        ->uniformVec3ui("dims", voxelSpaceDims);
 
-
-
-    for (auto& volume : volumeManager->volumes) {
-      for (auto& it : floor->bricks) {
-        Brick *brick = it.second;
-        brick->fill(fillSphereProgram);
-      }
-
-      if (volume->bricks.size() == 0) {
-        continue;
-      }
-
-      glm::mat4 volumeModel = volume->getModelMatrix();
-      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
-      raytracer->program->use()
-        ->uniformMat4("MVP", VP * volumeModel)
-        ->uniformVec3("invEye", glm::vec3(
-          invEye.x / invEye.w,
-          invEye.y / invEye.w,
-          invEye.z / invEye.w
-        ))
-        ->uniformMat4("model", volumeModel)
-        ->uniformVec3("eye", currentEye)
-        ->uniformFloat("maxDistance", max_distance)
-        ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformVec4("material", volume->material);
-
-      /*raytracer->program->uniformFloat(
-        "debug",
-        volume != tool && tool->overlaps(volume) ? 1.0 : 0.0
-      );*/
-
-      gl_error();
-      size_t activeBricks = volume->bind();
-      //raytracer->render(volume, raytracer->program);
-
-      glDrawElementsInstanced(
-        GL_TRIANGLES,
-        volume->mesh->faces.size(),
-        GL_UNSIGNED_INT,
-        0,
-        //volume->bricks.size()
-        activeBricks
+      glDispatchCompute(
+        voxelSpaceDims.x / 100,
+        voxelSpaceDims.y / 1,
+        voxelSpaceDims.z / 1
       );
       gl_error();
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
 
-    //volumeManager->volumes[0]->rotation.x += 0.0001;
-    //volumeManager->volumes[1]->scale.z = 1.0 + abs(sin(time / 1000.0)) * 10.0;
-    //volumeManager->volumes[1]->rotation.y += 0.001;
-/*
+
+    // Render the voxel space volume
     {
-      glm::mat4 volumeModel = floor->getModelMatrix();
-      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
-      raytracer->program->use()
-        ->uniformMat4("MVP", VP * volumeModel)
-        ->uniformVec3("invEye", glm::vec3(
-          invEye.x / invEye.w,
-          invEye.y / invEye.w,
-          invEye.z / invEye.w
-        ))
-        ->uniformFloat("maxDistance", max_distance)
-        ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformFloat("debug", debug)
-        ->uniformVec4("material", floor->material);
 
-      floor->bind();
-      raytracer->render(floor, raytracer->program);
+      raytraceVoxelSpace
+        ->use()
+        ->uniformVec3("eye", currentEye)
+        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->uniformFloat("maxDistance", 10000)
+        ->uniformMat4("VP", VP)
+        ->uniform1ui("time", time)
+        ->uniformVec3("dims", glm::vec3(voxelSpaceDims));
+
+      fullscreen_surface->render(raytraceVoxelSpace);
     }
-*/
     
-    physicsScene->Step();
-    //floor->rotation.z += 0.001;
-    //tool->rotation.z += 0.001;
-    //tool->rotation.y += 0.002;
-    //tool->rotation.x += 0.005;
-    
-    /*fbo->unbind();
-    
-    glBindTexture(GL_TEXTURE_2D, shadowFBO->texture_depth);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_DEPTH_TO_TEXTURE_EXT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-    fullscreen_program->use()
-      ->uniformFloat("maxDistance", max_distance)
-      ->texture2d("iColor", fbo->texture_color)
-      ->texture2d("iPosition", fbo->texture_position)
-      ->uniformVec3("light", shadowmap->eye)
-      ->uniformVec3("eye", currentEye)
-      ->texture2d("iShadowMap", shadowFBO->texture_depth)
-      ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP);
-    
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-
-    fullscreen_surface->render(fullscreen_program);
-   */
-
-    // Tool based boolean operations
-    // opCut
-    /*
-    if (state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER] > 0.1) {
-      for (auto& volume : volumeManager->volumes) {
-        if (volume == tool) {
-          continue;
-        }
-        
-        volume->booleanOp(tool, false, brickCutProgram);
-      }
-    }
-
-    if (state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] || keys[GLFW_KEY_SPACE]) {
-      floor->booleanOp(tool, true, brickAddProgram);
-    }
-    */
-
     {
       static float f = 0.0f;
       static int counter = 0;
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGui::Text("camera pos(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
-      /*ImGui::Text(
-        "tool pos(%.3f, %.3f, %.3f)",
-        tool->position.x,
-        tool->position.y,
-        tool->position.z
-      );
-      */
       ImGui::Text("%i floor bricks", floor->bricks.size());
     }
 
@@ -772,42 +737,13 @@ int main(void) {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);
 
-#if RENDER_DYNAMIC == 1
-    //update_volumes(raytracer, compute, time);
-#endif
-    /*
-    size_t total = raytracer->bricks.size();
-    total_affected = 0;
-    for (unsigned int i = 0; i < total; i++) {
-      if (raytracer->bricks[i] == tool) {
-        continue;
-      }
-
-      total_affected += compute->opCut(raytracer->bricks[i], tool);
-    }
-    clFinish(compute->job.command_queues[0]);
-    */
     time++;
-    
-    shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
-
-    // TODO: not in glfw 3.3
-    /*if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
-      glfwSetJoystickVibration(GLFW_JOYSTICK_1, total_affected, 0);
-    }*/
-    
-    if (total_affected <= 1000) {
-      total_affected = 0;
-    }
-    else {
-      total_affected -= 1000;
-    }
-
+   
     uv_run(uv_default_loop(), UV_RUN_NOWAIT);
     glfwPollEvents();
   }
 
-  cout << "SHUTING DOWN" << endl;
+  std::cout << "SHUTING DOWN" << endl;
 
   delete fullscreen_program;
   delete fullscreen_surface;

@@ -5,6 +5,7 @@
 #include "aabb.h"
 #include "gl-wrap.h"
   
+#define BRICK_MEM_TYPE GL_SHADER_STORAGE_BUFFER
 
   class Program;
   class Volume;

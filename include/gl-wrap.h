@@ -135,7 +135,7 @@ public:
 
 // TODO: consider renaming this to MappableSlab or something less gl specific
 class SSBO {
-  size_t total_bytes = 0;
+  GLsizeiptr total_bytes = 0;
   GLuint handle = 0;
   bool mapped = false;
 public:
@@ -146,11 +146,13 @@ public:
     MAP_WRITE_ONLY = GL_WRITE_ONLY,
   };
 
-  SSBO(size_t bytes) {
+  SSBO(uint64_t bytes) {
     this->resize(bytes);
   }
 
-  SSBO *resize(size_t bytes) {
+  SSBO *resize(uint64_t bytes) {
+    std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+    
     if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
     }
@@ -159,9 +161,11 @@ public:
       return this;
     }
 
+    
+
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_COPY); gl_error();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_DRAW); gl_error();
     this->unbind();
 
     this->total_bytes = bytes;

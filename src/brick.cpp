@@ -4,6 +4,8 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "volume.h"
 
+
+
 Brick::Brick(glm::ivec3 index) {
   this->index = index;
   this->debug = 0.0f;
@@ -20,7 +22,7 @@ Brick::Brick(glm::ivec3 index) {
 Brick::~Brick() {
   if (this->bufferAddress != 0) {
     glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
-    glMakeBufferNonResidentNV(GL_TEXTURE_BUFFER);
+    glMakeBufferNonResidentNV(BRICK_MEM_TYPE);
     glDeleteBuffers(1, &this->bufferId);
   }
 }
@@ -29,24 +31,24 @@ void Brick::createGPUMemory() {
   glGenBuffers(1, &bufferId);
   gl_error();
 
-  glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
+  glBindBuffer(BRICK_MEM_TYPE, bufferId);
   gl_error();
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
-    GL_TEXTURE_BUFFER,
+    BRICK_MEM_TYPE,
     // 4096 * 4 = 16384
     // vs
     // 4096 / 8 = 512
     BRICK_VOXEL_BYTES,//BRICK_VOXEL_COUNT * sizeof(uint32_t),
     NULL,
-    GL_STATIC_DRAW
+    GL_DYNAMIC_DRAW
   );
   gl_error();
 
-  glMakeBufferResidentNV(GL_TEXTURE_BUFFER, GL_READ_WRITE);
+  glMakeBufferResidentNV(BRICK_MEM_TYPE, GL_READ_WRITE);
   gl_error();
 
-  glGetBufferParameterui64vNV(GL_TEXTURE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &this->bufferAddress);
+  glGetBufferParameterui64vNV(BRICK_MEM_TYPE, GL_BUFFER_GPU_ADDRESS_NV, &this->bufferAddress);
   gl_error();
 
   glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -54,14 +56,14 @@ void Brick::createGPUMemory() {
 
 void Brick::upload() {
   // TODO: I believe this is causing an exception to be thrown further down the line..
-  glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
+  glBindBuffer(BRICK_MEM_TYPE, bufferId);
   gl_error();
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
-    GL_TEXTURE_BUFFER,
+    BRICK_MEM_TYPE,
     BRICK_VOXEL_BYTES,//BRICK_VOXEL_COUNT * sizeof(uint32_t),
     this->data,
-    GL_STATIC_DRAW
+    GL_DYNAMIC_DRAW
   );
 }
 
@@ -70,9 +72,9 @@ void Brick::fill(Program *program) {
   program->use()->bufferAddress("volume", this->bufferAddress);
 
   glDispatchCompute(
-    BRICK_VOXEL_WORDS,
-    1,
-    1
+    BRICK_DIAMETER / 32,
+    BRICK_DIAMETER / 32,
+    BRICK_DIAMETER
   );
   gl_error();
 }
@@ -103,7 +105,7 @@ void Brick::setVoxel(glm::uvec3 pos, float val) {
 }
 
 void Brick::fillConst(uint32_t val) {
-  glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
-  glClearBufferData(GL_TEXTURE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
+  glBindBuffer(BRICK_MEM_TYPE, bufferId);
+  glClearBufferData(BRICK_MEM_TYPE, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
   this->full = true;
 }

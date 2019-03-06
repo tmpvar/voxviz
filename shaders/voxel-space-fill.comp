@@ -1,0 +1,45 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 100, local_size_y = 10, local_size_z = 1 ) in;
+
+layout (std430, binding=1) buffer volumeSlab {
+  uint8_t volume[];
+};
+
+uniform uvec3 dims;
+uniform uint time;
+
+void main() {
+  uvec3 pos = gl_GlobalInvocationID.xyz;
+  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
+  vec3 hd = vec3(dims) * 0.5;
+
+  vec3 fpos = vec3(pos) / max(dims.x, max(dims.y, dims.z));
+
+  //float s = sin(fpos.x + float(time) / 1000.0) * 10000;
+
+  float a = sin(float(pos.z)/dims.z + float(time) / 10000.0) /
+          (abs(sin(float(pos.y)/dims.y + float(time) / 100000.0)));// * 0.1);
+
+
+
+  float d = 0.2 - length(mod(fpos.xy * vec2(1.0, a), 0.35) - 0.01);
+
+  float y = sin((fpos.z - fpos.x + float(time) / 10000.0) * 1.0) / 2.0;
+  float m = 0.0007 * min(float(dims.y), float(dims.z));
+  vec2 c = mod(fpos.yz - vec2(y, 0), vec2(m + 0.01));
+  d =  m * 0.5 - length(c - vec2(m * 0.5)) - a * 0.000000000;
+
+
+  d = length(fpos.zy - vec2(0.3, 0.1)) - 0.05;
+
+  volume[idx] = uint8_t(0);
+  if (pos.y < 5) {
+      volume[idx] = uint8_t(1.0);
+      return;
+  }
+  //volume[idx] = uint8_t(d <= 0.0 ? 1 : 0);
+}

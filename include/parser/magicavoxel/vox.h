@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include "glm/glm.hpp"
 
 using namespace std;
 
@@ -20,7 +21,7 @@ static bool cmp(const char *a, const char *b) {
 class VOXParser {
 
 public:
-	static void parse(string filename, VolumeManager *volumeManager, q3Scene *scene, q3BodyDef bodyDef) {
+	static void parse(string filename, uint8_t *buf, glm::uvec3 dims, glm::uvec3 offset) {
     cout << "Loading VOX file: " << filename.c_str() << endl;
     ifstream ifs(filename, ios::binary | ios::ate);
     ifs.seekg(0, ios::beg);
@@ -36,8 +37,9 @@ public:
     ifs.read((char *)&version, 4);
     cout << "    version: " << version << endl;
 
-    Volume *volume = new Volume(glm::vec3(0));
+/*    Volume *volume = new Volume(glm::vec3(0));
     volumeManager->addVolume(volume);
+*/
 
     while (!ifs.eof()) {
       char chunk_id[5] = { 0, 0, 0, 0, 0 };
@@ -88,16 +90,26 @@ public:
         for (uint32_t i = 0; i < num_voxels; i++) {
           uint8_t val[4];
           ifs.read((char *)&val[0], 4);
-/*
-          cout << "setVoxel("
+
+
+          /*cout << "setVoxel("
             << unsigned(val[0]) << ", "
             << unsigned(val[1]) << ", "
             << unsigned(val[2]) << ") = "
             << unsigned(val[3]) << endl;
             */
-          Brick *b = volume->AddBrick(glm::ivec3(val[0], val[2], val[1]));
+/*          Brick *b = volume->AddBrick(glm::ivec3(val[0], val[2], val[1]));
           b->createGPUMemory();
           b->fillConst(0xFFFFFFFFFF);
+          */
+          // TODO: ensure we don't go out of bounds
+          glm::uvec3 pos = glm::uvec3(val[0], val[2], val[1]) + offset;
+
+          if (glm::any(glm::greaterThanEqual(pos, dims))) {
+            continue;
+          }
+          uint64_t idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
+          buf[idx] = val[3];
         }
       }
       else {

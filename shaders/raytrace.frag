@@ -101,7 +101,6 @@ vec3 tx(mat4 m, vec3 v) {
 }
 
 void main() {
-
   // TODO: handle the case where the camera is inside of a brick
   vec3 eyeToPlane = (brickSurfacePos + brickTranslation) - invEye;
   vec3 dir = normalize(eyeToPlane);
