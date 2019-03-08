@@ -43,6 +43,7 @@ include_directories(
   deps/imgui
   deps/imgui/examples
   deps/catch2/include
+  deps/stb
 )
 
 file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp shaders/*.glsl)
