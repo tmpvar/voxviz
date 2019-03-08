@@ -26,16 +26,16 @@ public:
     ifstream ifs(filename, ios::binary | ios::ate);
     ifs.seekg(0, ios::beg);
 
-    cout << "  VOX Header" << endl;
+    //cout << "  VOX Header" << endl;
     // Header (Name)
     char id[5] = { 0, 0, 0, 0, 0 };
     ifs.read(&id[0], 4);
-    cout << "    id: " << id << endl;
+    //cout << "    id: " << id << endl;
 
     // Header (Version)
     uint32_t version;
     ifs.read((char *)&version, 4);
-    cout << "    version: " << version << endl;
+    //cout << "    version: " << version << endl;
 
 /*    Volume *volume = new Volume(glm::vec3(0));
     volumeManager->addVolume(volume);
@@ -44,30 +44,30 @@ public:
     while (!ifs.eof()) {
       char chunk_id[5] = { 0, 0, 0, 0, 0 };
       ifs.read(&chunk_id[0], 4);
-      cout << "  Chunk '" << chunk_id << "'" << endl;
+      //cout << "  Chunk '" << chunk_id << "'" << endl;
 
       //if (cmp(chunk_id, "MAIN")) {
         uint32_t chunk_bytes;
         ifs.read((char *)&chunk_bytes, 4);
-        cout << "    num bytes chunk content: " << chunk_bytes << endl;
+        //cout << "    num bytes chunk content: " << chunk_bytes << endl;
 
         uint32_t chunk_children_bytes;
         ifs.read((char *)&chunk_children_bytes, 4);
-        cout << "    num bytes children chunks: " << chunk_children_bytes << endl;
+        //cout << "    num bytes children chunks: " << chunk_children_bytes << endl;
       //}
       if (cmp(chunk_id, "MAIN")) {
         // noop
       }
       else if (cmp(chunk_id, "PACK")) {
-        cout << "    skip" << endl;
+        //cout << "    skip" << endl;
         ifs.seekg(4, ifs.cur);
       }
       else if (cmp(chunk_id, "SIZE")) {
-        cout << "    skip" << endl;
+        //cout << "    skip" << endl;
         ifs.seekg(4 * 3, ifs.cur);
       }
       else if (cmp(chunk_id, "RGBA")) {
-        cout << "    skip" << endl;
+        //cout << "    skip" << endl;
         ifs.seekg(4 * 256, ifs.cur);
       }
       else if (cmp(chunk_id, "MATT")) {
@@ -86,7 +86,7 @@ public:
       else if (cmp(chunk_id, "XYZI")) {
         uint32_t num_voxels;
         ifs.read((char *)&num_voxels, 4);
-        cout << "    num voxels: " << num_voxels << endl;
+        //cout << "    num voxels: " << num_voxels << endl;
         for (uint32_t i = 0; i < num_voxels; i++) {
           uint8_t val[4];
           ifs.read((char *)&val[0], 4);

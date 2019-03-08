@@ -355,6 +355,12 @@ public:
     return this;
   }
 
+  Program *uniformVec2ui(string name, glm::uvec2 v) {
+    GLint loc = this->uniformLocation(name);
+    glUniform2ui(loc, v[0], v[1]);
+    return this;
+  }
+
   Program *uniformVec3(string name, glm::vec3 v) {
     GLint loc = this->uniformLocation(name);
 
@@ -466,6 +472,7 @@ class GPUSlab {
 public:
 
   GPUSlab(uint32_t bytes) {
+    cout << "create GPUSlab of " << bytes << " bytes" << endl;
     this->resize(bytes);
   }
 

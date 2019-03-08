@@ -431,9 +431,7 @@ int main(void) {
   // Voxel space
   //const glm::uvec3 voxelSpaceDims = glm::uvec3(2000, 400, 3000);
   const glm::uvec3 voxelSpaceDims = glm::uvec3(512, 64, 512);
-
-
-
+   
   uint64_t voxelSpaceBytes =
     static_cast<uint64_t>(voxelSpaceDims.x) *
     static_cast<uint64_t>(voxelSpaceDims.y) *
@@ -453,6 +451,27 @@ int main(void) {
   Program *mipmapVoxelSpace = new Program();
   mipmapVoxelSpace->add(Shaders::get("voxel-space-mipmap.comp"))->link();
 
+  Program *raytraceVoxelSpace_Compute = new Program();
+  raytraceVoxelSpace_Compute->add(Shaders::get("voxel-space-raytrace.comp"))->link();
+  
+  Program *raytraceVoxelSpace_Blur = new Program();
+  raytraceVoxelSpace_Blur->add(Shaders::get("voxel-space-blur.comp"))->link();
+
+
+  uint64_t outputBytes =
+    static_cast<uint64_t>(windowDimensions[0]) *
+    static_cast<uint64_t>(windowDimensions[1]) * 16;
+
+  SSBO *raytraceOutput = new SSBO(outputBytes);
+  uint64_t terminationBytes =
+    static_cast<uint64_t>(windowDimensions[0]) *
+    static_cast<uint64_t>(windowDimensions[1]) * 48;
+
+  #define TAA_HISTORY_LENGTH 64
+  SSBO *terminationOutput = new SSBO(terminationBytes * static_cast<uint64_t>(TAA_HISTORY_LENGTH));
+
+  cout << "window dimensions: " << windowDimensions[0] << ", " << windowDimensions[1] << endl;
+  // Draw a plane under the scene
   {
     fillVoxelSpace
       ->use()
@@ -462,7 +481,7 @@ int main(void) {
 
     glDispatchCompute(
       voxelSpaceDims.x / 100,
-      voxelSpaceDims.y / 10,
+      1,
       voxelSpaceDims.z / 1
     );
     gl_error();
@@ -476,73 +495,82 @@ int main(void) {
     ->output("outColor")
     ->link();
 
+  Program *debugBindless = new Program();
+  debugBindless
+    ->add(Shaders::get("basic.vert"))
+    ->add(Shaders::get("debug-bindless.frag"))
+    ->output("outColor")
+    ->link();
 
-  uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(0, 10, 0)
-  );
-
-
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\monument\\monu1.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(300, 10, 200)
-  );
-
-
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\monument\\monu2.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(200, 10, 300)
-  );
-
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\monument\\monu3.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(200, 10, 100)
-  );
-
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\monument\\monu4.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(0, 10, 100)
-  );
+  // Load vox models
+  {
+    uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(0, 10, 0)
+    );
 
 
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\monument\\monu5.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(100, 10, 0)
-  );
-
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\monument\\monu6.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(100, 10, 100)
-  );
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\monument\\monu1.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(300, 10, 200)
+    );
 
 
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\monument\\monu16.vox",
-    buf,
-    voxelSpaceDims,
-    glm::uvec3(300, 10, 100)
-  );
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\monument\\monu2.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(200, 10, 300)
+    );
 
-  voxelSpaceSSBO->endMap();
-  
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\monument\\monu3.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(200, 10, 100)
+    );
+
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\monument\\monu4.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(0, 10, 100)
+    );
+
+
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\monument\\monu5.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(100, 10, 0)
+    );
+
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\monument\\monu6.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(100, 10, 100)
+    );
+
+
+    VOXParser::parse(
+      "D:\\work\\voxel-model\\vox\\monument\\monu16.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(300, 10, 100)
+    );
+
+    voxelSpaceSSBO->endMap();
+  }
    
   double deltaTime = 0.0;
   double lastTime = glfwGetTime();
+  float debug = 0.0;
   while (!glfwWindowShouldClose(window)) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -577,6 +605,13 @@ int main(void) {
       }
       else {
         raytracer->showHeat = 0;
+      }
+
+      if (keys[GLFW_KEY_TAB]) {
+        debug = 1.0f;
+      }
+      else {
+        debug = 0.0f;
       }
 
       float debug = keys[GLFW_KEY_1] ? 1.0f : 0.0f;
@@ -636,101 +671,103 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
-    
-    // Fill the voxel space volume
-    if (time % 5 == 0) {
-      glm::uvec3 sdfDims(40, 40, 40);
-      fillVoxelSpaceSDF
-        ->use()
-        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("offset", glm::uvec3(20, 20, 20))
-        ->uniformVec3ui("sdfDims", sdfDims)
-        ->uniformVec3ui("dims", voxelSpaceDims);
 
-      glDispatchCompute(
-        sdfDims.x,
-        sdfDims.y,
-        sdfDims.z
-      );
-
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-      sdfDims = glm::uvec3(40, 40, 40);
-      fillVoxelSpaceSDF
-        ->use()
-        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
-        ->uniform1ui("time", time + 200)
-        ->uniformVec3ui("offset", glm::uvec3(200, 20, 20))
-        ->uniformVec3ui("sdfDims", sdfDims)
-        ->uniformVec3ui("dims", voxelSpaceDims);
-
-      glDispatchCompute(
-        sdfDims.x,
-        sdfDims.y,
-        sdfDims.z
-      );
-
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-    }
-
-    // Generate mipmap for SSBO (level 1)
-    if (time % 5 == 0) {
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(2));
-
-      glDispatchCompute(
-        voxelSpaceDims.x / 16,
-        voxelSpaceDims.y / 16,
-        voxelSpaceDims.z / 1
-      );
-      gl_error();
-    }
-    
-    // Generate mipmap for SSBO
-    if (time % 50 == 0) {
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(4));
-
-      glDispatchCompute(
-        voxelSpaceDims.x / 16,
-        voxelSpaceDims.y / 16,
-        voxelSpaceDims.z / 1
-      );
-      gl_error();
-    }
-    
-    // Generate mipmap for SSBO
-    if (time % 150 == 0) {
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(8));
-
-      glDispatchCompute(
-        voxelSpaceDims.x / 16,
-        voxelSpaceDims.y / 16,
-        voxelSpaceDims.z / 1
-      );
-      gl_error();
-    }
-
-     // Render the voxel space volume
+    // Regenerate world
     {
+      // Fill the voxel space volume
+      if (time % 5 == 0) {
+        glm::uvec3 sdfDims(40, 40, 40);
+        fillVoxelSpaceSDF
+          ->use()
+          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+          ->uniform1ui("time", time)
+          ->uniformVec3ui("offset", glm::uvec3(20, 20, 20))
+          ->uniformVec3ui("sdfDims", sdfDims)
+          ->uniformVec3ui("dims", voxelSpaceDims);
 
+        glDispatchCompute(
+          sdfDims.x,
+          sdfDims.y,
+          sdfDims.z
+        );
+
+        gl_error();
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+        sdfDims = glm::uvec3(40, 40, 40);
+        fillVoxelSpaceSDF
+          ->use()
+          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+          ->uniform1ui("time", time + 200)
+          ->uniformVec3ui("offset", glm::uvec3(200, 20, 20))
+          ->uniformVec3ui("sdfDims", sdfDims)
+          ->uniformVec3ui("dims", voxelSpaceDims);
+
+        glDispatchCompute(
+          sdfDims.x,
+          sdfDims.y,
+          sdfDims.z
+        );
+
+        gl_error();
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      }
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      // Generate mipmap for SSBO (level 1)
+      if (time % 10 == 0) {
+        mipmapVoxelSpace
+          ->use()
+          ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
+          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
+          ->uniform1ui("time", time)
+          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(2));
+
+        glDispatchCompute(
+          voxelSpaceDims.x / 16,
+          voxelSpaceDims.y / 16,
+          voxelSpaceDims.z / 1
+        );
+        gl_error();
+      }
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      // Generate mipmap for SSBO
+      if (time % 10 == 0) {
+        mipmapVoxelSpace
+          ->use()
+          ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
+          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
+          ->uniform1ui("time", time)
+          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(4));
+
+        glDispatchCompute(
+          voxelSpaceDims.x / 16,
+          voxelSpaceDims.y / 16,
+          voxelSpaceDims.z / 1
+        );
+        gl_error();
+      }
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      // Generate mipmap for SSBO
+      if (time % 10 == 0) {
+        mipmapVoxelSpace
+          ->use()
+          ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
+          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
+          ->uniform1ui("time", time)
+          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(8));
+
+        glDispatchCompute(
+          voxelSpaceDims.x / 16,
+          voxelSpaceDims.y / 16,
+          voxelSpaceDims.z / 1
+        );
+        gl_error();
+      }
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
+    
+    // Render the voxel space volume
+    if (false) {
       raytraceVoxelSpace
         ->use()
         ->uniformVec3("eye", currentEye)
@@ -750,6 +787,79 @@ int main(void) {
         ->uniformVec3("dims", glm::vec3(voxelSpaceDims));
 
       fullscreen_surface->render(raytraceVoxelSpace);
+    }
+
+    // Raytrace in compute
+    {
+      // Raytrace into `raytraceOutput`
+      glm::uvec2 res = glm::uvec2(windowDimensions[0], windowDimensions[1]);
+      {
+        raytraceVoxelSpace_Compute
+          ->use()
+
+          ->uniformVec3("eye", currentEye)
+          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
+          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
+          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
+          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
+          ->uniformFloat("maxDistance", 10000)
+          ->uniformMat4("VP", VP)
+          ->uniform1ui("time", time)
+          ->uniformVec3ui("lightPos", glm::uvec3(
+            10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
+            20,
+            0
+          ))
+          ->uniformVec3("lightColor", glm::vec3(1.0, 1.0, 1.0))
+          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+
+          ->uniformVec2ui("resolution", res)
+          ->ssbo("outColorBuffer", raytraceOutput, 5)
+          ->ssbo("outTerminationBuffer", terminationOutput, 6)
+          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
+
+        glDispatchCompute(
+          windowDimensions[0] / 10,
+          windowDimensions[1] / 10,
+          1
+        );
+      }
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      
+      
+      // Blur the results
+      {
+        raytraceVoxelSpace_Blur
+          ->use()
+          ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]))
+          ->uniform1ui("time", time)
+          ->uniformVec3("eye", currentEye)
+          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+          ->uniformFloat("debug", debug)
+          ->ssbo("outColorBuffer", raytraceOutput, 1)
+          ->ssbo("inTerminationBuffer", terminationOutput, 2)
+          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
+
+        glDispatchCompute(
+          windowDimensions[0] / 10,
+          windowDimensions[1] / 10,
+          1
+        );
+      }
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      // Debug rendering
+      {
+        glDisable(GL_DEPTH_TEST);
+        debugBindless
+          ->use()
+          ->ssbo("inColorBuffer", raytraceOutput, 1)
+          ->ssbo("inTerminationBuffer", terminationOutput, 2)
+          ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]));
+
+          
+
+        fullscreen_surface->render(debugBindless);
+      }
     }
     
     {
