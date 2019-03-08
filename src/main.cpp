@@ -36,9 +36,7 @@ bool fullscreen = 0;
 int windowDimensions[2] = { 1440, 900 };
 
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
-Shadowmap *shadowmap;
 FBO *fbo = nullptr;
-FBO *shadowFBO = nullptr;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -77,68 +75,11 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     10000.0f
   );
   
-  shadowmap->depthProjectionMatrix = glm::perspective(
-    45.0f,
-    (float)(width / height),
-    0.001f,
-    10000.0f
-  );
-  
   glViewport(0, 0, width, height);
   if (fbo != nullptr) {
     fbo->setDimensions(width, height);
   }
-
-  if (shadowFBO != nullptr) {
-    shadowFBO->setDimensions(width, height);
-  }
-  
 }
-
-/*void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
-  const cl_uint total = (cl_uint)raytracer->bricks.size();
-  cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
-  cl_command_queue queue = compute->job.command_queues[0];
-
-  for (cl_uint i = 0; i < total; i++) {
-    mem[i] = raytracer->bricks[i]->computeBuffer;
-  }
-
-  cl_event opengl_get_completion;
-  CL_CHECK_ERROR(clEnqueueAcquireGLObjects(queue, total, mem, 0, nullptr, &opengl_get_completion));
-  clWaitForEvents(1, &opengl_get_completion);
-  clReleaseEvent(opengl_get_completion);
-
-  for (cl_uint i = 0; i < total; i++) {
-    compute->fill("sphere", queue, raytracer->bricks[i], time);
-  }
-
-  CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
-  clFinish(queue);
-  free(mem);
-}
-*/
-
-/*void apply_tool(Raytracer *raytracer, Compute *compute) {
-  const cl_uint total = (cl_uint)raytracer->bricks.size();
-  cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
-  cl_command_queue queue = compute->job.command_queues[0];
-
-  for (cl_uint i = 0; i < total; i++) {
-    mem[i] = raytracer->bricks[i]->computeBuffer;
-  }
-
-  cl_event opengl_get_completion;
-  CL_CHECK_ERROR(clEnqueueAcquireGLObjects(queue, total, mem, 0, nullptr, &opengl_get_completion));
-  clWaitForEvents(1, &opengl_get_completion);
-  clReleaseEvent(opengl_get_completion);
- 
-  compute->opCut(raytracer->bricks[0], raytracer->bricks[1]);
-
-  CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
-  free(mem);
-}
-*/
 
 /* LIBUV JUNK*/
 typedef struct {
@@ -285,9 +226,6 @@ int main(void) {
   }
 
   Shaders::init();
-  shadowmap = new Shadowmap();
-  shadowmap->orient(glm::vec3(-200, 300, 260), glm::vec3(350, 60, 260));
-
 
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
@@ -468,7 +406,6 @@ int main(void) {
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   fbo = new FBO(windowDimensions[0], windowDimensions[1]);
-  shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
   
   uint32_t total_affected = 0;
 
@@ -493,7 +430,7 @@ int main(void) {
 
   // Voxel space
   //const glm::uvec3 voxelSpaceDims = glm::uvec3(2000, 400, 3000);
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(500, 100, 500);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(512, 64, 512);
 
 
 
@@ -503,8 +440,18 @@ int main(void) {
     static_cast<uint64_t>(voxelSpaceDims.z);
   SSBO *voxelSpaceSSBO = new SSBO(voxelSpaceBytes);
 
+  SSBO *voxelSpaceSSBOMip1 = new SSBO(voxelSpaceBytes / 8);
+  SSBO *voxelSpaceSSBOMip2 = new SSBO(voxelSpaceBytes / 16);
+  SSBO *voxelSpaceSSBOMip3 = new SSBO(voxelSpaceBytes / 32);
+
   Program *fillVoxelSpace = new Program();
   fillVoxelSpace->add(Shaders::get("voxel-space-fill.comp"))->link();
+
+  Program *fillVoxelSpaceSDF = new Program();
+  fillVoxelSpaceSDF->add(Shaders::get("voxel-space-fill-sdf.comp"))->link();
+
+  Program *mipmapVoxelSpace = new Program();
+  mipmapVoxelSpace->add(Shaders::get("voxel-space-mipmap.comp"))->link();
 
   {
     fillVoxelSpace
@@ -591,9 +538,9 @@ int main(void) {
     glm::uvec3(300, 10, 100)
   );
 
-
-
   voxelSpaceSSBO->endMap();
+  
+   
   double deltaTime = 0.0;
   double lastTime = glfwGetTime();
   while (!glfwWindowShouldClose(window)) {
@@ -653,10 +600,8 @@ int main(void) {
         prevKeys[GLFW_KEY_ENTER] = false;
 
         delete fbo;
-        delete shadowFBO;
         glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
         fbo = new FBO(windowDimensions[0], windowDimensions[1]);
-        shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
 
       }
     }
@@ -691,35 +636,117 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
-
+    
     // Fill the voxel space volume
-    if (false && time % 10 == 0) {
-      fillVoxelSpace
+    if (time % 5 == 0) {
+      glm::uvec3 sdfDims(40, 40, 40);
+      fillVoxelSpaceSDF
         ->use()
         ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
         ->uniform1ui("time", time)
+        ->uniformVec3ui("offset", glm::uvec3(20, 20, 20))
+        ->uniformVec3ui("sdfDims", sdfDims)
         ->uniformVec3ui("dims", voxelSpaceDims);
 
       glDispatchCompute(
-        voxelSpaceDims.x / 100,
-        voxelSpaceDims.y / 1,
+        sdfDims.x,
+        sdfDims.y,
+        sdfDims.z
+      );
+
+      gl_error();
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+      sdfDims = glm::uvec3(40, 40, 40);
+      fillVoxelSpaceSDF
+        ->use()
+        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->uniform1ui("time", time + 200)
+        ->uniformVec3ui("offset", glm::uvec3(200, 20, 20))
+        ->uniformVec3ui("sdfDims", sdfDims)
+        ->uniformVec3ui("dims", voxelSpaceDims);
+
+      glDispatchCompute(
+        sdfDims.x,
+        sdfDims.y,
+        sdfDims.z
+      );
+
+      gl_error();
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    }
+
+    // Generate mipmap for SSBO (level 1)
+    if (time % 5 == 0) {
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
+        ->uniform1ui("time", time)
+        ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(2));
+
+      glDispatchCompute(
+        voxelSpaceDims.x / 16,
+        voxelSpaceDims.y / 16,
         voxelSpaceDims.z / 1
       );
       gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
+    
+    // Generate mipmap for SSBO
+    if (time % 50 == 0) {
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
+        ->uniform1ui("time", time)
+        ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(4));
+
+      glDispatchCompute(
+        voxelSpaceDims.x / 16,
+        voxelSpaceDims.y / 16,
+        voxelSpaceDims.z / 1
+      );
+      gl_error();
+    }
+    
+    // Generate mipmap for SSBO
+    if (time % 150 == 0) {
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
+        ->uniform1ui("time", time)
+        ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(8));
+
+      glDispatchCompute(
+        voxelSpaceDims.x / 16,
+        voxelSpaceDims.y / 16,
+        voxelSpaceDims.z / 1
+      );
+      gl_error();
     }
 
-
-    // Render the voxel space volume
+     // Render the voxel space volume
     {
 
       raytraceVoxelSpace
         ->use()
         ->uniformVec3("eye", currentEye)
-        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
+        ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
+        ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
+        ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
         ->uniformFloat("maxDistance", 10000)
         ->uniformMat4("VP", VP)
         ->uniform1ui("time", time)
+        ->uniformVec3ui("lightPos", glm::uvec3(
+          10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
+          20,
+          0
+        ))
+        ->uniformVec3("lightColor", glm::vec3(1.0, 1.0, 1.0))
         ->uniformVec3("dims", glm::vec3(voxelSpaceDims));
 
       fullscreen_surface->render(raytraceVoxelSpace);
@@ -748,7 +775,6 @@ int main(void) {
   delete fullscreen_program;
   delete fullscreen_surface;
   delete raytracer;
-  delete shadowmap;
   Shaders::destroy();
   uv_read_stop((uv_stream_t*)&stdin_pipe);
   uv_stop(uv_default_loop());

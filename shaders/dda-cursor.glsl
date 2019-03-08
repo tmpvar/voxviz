@@ -3,6 +3,7 @@ struct DDACursor {
   vec3 mapPos;
   vec3 rayStep;
   vec3 rayDir;
+  vec3 rayPos;
   vec3 sideDist;
   vec3 deltaDist;
 };
@@ -15,7 +16,7 @@ DDACursor dda_cursor_create(
 ) {
   DDACursor cursor;
   vec3 gp = (pos - gridCenter) + gridRadius;
-
+  cursor.rayPos = pos;
   cursor.rayDir = rayDir;
   cursor.mapPos = floor(gp);
   cursor.deltaDist = abs(vec3(length(rayDir)) / rayDir);
@@ -36,5 +37,5 @@ void dda_cursor_step(in out DDACursor cursor, out vec3 normal) {
                 step(sideDist.xyz, sideDist.zxy);
   cursor.sideDist += cursor.mask * cursor.deltaDist;
   cursor.mapPos += cursor.mask * cursor.rayStep;
-
+  cursor.rayPos += cursor.mask * cursor.rayStep;
 }

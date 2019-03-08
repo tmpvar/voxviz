@@ -1,0 +1,58 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 16, local_size_y = 16, local_size_z = 1 ) in;
+
+layout (std430, binding=1) buffer sourceVolumeSlab {
+  uint8_t src_volume[];
+};
+
+layout (std430, binding=2) buffer destVolumeSlab {
+  uint8_t dest_volume[];
+};
+
+
+uniform uvec3 dims;
+uniform uint time;
+
+void main() {
+  uvec3 pos = gl_GlobalInvocationID.xyz;
+  uint dst_idx = (
+    pos.x +
+    pos.y * dims.x +
+    pos.z * dims.x * dims.y
+  );
+
+  uvec3 src_dims = dims * 2;
+  dest_volume[dst_idx] = uint8_t(0);
+  for (int x = 0; x<2; x++) {
+    for (int y = 0; y<2; y++) {
+      for (int z = 0; z<2; z++) {
+
+        uvec3 src_pos = uvec3(
+          (x + pos.x * 2),
+          (y + pos.y * 2),
+          (z + pos.z * 2)
+        );
+
+        if (any(greaterThanEqual(src_pos, src_dims))) {
+          continue;
+        }
+
+        uint src_idx = (
+          src_pos.x +
+          src_pos.y * src_dims.x +
+          src_pos.z * src_dims.x * src_dims.y
+        );
+
+        // TODO: figure out how to average the palette
+        if (src_volume[src_idx] != uint8_t(0)) {
+          dest_volume[dst_idx] = uint8_t(1);
+          break;
+        }
+      }
+    }
+  }
+}
