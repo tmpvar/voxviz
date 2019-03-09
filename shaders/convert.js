@@ -80,7 +80,7 @@ const init = files.map((file) => {
     throw new Error(file + " could not be associated with a shader type")
   }
   const relpath = path.relative(__dirname, file)
-  return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.filter(Boolean).map(outputLine).join('\n') + `, "${spath(outFile)}", "${relpath}", ${type});\n`
+  return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.map(outputLine).join('\n') + `, "${spath(outFile)}", "${relpath}", ${type});\n`
 }).join('\n      ')
 
 const s = `

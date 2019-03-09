@@ -65,6 +65,7 @@ add_executable(
   include/shadowmap.h
 	include/volume.h
   include/volume-manager.h
+	include/blue-noise.h
 
   include/parser/vzd/vzd.h
   include/parser/magicavoxel/vox.h
@@ -82,7 +83,12 @@ add_executable(
   deps/imgui/imgui_draw.cpp
   deps/imgui/examples/imgui_impl_glfw.cpp
   deps/imgui/examples/imgui_impl_opengl3.cpp
+
+	#stb
+	deps/stb/stb_image.h
 )
+
+add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 
 source_group("shaders" FILES ${SHADER_FILES})
 
@@ -97,3 +103,5 @@ target_link_libraries(
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
  )
+
+file(COPY img DESTINATION ${CMAKE_BINARY_DIR})

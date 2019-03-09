@@ -49,7 +49,7 @@ void main() {
 
         // TODO: figure out how to average the palette
         if (src_volume[src_idx] != uint8_t(0)) {
-          dest_volume[dst_idx] = uint8_t(1);
+          dest_volume[dst_idx] = uint8_t(src_idx % 64 + 1);
           break;
         }
       }

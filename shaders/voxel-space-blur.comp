@@ -15,6 +15,11 @@ layout (std430, binding=2) buffer inTerminationBuffer {
   RayTermination in_termination[];
 };
 
+layout (std430, binding=7) buffer blueNoiseBuffer {
+  vec4 blueNoise[];
+};
+
+
 uniform uvec2 resolution;
 uniform uint time;
 uniform vec3 eye;
@@ -61,12 +66,27 @@ void acc(RayTermination o, in out float f, in out vec4 t, in ivec2 pos, in float
     }
   }
 }
+
+void main2() {
+  ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+  uint idx = pos.x + pos.y * resolution.x;
+
+  out_color[idx] = vec4(blueNoise[idx % (4096 * 64)]);
+}
+
 void main() {
   ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
   uint idx = pos.x + pos.y * resolution.x;
   RayTermination o;
   read(pos, o);
-  out_color[idx] = mix(readT(pos), o.color, float(pos.x) < float(resolution.x) / 2.0 ? 1.0 : 0.0);
+
+  out_color[idx] = mix(
+    o.color,
+    readT(pos),
+    1.0//float(pos.x) > float(resolution.x) / 2.0 ? 1.0 : 0.0
+  );
+
+  // out_color[idx] = o.color;
 }
 
 void main1() {
@@ -106,18 +126,6 @@ void main1() {
     acc(o, f, t, pos + ivec2( i,  i), float(i));
     acc(o, f, t, pos + ivec2( i,  0), float(i));
     acc(o, f, t, pos + ivec2( i, -i), float(i));
-
-
-
-    // acc(o, f, t, pos + ivec2( 0.0, 1.0) * i, float(i));// * 0.35294117647058826;
-    // acc(o, f, t, pos + ivec2( 1.0, 1.0) * i, float(i));// * 0.35294117647058826;
-    // acc(o, f, t, pos + ivec2( 1.0, 0.0) * i, float(i));// * 0.35294117647058826;
-    // acc(o, f, t, pos + ivec2(-1.0, 1.0) * i, float(i));// * 0.35294117647058826;
-    // acc(o, f, t, pos - ivec2( 0.0, 1.0) * i, float(i));// * 0.35294117647058826;
-    // acc(o, f, t, pos - ivec2( 1.0, 1.0) * i, float(i));// * 0.35294117647058826;
-    // acc(o, f, t, pos - ivec2( 1.0, 0.0) * i, float(i));// * 0.35294117647058826;
-    // acc(o, f, t, pos - ivec2(-1.0, 1.0) * i, float(i));// * 0.35294117647058826;
-
     color = color + t / f * 0.7;//(color + t / 8.0) / 2.0;// * (float(i) / float(upper));
   }
 

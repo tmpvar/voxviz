@@ -22,6 +22,7 @@
 #include <glm/glm.hpp>
 #include "parser/vzd/vzd.h"
 #include "parser/magicavoxel/vox.h"
+#include "blue-noise.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -502,6 +503,9 @@ int main(void) {
     ->output("outColor")
     ->link();
 
+  BlueNoise1x64x64x64 *blue_noise = new BlueNoise1x64x64x64();
+  blue_noise->upload();
+
   // Load vox models
   {
     uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
@@ -816,6 +820,7 @@ int main(void) {
           ->uniformVec2ui("resolution", res)
           ->ssbo("outColorBuffer", raytraceOutput, 5)
           ->ssbo("outTerminationBuffer", terminationOutput, 6)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
           ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
 
         glDispatchCompute(
@@ -838,6 +843,7 @@ int main(void) {
           ->uniformFloat("debug", debug)
           ->ssbo("outColorBuffer", raytraceOutput, 1)
           ->ssbo("inTerminationBuffer", terminationOutput, 2)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
           ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
 
         glDispatchCompute(
