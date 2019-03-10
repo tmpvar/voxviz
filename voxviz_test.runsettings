@@ -1,23 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RunSettings>
 
-    <Include>
-        <ModulePath>voxviz_test.exe</ModulePath>
-    </Include>
-
     <!-- Adapter Specific sections -->
     <Catch2Adapter>
-        <DebugBreak>on</DebugBreak><!-- Introduced in v1.1.0 -->
-        <DiscoverCommandLine>--list-tests *</DiscoverCommandLine>
-        <DiscoverTimeout>500</DiscoverTimeout><!-- Milliseconds -->
-        <FilenameFilter>^Catch_</FilenameFilter><!-- Regex filter -->
-        <IncludeHidden>true</IncludeHidden>
-        <Logging>normal</Logging>
-        <MessageFormat>StatsOnly</MessageFormat>
-        <StackTraceFormat>ShortInfo</StackTraceFormat>
-        <TestCaseTimeout>20000</TestCaseTimeout><!-- Milliseconds -->
-        <WorkingDirectory>build/Debug</WorkingDirectory>
-        <WorkingDirectoryRoot>Executable</WorkingDirectoryRoot>
+        <FilenameFilter>.*</FilenameFilter><!-- Regex filter -->
     </Catch2Adapter>
 
 </RunSettings>

@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
 project(VoxelViz)
-
-
 find_package(OpenGL REQUIRED)
 
 # find opencl on osx/linux
@@ -19,8 +17,6 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glfw)
 
-set(GLM_TEST_ENABLE OFF CACHE BOOL "" FORCE)
-add_subdirectory(deps/glm)
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1)
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -37,14 +33,16 @@ include_directories(
   ${OPENCL_INCLUDE_DIRS}
   ${OpenCL_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}
-  ${GLM_INCLUDE_DIR}
+  deps/glm/
 	deps/qu3e/src
   deps/libuv/include
   deps/imgui
   deps/imgui/examples
-  deps/catch2/include
   deps/stb
 )
+
+ENABLE_TESTING()
+ADD_SUBDIRECTORY( test )
 
 file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp shaders/*.glsl)
 
@@ -66,6 +64,8 @@ add_executable(
 	include/volume.h
   include/volume-manager.h
 	include/blue-noise.h
+	include/scene.h
+	include/obb.h
 
   include/parser/vzd/vzd.h
   include/parser/magicavoxel/vox.h
@@ -97,7 +97,6 @@ add_dependencies(voxviz shaders_out)
 target_link_libraries(
   voxviz
   glfw
-  glm
   uv_a
 	qu3e
   ${OPENGL_gl_LIBRARY}

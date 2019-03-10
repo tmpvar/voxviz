@@ -1,6 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include <catch2/catch.hpp>
-#include "volume_cut_test.h"
+
+#include "obb-test.h"
 
 unsigned int Factorial(unsigned int number) {
   return number <= 1 ? number : Factorial(number - 1)*number;
