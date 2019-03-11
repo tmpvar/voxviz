@@ -104,7 +104,7 @@ void main() {
   float d = doModel((vec3(rp) - hd + 0.5) / 20.0);
   uint material = (rpi % 10) + 1;
 
-  if (d < 0.0 && volume[idx] == uint8_t(0)) {
-    volume[idx] = uint8_t(material);
+  if (d < 0.0 && volume[idx] == uint8_t(material)) {
+    volume[idx] = uint8_t(0);
   }
 }

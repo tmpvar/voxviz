@@ -4,9 +4,10 @@ add_subdirectory(deps/catch2)
 
 include_directories(
   deps/catch2/include
+  include
 )
 
-file(GLOB_RECURSE TEST_HEADERS "*.h")
+file(GLOB_RECURSE TEST_HEADERS "include/*.h")
 add_executable(voxviz_test main.cpp ${TEST_HEADERS})
 target_link_libraries(voxviz_test Catch2::Catch2)
 

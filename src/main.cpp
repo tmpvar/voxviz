@@ -23,6 +23,7 @@
 #include "parser/vzd/vzd.h"
 #include "parser/magicavoxel/vox.h"
 #include "blue-noise.h"
+#include "scene.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -431,7 +432,7 @@ int main(void) {
 
   // Voxel space
   //const glm::uvec3 voxelSpaceDims = glm::uvec3(2000, 400, 3000);
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(512, 64, 512);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(512, 128, 512);
    
   uint64_t voxelSpaceBytes =
     static_cast<uint64_t>(voxelSpaceDims.x) *
@@ -448,6 +449,9 @@ int main(void) {
 
   Program *fillVoxelSpaceSDF = new Program();
   fillVoxelSpaceSDF->add(Shaders::get("voxel-space-fill-sdf.comp"))->link();
+
+  Program *clearVoxelSpaceSDF = new Program();
+  clearVoxelSpaceSDF->add(Shaders::get("voxel-space-clear-sdf.comp"))->link();
 
   Program *mipmapVoxelSpace = new Program();
   mipmapVoxelSpace->add(Shaders::get("voxel-space-mipmap.comp"))->link();
@@ -507,8 +511,18 @@ int main(void) {
   blue_noise->upload();
 
   // Load vox models
+  VoxEntity *catModel = new VoxEntity(
+    "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
+    glm::vec3(10.0, 20.0, 10.0)
+  );
+
   {
+
+
     uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
+    catModel->paintInto(buf, voxelSpaceDims);
+   /*
+    
     VOXParser::parse(
       "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
       buf,
@@ -569,12 +583,24 @@ int main(void) {
       glm::uvec3(300, 10, 100)
     );
 
+
+    VOXParser::parse(
+      "D:\\work\\voxviz\\img\\models\\first.vox",
+      buf,
+      voxelSpaceDims,
+      glm::uvec3(50, 0, 200)
+    );
+    */
+
     voxelSpaceSSBO->endMap();
   }
    
   double deltaTime = 0.0;
   double lastTime = glfwGetTime();
   float debug = 0.0;
+  glm::vec3 characterPos(20.0);
+  int lastCharacterTime = -1;
+  glm::vec3 lastCharacterPos(20.0);
   while (!glfwWindowShouldClose(window)) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -596,11 +622,11 @@ int main(void) {
         camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed);
       }
 
-      if (keys[GLFW_KEY_A]) {
+      if (keys[GLFW_KEY_D]) {
         camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
       }
 
-      if (keys[GLFW_KEY_D]) {
+      if (keys[GLFW_KEY_A]) {
         camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
       }
 
@@ -643,17 +669,45 @@ int main(void) {
         fbo = new FBO(windowDimensions[0], windowDimensions[1]);
 
       }
+
+      // mouse look like free-fly/fps
+      double xpos, ypos, delta[2];
+      glfwGetCursorPos(window, &xpos, &ypos);
+      delta[0] = mouse[0] - xpos;
+      delta[1] = mouse[1] - ypos;
+      mouse[0] = xpos;
+      mouse[1] = ypos;
+
+      camera->ProcessMouseMovement((float)delta[0], (float)delta[1]);
     }
 
-    // mouse look like free-fly/fps
-    double xpos, ypos, delta[2];
-    glfwGetCursorPos(window, &xpos, &ypos);
-    delta[0] = xpos - mouse[0];
-    delta[1] = ypos - mouse[1];
-    mouse[0] = xpos;
-    mouse[1] = ypos;
+    // Handle gamepad input
+    {
+      GLFWgamepadstate state;
+      if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
+        int axis_count;
+        const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
+        const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+        const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+        const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
+        
+        catModel->move(glm::vec3(
+          fabs(x) > 0.1 ? x * 100 * deltaTime : 0,
+          fabs(y) > 0.1 ? -y * 100 * deltaTime : 0,
+          fabs(z) > 0.1 ? -z * 100 * deltaTime : 0
+        ));
 
-    camera->ProcessMouseMovement((float)delta[0], (float)-delta[1]);
+        /*lastCharacterPos = characterPos;
+        characterPos += glm::vec3(
+          fabs(x) > 0.1 ? x * 100 * deltaTime : 0,
+          fabs(y) > 0.1 ? y * 100 * deltaTime : 0,
+          fabs(z) > 0.1 ? -z * 100 * deltaTime : 0
+        );
+        */
+      }
+    }
+
+
 
     viewMatrix = camera->GetViewMatrix();
 
@@ -678,47 +732,49 @@ int main(void) {
 
     // Regenerate world
     {
+      // Clear the voxel space volume
+      glm::uvec3 sdfDims(40, 40, 40);
+      clearVoxelSpaceSDF
+        ->use()
+        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->uniform1ui("time", lastCharacterTime)
+        ->uniformVec3("offset", lastCharacterPos)
+        ->uniformVec3ui("sdfDims", sdfDims)
+        ->uniformVec3ui("dims", voxelSpaceDims);
+
+      glDispatchCompute(
+        sdfDims.x,
+        sdfDims.y,
+        sdfDims.z
+      );
+
       // Fill the voxel space volume
-      if (time % 5 == 0) {
-        glm::uvec3 sdfDims(40, 40, 40);
-        fillVoxelSpaceSDF
-          ->use()
-          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
-          ->uniform1ui("time", time)
-          ->uniformVec3ui("offset", glm::uvec3(20, 20, 20))
-          ->uniformVec3ui("sdfDims", sdfDims)
-          ->uniformVec3ui("dims", voxelSpaceDims);
+      fillVoxelSpaceSDF
+        ->use()
+        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->uniform1ui("time", time)
+        ->uniformVec3("offset", characterPos)
+        ->uniformVec3ui("sdfDims", sdfDims)
+        ->uniformVec3ui("dims", voxelSpaceDims);
 
-        glDispatchCompute(
-          sdfDims.x,
-          sdfDims.y,
-          sdfDims.z
-        );
+      glDispatchCompute(
+        sdfDims.x,
+        sdfDims.y,
+        sdfDims.z
+      );
 
-        gl_error();
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      lastCharacterTime = time;
 
-        sdfDims = glm::uvec3(40, 40, 40);
-        fillVoxelSpaceSDF
-          ->use()
-          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
-          ->uniform1ui("time", time + 200)
-          ->uniformVec3ui("offset", glm::uvec3(200, 20, 20))
-          ->uniformVec3ui("sdfDims", sdfDims)
-          ->uniformVec3ui("dims", voxelSpaceDims);
+      catModel->rotate(glm::vec3(0.0, 0.1, 0.0));
+      uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
+      catModel->paintInto(buf, voxelSpaceDims);
+      voxelSpaceSSBO->endMap();
 
-        glDispatchCompute(
-          sdfDims.x,
-          sdfDims.y,
-          sdfDims.z
-        );
-
-        gl_error();
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-      }
+      gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
       // Generate mipmap for SSBO (level 1)
-      if (time % 10 == 0) {
+      if (time % 1 == 0) {
         mipmapVoxelSpace
           ->use()
           ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)

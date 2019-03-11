@@ -83,7 +83,7 @@ void main() {
   out_color[idx] = mix(
     o.color,
     readT(pos),
-    1.0//float(pos.x) > float(resolution.x) / 2.0 ? 1.0 : 0.0
+    0.0//float(pos.x) > float(resolution.x) / 2.0 ? 1.0 : 0.0
   );
 
   // out_color[idx] = o.color;

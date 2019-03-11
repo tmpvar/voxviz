@@ -18,10 +18,24 @@ static bool cmp(const char *a, const char *b) {
   return strcmp(a, b) == 0;
 }
 
+class VOXModel {
+  public:
+  uint8_t palette[256];
+  glm::uvec3 dims;
+  size_t bytes = 0;
+  uint8_t *buffer = nullptr;
+  
+  ~VOXModel() {
+    if (this->buffer != nullptr) {
+      free(this->buffer);
+    }
+  }
+};
+
 class VOXParser {
 
 public:
-	static void parse(string filename, uint8_t *buf, glm::uvec3 dims, glm::uvec3 offset) {
+	static VOXModel *parse(string filename) {
     cout << "Loading VOX file: " << filename.c_str() << endl;
     ifstream ifs(filename, ios::binary | ios::ate);
     ifs.seekg(0, ios::beg);
@@ -37,10 +51,7 @@ public:
     ifs.read((char *)&version, 4);
     //cout << "    version: " << version << endl;
 
-/*    Volume *volume = new Volume(glm::vec3(0));
-    volumeManager->addVolume(volume);
-*/
-
+    VOXModel *vox = new VOXModel;
     while (!ifs.eof()) {
       char chunk_id[5] = { 0, 0, 0, 0, 0 };
       ifs.read(&chunk_id[0], 4);
@@ -63,12 +74,23 @@ public:
         ifs.seekg(4, ifs.cur);
       }
       else if (cmp(chunk_id, "SIZE")) {
-        //cout << "    skip" << endl;
-        ifs.seekg(4 * 3, ifs.cur);
+        uint32_t size;
+                
+        ifs.read((char *)&size, 4);
+        vox->dims.x = size;
+
+        ifs.read((char *)&size, 4);
+        vox->dims.y = size;
+
+        ifs.read((char *)&size, 4);
+        vox->dims.z = size;
+        
+        const size_t bytes = vox->dims.x*vox->dims.y*vox->dims.z;
+        vox->buffer = (uint8_t *)malloc(bytes);
+        memset(vox->buffer, 0, bytes);
       }
       else if (cmp(chunk_id, "RGBA")) {
-        //cout << "    skip" << endl;
-        ifs.seekg(4 * 256, ifs.cur);
+        ifs.read((char *)&vox->palette, 4 * 256);
       }
       else if (cmp(chunk_id, "MATT")) {
         // skip id, type, weight
@@ -90,31 +112,25 @@ public:
         for (uint32_t i = 0; i < num_voxels; i++) {
           uint8_t val[4];
           ifs.read((char *)&val[0], 4);
+          glm::uvec3 pos = glm::uvec3(val[0], val[2], val[1]);
 
-
-          /*cout << "setVoxel("
-            << unsigned(val[0]) << ", "
-            << unsigned(val[1]) << ", "
-            << unsigned(val[2]) << ") = "
-            << unsigned(val[3]) << endl;
-            */
-/*          Brick *b = volume->AddBrick(glm::ivec3(val[0], val[2], val[1]));
-          b->createGPUMemory();
-          b->fillConst(0xFFFFFFFFFF);
-          */
-          // TODO: ensure we don't go out of bounds
-          glm::uvec3 pos = glm::uvec3(val[0], val[2], val[1]) + offset;
-
-          if (glm::any(glm::greaterThanEqual(pos, dims))) {
+          if (glm::any(glm::greaterThanEqual(pos, vox->dims))) {
             continue;
           }
-          uint64_t idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
-          buf[idx] = val[3];
+          uint64_t idx = (
+            pos.x +
+            pos.y * vox->dims.x +
+            pos.z * vox->dims.x * vox->dims.y
+          );
+
+          vox->buffer[idx] = val[3];
         }
       }
       else {
-        return;
+        break;
       }
     }
+
+    return vox;
 	}
 };

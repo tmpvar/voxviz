@@ -156,9 +156,9 @@ vec3 cangle(uvec3 pos, vec3 normal) {
 }
 
 vec3 cdir(in uint seed, in vec3 normal) {
-  uint slice = (time % 64) * 4096;
+  // uint slice = (time % 64) * 4096;
 
-  vec2 bn = 2.0 * blueNoise[(seed % 4096) + slice].xy - 0.5;
+  vec2 bn = 2.0 * blueNoise[(seed * time * 100) % (4096 * 64)].xy - 0.5;
 
   float u = bn.x;
   float v = bn.y;
@@ -231,7 +231,7 @@ float trace_sky(in DDACursor cursor, vec2 uv) {
   new_ray_dir = normalize(new_ray_dir) * div;
 
   DDACursor c = dda_cursor_create(
-    (cursor.mapPos / 2.0 - hd + sign(new_ray_dir) * normal * cd),
+    (cursor.mapPos / 2.0 - hd + sign(new_ray_dir) * normal + cd),
     vec3(0.0),
     hd,
     new_ray_dir
@@ -289,9 +289,9 @@ vec3 trace_reflection(in DDACursor cursor, vec2 uv) {
 }
 
 vec3 compute_ray_dir(vec2 uv, mat4 inv) {
-  vec4 far = inv * vec4(uv.x, uv.y, 1.0, 1.0);
+  vec4 far = inv * vec4(-uv.x, uv.y, 1.0, 1.0);
   far /= far.w;
-  vec4 near = inv * vec4(uv.x, uv.y, 0.1, 1.0);
+  vec4 near = inv * vec4(-uv.x, uv.y, 0.1, 1.0);
   near /= near.w;
 
   return (far.xyz - near.xyz);

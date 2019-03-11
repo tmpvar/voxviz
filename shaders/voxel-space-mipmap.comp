@@ -47,7 +47,14 @@ void main() {
           src_pos.z * src_dims.x * src_dims.y
         );
 
-        // TODO: figure out how to average the palette
+        // TODO: there should be two types of grids:
+        // 1. traversal grid: where each voxel is represented by a single bit
+        // 2. material grid: where each voxel contains material information
+        // mimapping should probably only occur on the traversal grid as we
+        // should be able to resolve voxel materials once we have the grid pos
+        // where the ray terminates.
+        //
+        //  Not sure how to represent things like smoke in this system though.
         if (src_volume[src_idx] != uint8_t(0)) {
           dest_volume[dst_idx] = uint8_t(src_idx % 64 + 1);
           break;
