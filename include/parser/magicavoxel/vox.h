@@ -51,7 +51,7 @@ public:
     ifs.read((char *)&version, 4);
     //cout << "    version: " << version << endl;
 
-    VOXModel *vox = new VOXModel;
+    VOXModel *vox = new VOXModel();
     while (!ifs.eof()) {
       char chunk_id[5] = { 0, 0, 0, 0, 0 };
       ifs.read(&chunk_id[0], 4);
@@ -85,12 +85,12 @@ public:
         ifs.read((char *)&size, 4);
         vox->dims.z = size;
         
-        const size_t bytes = vox->dims.x*vox->dims.y*vox->dims.z;
+        const uint64_t bytes = vox->dims.x*vox->dims.y*vox->dims.z;
         vox->buffer = (uint8_t *)malloc(bytes);
         memset(vox->buffer, 0, bytes);
       }
       else if (cmp(chunk_id, "RGBA")) {
-        ifs.read((char *)&vox->palette, 4 * 256);
+        ifs.read((char *)&vox->palette, 256);
       }
       else if (cmp(chunk_id, "MATT")) {
         // skip id, type, weight

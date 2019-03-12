@@ -3,7 +3,7 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-layout( local_size_x = 10, local_size_y = 10, local_size_z = 1 ) in;
+layout( local_size_x = 128, local_size_y = 8, local_size_z = 1 ) in;
 
 #include "ray-aabb.glsl"
 #include "dda-cursor.glsl"
@@ -31,15 +31,19 @@ layout (std430, binding=4) buffer volumeSlabMip3 {
   uint8_t volumeMip3[];
 };
 
-layout (std430, binding=5) buffer outColorBuffer {
+layout (std430, binding=5) buffer volumeSlabMip4 {
+  uint8_t volumeMip4[];
+};
+
+layout (std430, binding=6) buffer outColorBuffer {
   vec4 out_color[];
 };
 
-layout (std430, binding=6) buffer outTerminationBuffer {
+layout (std430, binding=7) buffer outTerminationBuffer {
   RayTermination out_termination[];
 };
 
-layout (std430, binding=7) buffer blueNoiseBuffer {
+layout (std430, binding=8) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
@@ -55,7 +59,9 @@ uniform uint terminationBufferIdx;
 uniform uvec3 lightPos;
 uniform vec3 lightColor;
 
-#define ITERATIONS 600
+uniform vec3 characterPos;
+
+#define ITERATIONS 800
 
 bool voxel_get(vec3 pos, out uint8_t palette_idx) {
   if (
@@ -143,6 +149,23 @@ bool voxel_get_mip3(vec3 pos, out uint8_t palette_idx) {
   return palette_idx > uint8_t(0);
 }
 
+bool voxel_get_mip4(vec3 pos, out uint8_t palette_idx) {
+  vec3 d = dims / 16.0;
+  if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(d)))) {
+    return false;
+  }
+
+  uint idx = uint(
+    pos.x +
+    pos.y * d.x +
+    pos.z * d.x * d.y
+  );
+
+  palette_idx = volumeMip3[idx];
+
+  return palette_idx > uint8_t(0);
+}
+
 vec2 noise2d(uvec3 pos) {
   uint idx = (pos.x % 64) + (pos.y%64) * 64 + (pos.z%64) * 64 * 64;
   return 2.0 * blueNoise[idx].xy - 1.0;
@@ -158,7 +181,7 @@ vec3 cangle(uvec3 pos, vec3 normal) {
 vec3 cdir(in uint seed, in vec3 normal) {
   // uint slice = (time % 64) * 4096;
 
-  vec2 bn = 2.0 * blueNoise[(seed * time * 100) % (4096 * 64)].xy - 0.5;
+  vec2 bn = 2.0 * blueNoise[(seed * time * 1000) % (4096 * 64)].xy - 0.5;
 
   float u = bn.x;
   float v = bn.y;
@@ -171,28 +194,31 @@ vec3 cdir(in uint seed, in vec3 normal) {
   );
 }
 
-float trace_light(in DDACursor cursor, vec2 uv) {
+float trace_light1(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
   vec3 normal = vec3(cursor.mask);
-  float div = 2.0;
+  float div = 1.0;
+
   vec3 mapPos = cursor.mapPos / div;
   vec3 hd = (dims * 0.5) / div;
-
+  vec3 lightPos = (worldLightPos / div);
+  const uint steps = 512;
   vec3 cd = cdir(
     uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * resolution.x),
     normal
-  ); // roughness
+  ) * 0.5; // roughness
 
-  vec3 lightPos = vec3(
-    0.0,
-    (55 + sin(float(time)/100.00) * 50) / div,
-    0.0
-  );
+  // float intensity = (1.0 - distance(lightPos, mapPos) / float(steps)) * 2.0;
+  // if (distance(lightPos, mapPos) > float(steps)) {
+  //   return -intensity;
+  // }
+  float intensity = 1.0;
 
-  vec3 new_ray_dir = cd + lightPos - mapPos / div;
+  //vec3 new_ray_dir = cd + lightPos - mapPos / div;
+  vec3 new_ray_dir = (lightPos - mapPos);
   new_ray_dir = normalize(new_ray_dir);
 
   DDACursor c = dda_cursor_create(
-    (mapPos - hd + sign(new_ray_dir) * normal + new_ray_dir),
+    (mapPos - hd + sign(new_ray_dir) * normal),
     vec3(0.0),
     hd,
     new_ray_dir
@@ -200,18 +226,60 @@ float trace_light(in DDACursor cursor, vec2 uv) {
 
   uint8_t noop;
   vec3 found_normal;
-  for (int i=0; i<256; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
-      return -1.0;
+  for (int i=0; i<steps; i++) {
+    if (voxel_get(c.mapPos, noop)) {
+      return -intensity;
+    }
+
+    if (distance(c.rayPos + hd, worldLightPos) < 1.0) {
+      return intensity;
     }
     dda_cursor_step(c, found_normal);
   }
-  return 2.0 - length((lightPos - cursor.rayPos)/vec3(dims));
+  return -intensity;//2.0 - length((lightPos - cursor.rayPos)/vec3(dims));
+}
+
+float trace_light(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
+  vec3 normal = vec3(cursor.mask);
+  const uint steps = 128;
+  vec3 cd = cdir(
+    uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * resolution.x),
+    normal
+  ); // roughness
+
+
+  //vec3 new_ray_dir = cd + lightPos - mapPos / div;
+  vec3 new_ray_dir = cd + (worldLightPos - cursor.rayPos);
+  new_ray_dir = normalize(new_ray_dir);
+
+  uint8_t noop;
+  vec3 pos = cursor.rayPos + cd + normal * 2.0 + new_ray_dir;
+  float intensity = 1.0;//(distance(lightPos, pos) / float(steps));
+  if (distance(lightPos, pos) > float(steps * 5)) {
+    return -intensity;
+  }
+
+
+  for (int i=0; i<steps; i++) {
+    //
+    if (voxel_get(floor(pos), noop)) {
+      //return -float(i)/float(steps);
+      return -intensity;
+    }
+
+    if (distance(pos, worldLightPos) < 3.0) {
+      return intensity;
+    }
+
+    pos += (new_ray_dir * 1.0);
+
+  }
+  return -intensity;
 }
 
 float trace_sky(in DDACursor cursor, vec2 uv) {
   vec3 normal = vec3(cursor.mask);
-  float div = 1.0;
+  float div = 4.0;
   vec3 mapPos = cursor.mapPos / div;
   vec3 hd = (dims * 0.5) / div;
 
@@ -231,7 +299,7 @@ float trace_sky(in DDACursor cursor, vec2 uv) {
   new_ray_dir = normalize(new_ray_dir) * div;
 
   DDACursor c = dda_cursor_create(
-    (cursor.mapPos / 2.0 - hd + sign(new_ray_dir) * normal + cd),
+    (cursor.mapPos / div - hd + new_ray_dir + sign(new_ray_dir) * normal + cd * 0.5),
     vec3(0.0),
     hd,
     new_ray_dir
@@ -244,15 +312,15 @@ float trace_sky(in DDACursor cursor, vec2 uv) {
 
   uint8_t noop;
   vec3 found_normal;
-  for (int i=0; i<32; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
+  for (int i=0; i<64; i++) {
+    if (voxel_get_mip2(c.mapPos, noop)) {
     // if (voxel_get_mip1(pos, noop)) {
-      return -1.0;
+      return -0.75;
     }
     dda_cursor_step(c, found_normal);
     // pos += new_ray_dir;
   }
-  return 1.0;
+  return c.mapPos.y >= dims.y / 4.0 ? 1.0 : -1.0;
 }
 
 vec3 trace_reflection(in DDACursor cursor, vec2 uv) {
@@ -300,6 +368,10 @@ vec3 compute_ray_dir(vec2 uv, mat4 inv) {
 float sum(vec3 v) { return dot(v, vec3(1.0)); }
 
 void main() {
+  if (any(greaterThanEqual(gl_GlobalInvocationID.xy, resolution))) {
+    return;
+  }
+
   vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(resolution) * 2.0 - 1.0;
   uvec2 out_color_pos = gl_GlobalInvocationID.xy;
   uint out_color_idx = out_color_pos.x + out_color_pos.y * resolution.x;
@@ -321,18 +393,12 @@ void main() {
   );
 
   if (hit) {
-    // outColor = vec4(0.0, 0.0, 0.2, 1.0);
+
     vec3 pos = eye + in_ray_dir * found_distance;
+
     if (all(greaterThanEqual(eye, vec3(0.0))) && all(lessThanEqual(eye, dims))) {
-      pos = eye;
+      pos = eye + in_ray_dir * 0.001;
     }
-
-
-    // vec3 cd = cdir(
-    //   uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * resolution.x),
-    //   in_ray_dir
-    // );
-
 
     //vec3 pos = (eye + in_ray_dir * found_distance) * dims;
     vec3 rayPos = (pos - in_ray_dir * 0.001);
@@ -352,12 +418,17 @@ void main() {
     vec3 reflectColor = vec3(0.0);
     int i;
 
+    vec3 lightPos = vec3(
+      0.0,
+      (55 + sin(float(time)/100.00) * 50) / 2.0,
+      0.0
+    );
+
     for (i=0; i<ITERATIONS; i++) {
       if (voxel_get(cursor.mapPos, palette_idx)) {
-         intensity += (
-           trace_light(cursor, uv)
-         ) * 0.333;
-        intensity += trace_sky(cursor, uv) * 0.5;
+        intensity += (trace_light(cursor, uv, lightPos)) * 0.333;
+        intensity += (trace_light(cursor, uv, characterPos + vec3(10.0, 0.0, 0.0))) * 0.333;
+        intensity += trace_sky(cursor, uv) * .95;
         if (cursor.mapPos.y < 10) {
           vec3 rpos = trace_reflection(cursor, uv);
           if (rpos.x >= 0.0 && voxel_get(rpos, palette_idx)) {
@@ -381,7 +452,7 @@ void main() {
       out_termination[out_termination_idx].position = vec4(cursor.rayPos, 0.0);
       out_termination[out_termination_idx].normal = vec4(cursor.mask, 0.0);
       out_termination[out_termination_idx].color = vec4(
-        c * 0.5 + reflectColor * .5 + intensity * 0.25 * lcolor, 1.0
+        c * 0.5 + reflectColor * .5 + intensity * 0.5 * lcolor, 1.0
       );
     } else {
       out_termination[out_termination_idx].position = vec4(0.0);

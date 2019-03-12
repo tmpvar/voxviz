@@ -62,6 +62,12 @@ class OBB {
       return this;
     }
 
+    OBB *setRotation(glm::vec3 rotation) {
+      this->rotation = rotation;
+      this->dirty = true;
+      return this;
+    }
+
     OBB *resize(glm::vec3 radius) {
       this->radius = radius;
       this->dirty = true;

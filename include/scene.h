@@ -37,6 +37,15 @@ class Entity {
       this->obb->rotate(offset);
     }
 
+    void setRotation(glm::vec3 rotation) {
+      this->obb->setRotation(rotation);
+    }
+
+    glm::vec3 getPosition() {
+      return this->obb->getPosition();
+    }
+    
+
     void paintInto(uint32_t *buf, glm::uvec3 bufDims) {
       assert(false);
     }
@@ -71,13 +80,23 @@ class VoxEntity : public Entity {
       size_t bufLength = bufDims.x * bufDims.y * bufDims.z;
       glm::mat4 mat = this->obb->getMatrix();
 
-      for (int32_t x = 0; x < dims.x; x++) {
+      uint64_t src_idx = 0;
+      uint64_t dimsxy = dims.x * dims.y;
+      uint64_t zoff = 0;
+      uint64_t yoff = 0;
+
+      for (int32_t z = 0; z < dims.z; z++) {
+        zoff = z * dimsxy;
         for (int32_t y = 0; y < dims.y; y++) {
-          for (int32_t z = 0; z < dims.z; z++) {
+          yoff = y * dims.x;
+          for (int32_t x = 0; x < dims.x; x++) {
+
+            src_idx++;
+
             glm::vec4 tmp(
-              static_cast<float>(x + offset.x),
-              static_cast<float>(y + offset.y),
-              static_cast<float>(z + offset.z),
+              static_cast<float>(x + offset.x) + 0.5,
+              static_cast<float>(y + offset.y) + 0.5,
+              static_cast<float>(z + offset.z) + 0.5,
               1.0
             );
             tmp = mat * tmp;
@@ -86,11 +105,7 @@ class VoxEntity : public Entity {
             );
 
 
-            uint64_t src_idx = (
-              x +
-              y * dims.x +
-              z * dims.x * dims.y
-            );
+            uint64_t src_idx = (x + yoff + zoff);
 
             int64_t dest_idx = (
               pos.x +

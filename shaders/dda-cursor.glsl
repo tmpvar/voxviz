@@ -15,15 +15,14 @@ DDACursor dda_cursor_create(
   in const vec3 rayDir
 ) {
   DDACursor cursor;
-  vec3 gp = (pos - gridCenter) + gridRadius;
+
   cursor.rayPos = pos;
   cursor.rayDir = rayDir;
-  cursor.mapPos = floor(gp);
+  cursor.mapPos = floor(pos);
   cursor.deltaDist = abs(vec3(length(rayDir)) / rayDir);
   cursor.rayStep = sign(rayDir);
-  vec3 p = (cursor.mapPos - gp);
   cursor.sideDist = (
-    cursor.rayStep * p + (cursor.rayStep * 0.5) + 0.5
+    (cursor.rayStep * 0.5) + 0.5
   ) * cursor.deltaDist;
   cursor.mask = step(cursor.sideDist.xyz, cursor.sideDist.yzx) *
                 step(cursor.sideDist.xyz, cursor.sideDist.zxy);

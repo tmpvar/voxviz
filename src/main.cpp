@@ -443,6 +443,7 @@ int main(void) {
   SSBO *voxelSpaceSSBOMip1 = new SSBO(voxelSpaceBytes / 8);
   SSBO *voxelSpaceSSBOMip2 = new SSBO(voxelSpaceBytes / 16);
   SSBO *voxelSpaceSSBOMip3 = new SSBO(voxelSpaceBytes / 32);
+  SSBO *voxelSpaceSSBOMip4 = new SSBO(voxelSpaceBytes / 64);
 
   Program *fillVoxelSpace = new Program();
   fillVoxelSpace->add(Shaders::get("voxel-space-fill.comp"))->link();
@@ -461,6 +462,9 @@ int main(void) {
   
   Program *raytraceVoxelSpace_Blur = new Program();
   raytraceVoxelSpace_Blur->add(Shaders::get("voxel-space-blur.comp"))->link();
+
+  Program *gravityVoxelSpace = new Program();
+  gravityVoxelSpace->add(Shaders::get("voxel-space-gravity.comp"))->link();
 
 
   uint64_t outputBytes =
@@ -513,84 +517,74 @@ int main(void) {
   // Load vox models
   VoxEntity *catModel = new VoxEntity(
     "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
-    glm::vec3(10.0, 20.0, 10.0)
+    glm::vec3(10.0, 10.0, 10.0)
   );
 
   {
 
+    VoxEntity *voxMonu1 = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\monument\\monu1.vox",
+      glm::uvec3(300, 64, 100)
+    );
+
+    VoxEntity *voxMonu2 = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\monument\\monu2.vox",
+      glm::uvec3(200, 64, 300)
+    );
+
+    VoxEntity *voxMonu3 = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\monument\\monu3.vox",
+      glm::uvec3(200, 64, 100)
+    );
+
+
+    VoxEntity *voxMonu4 = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\monument\\monu4.vox",
+      glm::uvec3(0, 64, 100)
+    );
+
+    VoxEntity *voxMonu5 = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\monument\\monu5.vox",
+      glm::uvec3(100, 64, 0)
+    );
+
+    VoxEntity *voxMonu6 = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\monument\\monu6.vox",
+      glm::uvec3(100, 64, 100)
+    );
+
+
+    VoxEntity *voxMonu7 = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\monument\\monu16.vox",
+      glm::uvec3(300, 64, 100)
+    );
+
+
+    VoxEntity *voxModelFirst = new VoxEntity(
+      "D:\\work\\voxviz\\img\\models\\first.vox",
+      glm::uvec3(128, 100, 200)
+    );
+
+
+
+    VoxEntity *voxModelRh2house = new VoxEntity(
+      "D:\\work\\voxviz\\img\\models\\rh2house.vox",
+      glm::uvec3(50, 64, 100)
+    );
 
     uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
+
     catModel->paintInto(buf, voxelSpaceDims);
-   /*
+    voxMonu1->paintInto(buf, voxelSpaceDims);
+    voxMonu2->paintInto(buf, voxelSpaceDims);
+    voxMonu3->paintInto(buf, voxelSpaceDims);
+    voxMonu4->paintInto(buf, voxelSpaceDims);
+    voxMonu5->paintInto(buf, voxelSpaceDims);
+    voxMonu6->paintInto(buf, voxelSpaceDims);
+    voxMonu7->paintInto(buf, voxelSpaceDims);
     
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(0, 10, 0)
-    );
-
-
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\monument\\monu1.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(300, 10, 200)
-    );
-
-
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\monument\\monu2.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(200, 10, 300)
-    );
-
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\monument\\monu3.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(200, 10, 100)
-    );
-
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\monument\\monu4.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(0, 10, 100)
-    );
-
-
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\monument\\monu5.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(100, 10, 0)
-    );
-
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\monument\\monu6.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(100, 10, 100)
-    );
-
-
-    VOXParser::parse(
-      "D:\\work\\voxel-model\\vox\\monument\\monu16.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(300, 10, 100)
-    );
-
-
-    VOXParser::parse(
-      "D:\\work\\voxviz\\img\\models\\first.vox",
-      buf,
-      voxelSpaceDims,
-      glm::uvec3(50, 0, 200)
-    );
-    */
+    voxModelFirst->paintInto(buf, voxelSpaceDims);
+    voxModelRh2house->paintInto(buf, voxelSpaceDims);
 
     voxelSpaceSSBO->endMap();
   }
@@ -686,16 +680,26 @@ int main(void) {
       GLFWgamepadstate state;
       if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
         int axis_count;
-        const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
         const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
         const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
         const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
         
-        catModel->move(glm::vec3(
-          fabs(x) > 0.1 ? x * 100 * deltaTime : 0,
-          fabs(y) > 0.1 ? -y * 100 * deltaTime : 0,
-          fabs(z) > 0.1 ? -z * 100 * deltaTime : 0
-        ));
+        glm::vec3 move(
+          fabs(x) > 0.1 ? x * 100 * deltaTime : 0.0,
+          fabs(y) > 0.1 ? -y * 100 * deltaTime : 0.0,
+          fabs(z) > 0.1 ? -z * 100 * deltaTime : 0.0
+        );
+        catModel->move(move);
+
+        if (fabs(x) > 0.1 || fabs(z) > 0.1) {
+          float dir = atan2(-move.x, -move.z);
+
+          catModel->setRotation(glm::vec3(
+            0.0,
+            dir,
+            0.0
+          ));
+        }
 
         /*lastCharacterPos = characterPos;
         characterPos += glm::vec3(
@@ -706,8 +710,6 @@ int main(void) {
         */
       }
     }
-
-
 
     viewMatrix = camera->GetViewMatrix();
 
@@ -731,7 +733,7 @@ int main(void) {
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     // Regenerate world
-    {
+    if (true) {
       // Clear the voxel space volume
       glm::uvec3 sdfDims(40, 40, 40);
       clearVoxelSpaceSDF
@@ -762,51 +764,87 @@ int main(void) {
         sdfDims.y,
         sdfDims.z
       );
+      
+      // Apply gravity to the scene
+      //if (time % 5 == 0) {
+        gravityVoxelSpace
+          ->use()
+          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+          ->ssbo("blueNoise", blue_noise->ssbo, 2)
+          ->uniform1ui("time", time)
+          ->uniformVec3ui("dims", voxelSpaceDims);
 
+        glDispatchCompute(
+          voxelSpaceDims.x / 4,
+          1,
+          voxelSpaceDims.z / 4
+        );
+      //}
       lastCharacterTime = time;
 
-      catModel->rotate(glm::vec3(0.0, 0.1, 0.0));
       uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
       catModel->paintInto(buf, voxelSpaceDims);
       voxelSpaceSSBO->endMap();
 
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    }
+    
+    // Generate mipmap for SSBO (level 1)
+    {
+      glm::uvec3 mipDims = voxelSpaceDims / glm::uvec3(2);
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
+        ->uniform1ui("time", time)
+        ->uniformVec3ui("dims", mipDims);
 
-      // Generate mipmap for SSBO (level 1)
-      if (time % 1 == 0) {
-        mipmapVoxelSpace
-          ->use()
-          ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
-          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
-          ->uniform1ui("time", time)
-          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(2));
-
-        glDispatchCompute(
-          voxelSpaceDims.x / 16,
-          voxelSpaceDims.y / 16,
-          voxelSpaceDims.z / 1
-        );
-        gl_error();
-      }
+      glDispatchCompute(
+        mipDims.x / 128,
+        mipDims.y / 8,
+        mipDims.z / 1
+      );
+      gl_error();
+    
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
-      // Generate mipmap for SSBO
-      if (time % 10 == 0) {
-        mipmapVoxelSpace
-          ->use()
-          ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
-          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
-          ->uniform1ui("time", time)
-          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(4));
 
-        glDispatchCompute(
-          voxelSpaceDims.x / 16,
-          voxelSpaceDims.y / 16,
-          voxelSpaceDims.z / 1
-        );
-        gl_error();
-      }
+      // Generate mipmap for SSBO (level 2)
+      mipDims = mipDims / glm::uvec3(2);
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
+        ->uniform1ui("time", time)
+        ->uniformVec3ui("dims", mipDims);
+
+      glDispatchCompute(
+        mipDims.x / 128,
+        mipDims.y / 8,
+        mipDims.z / 1
+      );
+      gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+      // Generate mipmap for SSBO (level 3)
+      mipDims = mipDims / glm::uvec3(2);
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
+        ->uniform1ui("time", time)
+        ->uniformVec3ui("dims", mipDims);
+
+      glDispatchCompute(
+        mipDims.x / 128,
+        mipDims.y / 8,
+        mipDims.z / 1
+      );
+      gl_error();
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+
+      /*
       // Generate mipmap for SSBO
       if (time % 10 == 0) {
         mipmapVoxelSpace
@@ -817,13 +855,32 @@ int main(void) {
           ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(8));
 
         glDispatchCompute(
-          voxelSpaceDims.x / 16,
-          voxelSpaceDims.y / 16,
-          voxelSpaceDims.z / 1
+          voxelSpaceDims.x / 2,
+          voxelSpaceDims.y / 2,
+          voxelSpaceDims.z / 2
         );
         gl_error();
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+      // Generate mipmap for SSBO
+      if (time % 10 == 0) {
+        mipmapVoxelSpace
+          ->use()
+          ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip3, 1)
+          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip4, 2)
+          ->uniform1ui("time", time)
+          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(16));
+
+        glDispatchCompute(
+          voxelSpaceDims.x / 2,
+          voxelSpaceDims.y / 2,
+          voxelSpaceDims.z / 2
+        );
+        gl_error();
+      }
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      */
     }
     
     // Render the voxel space volume
@@ -862,6 +919,7 @@ int main(void) {
           ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
           ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
           ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
+          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
           ->uniformFloat("maxDistance", 10000)
           ->uniformMat4("VP", VP)
           ->uniform1ui("time", time)
@@ -873,15 +931,17 @@ int main(void) {
           ->uniformVec3("lightColor", glm::vec3(1.0, 1.0, 1.0))
           ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
 
+          ->uniformVec3("characterPos", catModel->getPosition())
+
           ->uniformVec2ui("resolution", res)
-          ->ssbo("outColorBuffer", raytraceOutput, 5)
-          ->ssbo("outTerminationBuffer", terminationOutput, 6)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
+          ->ssbo("outColorBuffer", raytraceOutput, 6)
+          ->ssbo("outTerminationBuffer", terminationOutput, 7)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 8)
           ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
 
         glDispatchCompute(
-          windowDimensions[0] / 10,
-          windowDimensions[1] / 10,
+          windowDimensions[0] / 128 + 1,
+          windowDimensions[1] / 8 + 1,
           1
         );
       }
@@ -903,8 +963,8 @@ int main(void) {
           ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
 
         glDispatchCompute(
-          windowDimensions[0] / 10,
-          windowDimensions[1] / 10,
+          windowDimensions[0] / 128 + 1,
+          windowDimensions[1] / 8 + 1,
           1
         );
       }

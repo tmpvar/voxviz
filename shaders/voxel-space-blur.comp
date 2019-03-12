@@ -6,7 +6,7 @@
 #include "voxel-space.glsl"
 #include "cosine-direction.glsl"
 
-layout( local_size_x = 10, local_size_y = 10, local_size_z = 1 ) in;
+layout( local_size_x = 128, local_size_y = 8, local_size_z = 1 ) in;
 
 layout (std430, binding=1) buffer outColorBuffer {
   vec4 out_color[];
@@ -49,32 +49,11 @@ vec4 readT(ivec2 pos) {
     color += in_termination[idx].color;//((1 + float(i % 64)) / 64.0);
  }
 
-  return color / 64;
-}
-
-void acc(RayTermination o, in out float f, in out vec4 t, in ivec2 pos, in float d) {
-  RayTermination termination;
-  if (read(pos, termination)) {
-    float dist = distance(
-      termination.position.xyz,
-      o.position.xyz
-    );
-    if (all(equal(o.normal, termination.normal)) && dist < 2.5) {
-      f++;
-
-      t = (t + termination.color * 0.5);
-    }
-  }
-}
-
-void main2() {
-  ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-  uint idx = pos.x + pos.y * resolution.x;
-
-  out_color[idx] = vec4(blueNoise[idx % (4096 * 64)]);
+  return color;
 }
 
 void main() {
+
   ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
   uint idx = pos.x + pos.y * resolution.x;
   RayTermination o;
@@ -86,50 +65,5 @@ void main() {
     0.0//float(pos.x) > float(resolution.x) / 2.0 ? 1.0 : 0.0
   );
 
-  // out_color[idx] = o.color;
-}
-
-void main1() {
-  ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-  uint idx = pos.x + pos.y * resolution.x;
-
-  vec4 s;
-  int upper = 4;//(int(time)/100)%32;
-  int lower = -upper;
-
-  vec4 color = vec4(0.0);
-  ivec2 dir = ivec2(0, 1);
-  vec2 off = vec2(1.3333333333333333) * vec2(0.0, 1.0);
-  vec2 v2res = vec2(resolution);
-  //out_color[idx] = vec4(0);
-
-  RayTermination o;
-  read(pos, o);
-  out_color[idx] = o.color;
-  return;
-  color = o.color * 0.5;//out_color[idx] * 0.4;
-
-  for (int i = 1; i<upper; i++) {
-    vec4 t = o.color;//vec4(0.0);
-    float f = 1.0;
-    float d = float(i) / float(upper);
-
-    // acc(o, f, t, pos + ivec2( i, 0), float(i));
-    // acc(o, f, t, pos + ivec2( i, i), float(i));
-    acc(o, f, t, pos + ivec2( 0, i), float(i));
-    acc(o, f, t, pos + ivec2( 0, -i), float(i));
-
-    acc(o, f, t, pos + ivec2( -i,  i), float(i));
-    acc(o, f, t, pos + ivec2( -i,  0), float(i));
-    acc(o, f, t, pos + ivec2( -i, -i), float(i));
-
-    acc(o, f, t, pos + ivec2( i,  i), float(i));
-    acc(o, f, t, pos + ivec2( i,  0), float(i));
-    acc(o, f, t, pos + ivec2( i, -i), float(i));
-    color = color + t / f * 0.7;//(color + t / 8.0) / 2.0;// * (float(i) / float(upper));
-  }
-
-  out_color[idx] = (out_color[idx] + mix(color, o.color, float(pos.x) < float(resolution.x) / 2.0 ? 1.0 : 0.0)) * 0.5;
-  //out_color[idx] = vec4(o.position.xyz / dims, 1.0);
-
+  //out_color[idx] = o.color;
 }
