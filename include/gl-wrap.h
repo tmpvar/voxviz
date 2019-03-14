@@ -461,6 +461,19 @@ public:
     ssbo->unbind();
     return this;
   }
+
+
+  Program *compute(glm::uvec3 dims) {
+    GLint local_layout[3];
+    glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &local_layout[0]);
+    glDispatchCompute(
+      dims.x / local_layout[0],
+      dims.y / local_layout[1],
+      dims.z / local_layout[2]
+    );
+    gl_error();
+    return this;
+  }
 };
 
 class GPUSlab {
