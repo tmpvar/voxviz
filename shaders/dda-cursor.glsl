@@ -21,8 +21,9 @@ DDACursor dda_cursor_create(
   cursor.mapPos = floor(pos);
   cursor.deltaDist = abs(vec3(length(rayDir)) / rayDir);
   cursor.rayStep = sign(rayDir);
+  vec3 p = (cursor.mapPos - pos);
   cursor.sideDist = (
-    (cursor.rayStep * 0.5) + 0.5
+    cursor.rayStep * p + (cursor.rayStep * 0.5) + 0.5
   ) * cursor.deltaDist;
   cursor.mask = step(cursor.sideDist.xyz, cursor.sideDist.yzx) *
                 step(cursor.sideDist.xyz, cursor.sideDist.zxy);
