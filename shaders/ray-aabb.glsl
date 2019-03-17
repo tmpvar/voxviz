@@ -71,9 +71,9 @@ bool ailaWaldHitAABox(
   // Compute the intersection distance
   found_distance = (t0 > 0.0) ? t0 : t1;
 
-  //vec3 V = boxCenter - (rayOrigin + rayDirection * found_distance) * (1.0 / boxRadius);
-  //vec3 mask = vec3(lessThan(vec3(lessThan(V.xyz, V.yzx)), V.zxy));// step(V.xyz, V.yzx) * step(V.xyz, V.zxy);
-  //found_normal = mask;// * (all(lessThan(abs(origin), boxRadius)) ? -1.0 : 1.0);
+  vec3 V = boxCenter - (rayOrigin + rayDirection * found_distance) * (1.0 / boxRadius);
+  vec3 mask = vec3(lessThan(vec3(lessThan(V.xyz, V.yzx)), V.zxy));// step(V.xyz, V.yzx) * step(V.xyz, V.zxy);
+  found_normal = mask;// * (all(lessThan(abs(origin), boxRadius)) ? -1.0 : 1.0);
 
 
   return (t0 <= t1) && (found_distance > 0.0) && !isinf(found_distance);
@@ -132,3 +132,64 @@ bool ourIntersectBoxCommon(
 
     return (sgn.x != 0) || (sgn.y != 0) || (sgn.z != 0);
 }
+//
+// // vec3 box.radius:       independent half-length along the X, Y, and Z axes
+// // mat3 box.rotation:     box-to-world rotation (orthonormal 3x3 matrix) transformation
+// // bool rayCanStartInBox: if true, assume the origin is never in a box. GLSL optimizes this at compile time
+// // bool oriented:         if false, ignore box.rotation
+// bool ourIntersectBoxCommon(
+//   vec3 boxCenter,
+//   vec3 boxRadius,
+//   vec3 rayOrigin,
+//   vec3 rayDirection,
+//   vec3 invRayDirection,
+//   out float distance,
+//   out vec3 normal
+// ) {
+//
+//     // Move to the box's reference frame. This is unavoidable and un-optimizable.
+//     vec3 origin = rayOrigin - boxCenter;
+//
+//     // This "rayCanStartInBox" branch is evaluated at compile time because `const` in GLSL
+//     // means compile-time constant. The multiplication by 1.0 will likewise be compiled out
+//     // when rayCanStartInBox = false.
+//     float winding = 1.0;
+//
+//     // We'll use the negated sign of the ray direction in several places, so precompute it.
+//     // The sign() instruction is fast...but surprisingly not so fast that storing the result
+//     // temporarily isn't an advantage.
+//     vec3 sgn = -sign(rayDirection);
+//
+// 	// Ray-plane intersection. For each pair of planes, choose the one that is front-facing
+//     // to the ray and compute the distance to it.
+//     vec3 distanceToPlane = boxRadius * winding * sgn - rayOrigin;
+//     distanceToPlane *= invRayDirection;
+//
+//     // Perform all three ray-box tests and cast to 0 or 1 on each axis.
+//     // Use a macro to eliminate the redundant code (no efficiency boost from doing so, of course!)
+//     // Could be written with
+//     #define TEST(U, VW) (distanceToPlane.U >= 0.0) && all(lessThan(abs(rayOrigin.VW + rayDirection.VW * distanceToPlane.U), boxRadius.VW))
+//     bvec3 test = bvec3(TEST(x, yz), TEST(y, zx), TEST(z, xy));
+//
+//     // CMOV chain that guarantees exactly one element of sgn is preserved and that the value has the right sign
+//     sgn = test.x ? vec3(sgn.x, 0.0, 0.0) : (test.y ? vec3(0.0, sgn.y, 0.0) : vec3(0.0, 0.0, test.z ? sgn.z : 0.0));
+//     #undef TEST
+//
+//     // At most one element of sgn is non-zero now. That element carries the negative sign of the
+//     // ray direction as well. Notice that we were able to drop storage of the test vector from registers,
+//     // because it will never be used again.
+//
+//     // Mask the distance by the non-zero axis
+//     // Dot product is faster than this CMOV chain, but doesn't work when distanceToPlane contains nans or infs.
+//     //
+//     distance = (sgn.x != 0.0) ? distanceToPlane.x : ((sgn.y != 0.0) ? distanceToPlane.y : distanceToPlane.z);
+//
+//     // Normal must face back along the ray. If you need
+//     // to know whether we're entering or leaving the box,
+//     // then just look at the value of winding. If you need
+//     // texture coordinates, then use box.invDirection * hitPoint.
+//
+//     normal = sgn;
+//
+//     return (sgn.x != 0) || (sgn.y != 0) || (sgn.z != 0);
+// }

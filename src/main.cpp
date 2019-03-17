@@ -40,6 +40,11 @@ int windowDimensions[2] = { 1440, 900 };
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 FBO *fbo = nullptr;
 
+SSBO *raytraceOutput = nullptr;
+#define TAA_HISTORY_LENGTH 16
+SSBO *terminationOutput = nullptr;
+
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -76,10 +81,27 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     0.1f,
     10000.0f
   );
+
+  printf("window resize %ix%i\n", width, height);
   
   glViewport(0, 0, width, height);
   if (fbo != nullptr) {
     fbo->setDimensions(width, height);
+  }
+
+  if (raytraceOutput != nullptr) {
+    uint64_t outputBytes =
+      static_cast<uint64_t>(width) *
+      static_cast<uint64_t>(height) * 16;
+
+    raytraceOutput->resize(outputBytes);
+  }
+
+  if (terminationOutput != nullptr) {
+    uint64_t terminationBytes =
+      static_cast<uint64_t>(width) *
+      static_cast<uint64_t>(height) * 48;
+    terminationOutput->resize(terminationBytes);
   }
 }
 
@@ -197,14 +219,15 @@ int main(void) {
   GLFWmonitor* primary = glfwGetPrimaryMonitor();
   const GLFWvidmode* mode = glfwGetVideoMode(primary);
   window = glfwCreateWindow(mode->width, mode->height, "voxviz", glfwGetPrimaryMonitor(), NULL);
-  glfwSetWindowSizeCallback(window, window_resize);
 #endif
+
 
   if (!window) {
     glfwTerminate();
     return -1;
   }
 
+  glfwSetWindowSizeCallback(window, window_resize);
   glfwSetKeyCallback(window, key_callback);
   glfwMakeContextCurrent(window);
   gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
@@ -473,13 +496,13 @@ int main(void) {
     static_cast<uint64_t>(windowDimensions[0]) *
     static_cast<uint64_t>(windowDimensions[1]) * 16;
 
-  SSBO *raytraceOutput = new SSBO(outputBytes);
+  raytraceOutput = new SSBO(outputBytes);
   uint64_t terminationBytes =
     static_cast<uint64_t>(windowDimensions[0]) *
     static_cast<uint64_t>(windowDimensions[1]) * 48;
 
   #define TAA_HISTORY_LENGTH 16
-  SSBO *terminationOutput = new SSBO(terminationBytes * static_cast<uint64_t>(TAA_HISTORY_LENGTH));
+  terminationOutput = new SSBO(terminationBytes * static_cast<uint64_t>(TAA_HISTORY_LENGTH));
 
   cout << "window dimensions: " << windowDimensions[0] << ", " << windowDimensions[1] << endl;
   // Draw a plane under the scene
@@ -601,6 +624,7 @@ int main(void) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
 
     double nowTime = glfwGetTime();
     deltaTime = nowTime - lastTime;
@@ -735,7 +759,7 @@ int main(void) {
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     // Regenerate world
-    if (false) {
+    if (true) {
       // Clear the voxel space volume
       glm::uvec3 sdfDims(40, 40, 40);
 
@@ -759,18 +783,25 @@ int main(void) {
         ->compute(sdfDims);
       
       // Apply gravity to the scene
-      if (time % 5 == 0) {
+      if (time > 1) {
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
         gravityVoxelSpace
           ->use()
-          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
-          ->ssbo("blueNoise", blue_noise->ssbo, 2)
+          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
+          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
+          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
+          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
+          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
+          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
+          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip5, 7)
+          ->ssbo("blueNoise", blue_noise->ssbo, 8)
           ->uniform1ui("time", time)
-          ->uniformVec3ui("dims", voxelSpaceDims)
-          ->compute(glm::uvec3(
-            voxelSpaceDims.x,
-            1,
-            voxelSpaceDims.z
-          ));
+          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+          ->timedCompute(
+            "gravity",
+            glm::uvec3(voxelSpaceDims.x, 1, voxelSpaceDims.z)
+           );
+        
       }
       lastCharacterTime = time;
 
@@ -783,7 +814,9 @@ int main(void) {
     }
     
     // Generate mipmaps
-    if (true ||time % 5 == 0) {
+    if (time) {
+
+
       double mipStart = glfwGetTime();
       // Generate mipmap for SSBO (level 1)
       glm::uvec3 mipDims = voxelSpaceDims / glm::uvec3(2);
@@ -792,10 +825,10 @@ int main(void) {
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
         ->uniformVec3ui("destDims", mipDims)
-        ->compute(mipDims);
+        ->timedCompute("mip 1", mipDims);
       gl_error();
-    
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
 
       // Generate mipmap for SSBO (level 2)
       mipDims = mipDims / glm::uvec3(2);
@@ -804,7 +837,7 @@ int main(void) {
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
         ->uniformVec3ui("destDims", mipDims)
-        ->compute(mipDims);
+        ->timedCompute("mip 2", mipDims);
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
       
@@ -815,9 +848,10 @@ int main(void) {
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
         ->uniformVec3ui("destDims", mipDims)
-        ->compute(mipDims);
+        ->timedCompute("mip 3", mipDims);
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      
        
       // Generate mipmap for SSBO (level 4)
       mipDims = mipDims / glm::uvec3(2);
@@ -826,7 +860,7 @@ int main(void) {
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip3, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip4, 2)
         ->uniformVec3ui("destDims", mipDims)
-        ->compute(mipDims);
+        ->timedCompute("mip 4", mipDims);
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
@@ -837,7 +871,7 @@ int main(void) {
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip4, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip5, 2)
         ->uniformVec3ui("destDims", mipDims)
-        ->compute(mipDims);
+        ->timedCompute("mip 5", mipDims);
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
@@ -848,11 +882,9 @@ int main(void) {
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip5, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip6, 2)
         ->uniformVec3ui("destDims", mipDims)
-        ->compute(mipDims);
+        ->timedCompute("mip 6", mipDims);
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-      ImGui::Text("mipmaps: %f", (glfwGetTime() - mipStart) * 1000.0);
     }
     
     // Render the voxel space volume
@@ -913,13 +945,15 @@ int main(void) {
           ->uniformVec3("characterPos", catModel->getPosition())
 
           ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", 0);//res.x * res.y * (time%TAA_HISTORY_LENGTH));
-
-        glDispatchCompute(
-          windowDimensions[0] / 128 + 1,
-          windowDimensions[1] / 8 + 1,
-          1
-        );
+          ->uniform1ui("terminationBufferIdx", 0) //res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->timedCompute(
+            "primary rays",
+            glm::uvec3(
+              windowDimensions[0],
+              windowDimensions[1],
+              1
+            )
+          );
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
       
@@ -963,9 +997,8 @@ int main(void) {
     {
       static float f = 0.0f;
       static int counter = 0;
-      ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-      ImGui::Text("camera pos(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
-      ImGui::Text("%i floor bricks", floor->bricks.size());
+      ImGui::Text("%.1fFPS (%.3f ms)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("camera(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
     }
 
     ImGui::Render();

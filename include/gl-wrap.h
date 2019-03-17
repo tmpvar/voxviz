@@ -17,6 +17,7 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <imgui.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -467,11 +468,32 @@ public:
     GLint local_layout[3];
     glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &local_layout[0]);
     glDispatchCompute(
-      dims.x / local_layout[0],
-      dims.y / local_layout[1],
-      dims.z / local_layout[2]
+      (dims.x / local_layout[0])+1,
+      (dims.y / local_layout[1])+1,
+      (dims.z / local_layout[2])+1
     );
     gl_error();
+    return this;
+  }
+
+  Program *timedCompute(const char *str, glm::uvec3 dims) {
+    GLuint query;
+    GLuint64 elapsed_time;
+    GLint done = 0;
+    glGenQueries(1, &query);
+    glBeginQuery(GL_TIME_ELAPSED, query);
+
+    this->compute(dims);
+
+    glEndQuery(GL_TIME_ELAPSED);
+    while (!done) {
+      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+    }
+
+    // get the query result
+    glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+    ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+
     return this;
   }
 };
