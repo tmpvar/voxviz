@@ -3,7 +3,7 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-layout( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
+layout( local_size_x = 32, local_size_y = 1, local_size_z = 1 ) in;
 
 uniform vec3 dims;
 uniform uint time;
@@ -47,7 +47,7 @@ uint8_t get(uvec3 pos) {
 }
 
 void main() {
-return;
+
   uvec3 last_pos = uvec3(gl_GlobalInvocationID.x, 0, gl_GlobalInvocationID.z);
 
   if (any(greaterThanEqual(last_pos, dims))) {
@@ -61,7 +61,7 @@ return;
     uvec3 current_pos = uvec3(last_pos.x, y, last_pos.z);
     bool lmoved = move(current_pos, ivec3(0, -1, 0), false);
 
-    if (get(current_pos) == uint8_t(16)) {
+    if (get(current_pos) <= uint8_t(16)) {
       lmoved = move(current_pos, ivec3( 0, -1,  1), lmoved);
       lmoved = move(current_pos, ivec3( 0, -1, -1), lmoved);
       lmoved = move(current_pos, ivec3( 1, -1,  0), lmoved);

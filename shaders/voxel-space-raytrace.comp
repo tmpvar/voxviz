@@ -72,10 +72,6 @@ vec3 cdir(in uint seed, in vec3 normal) {
   );
 }
 
-float mincomp(vec3 v) {
-  return min(v.x, min(v.y, v.z));
-}
-
 float trace_light1(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
   vec3 normal = vec3(cursor.mask);
   float div = 1.0;
@@ -336,14 +332,17 @@ void main() {
     );
     found_distance += 0.1;
   }
-  out_termination[out_termination_idx].color = vec4(0.2);
+  out_termination[out_termination_idx].color = vec4(0.0);
+  out_termination[out_termination_idx].rayDir = vec4(in_ray_dir, 1.0);
   if (!hit) {
+    out_termination[out_termination_idx].position = vec4(-1.0);
+    out_termination[out_termination_idx].normal = vec4(found_normal, 1.0);
     return;
   }
 
 
   uint8_t palette_idx;
-  vec3 c = vec3(0.2);
+  vec3 c = vec3(0.0);
   int i;
 
   int mip = 0;
@@ -364,11 +363,13 @@ void main() {
   float mipSize = (float(1<<(mip)));
   float invMipSize = 1.0 / mipSize;
   vec3 mask;
+  bool miss = false;
   for (i=0; i<ITERATIONS; i++) {
     if (
       any(lessThan(p, vec3(0.0))) ||
-      any(greaterThan(p, vec3(dims)))
+      any(greaterEqualThan(p, vec3(dims)))
     ) {
+      miss = true;
       break;
     }
 
@@ -389,10 +390,6 @@ void main() {
         hit.dir = d;
         hit.t = t;
         hit.normal = found_normal;
-        c += trace_sky(hit) * 0.3;
-        //c += sky_intensity * 0.2;
-        //c = found_normal;
-
         break;
       }
 
@@ -425,4 +422,7 @@ void main() {
   }
 
   out_termination[out_termination_idx].color = vec4(c, 1.0);
+  out_termination[out_termination_idx].position = miss ? vec4(-1.0) : vec4(p, 1.0);
+  out_termination[out_termination_idx].normal = vec4(found_normal, 1.0);
+
 }

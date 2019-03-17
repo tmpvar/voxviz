@@ -42,6 +42,7 @@ FBO *fbo = nullptr;
 
 SSBO *raytraceOutput = nullptr;
 #define TAA_HISTORY_LENGTH 16
+#define RAY_TERMINATION_BYTES 64
 SSBO *terminationOutput = nullptr;
 
 
@@ -100,7 +101,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   if (terminationOutput != nullptr) {
     uint64_t terminationBytes =
       static_cast<uint64_t>(width) *
-      static_cast<uint64_t>(height) * 48;
+      static_cast<uint64_t>(height) * RAY_TERMINATION_BYTES;
     terminationOutput->resize(terminationBytes);
   }
 }
@@ -485,6 +486,10 @@ int main(void) {
   Program *raytraceVoxelSpace_Compute = new Program();
   raytraceVoxelSpace_Compute->add(Shaders::get("voxel-space-raytrace.comp"))->link();
   
+
+  Program *skyRays_Compute = new Program();
+  skyRays_Compute->add(Shaders::get("voxel-space-sky-rays.comp"))->link();
+
   Program *raytraceVoxelSpace_Blur = new Program();
   raytraceVoxelSpace_Blur->add(Shaders::get("voxel-space-blur.comp"))->link();
 
@@ -499,7 +504,7 @@ int main(void) {
   raytraceOutput = new SSBO(outputBytes);
   uint64_t terminationBytes =
     static_cast<uint64_t>(windowDimensions[0]) *
-    static_cast<uint64_t>(windowDimensions[1]) * 48;
+    static_cast<uint64_t>(windowDimensions[1]) * RAY_TERMINATION_BYTES;
 
   #define TAA_HISTORY_LENGTH 16
   terminationOutput = new SSBO(terminationBytes * static_cast<uint64_t>(TAA_HISTORY_LENGTH));
@@ -799,7 +804,7 @@ int main(void) {
           ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
           ->timedCompute(
             "gravity",
-            glm::uvec3(voxelSpaceDims.x, 1, voxelSpaceDims.z)
+            glm::uvec3(voxelSpaceDims.x, 1, voxelSpaceDims.z) / glm::uvec3(4)
            );
         
       }
@@ -953,6 +958,28 @@ int main(void) {
               windowDimensions[1],
               1
             )
+          );
+
+
+        skyRays_Compute
+          ->use()
+          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
+          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
+          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
+          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
+          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
+          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
+          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip6, 7)
+          ->ssbo("outTerminationBuffer", terminationOutput, 9)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
+          ->uniform1ui("time", time)
+          ->uniformFloat("debug", debug)
+          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+          ->uniformVec2ui("resolution", res)
+          ->uniform1ui("terminationBufferIdx", 0) //res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->timedCompute(
+            "sky rays",
+            glm::uvec3(res, 1)
           );
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);

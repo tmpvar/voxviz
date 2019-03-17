@@ -1,0 +1,113 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 32 , local_size_y = 16, local_size_z = 1 ) in;
+
+#include "ray-aabb.glsl"
+#include "dda-cursor.glsl"
+#include "palette.glsl"
+#include "cosine-direction.glsl"
+#include "voxel-space.glsl"
+#include "hsl.glsl"
+
+uniform uvec2 out_color_dims;
+uniform mat4 VP;
+uniform uvec2 resolution;
+uniform float debug;
+uniform vec3 eye;
+uniform vec3 dims;
+uniform uint time;
+uniform uint terminationBufferIdx;
+uniform uvec3 lightPos;
+uniform vec3 lightColor;
+
+uniform vec3 characterPos;
+
+// uses bindings 1-7 and requires `dims`
+#include "voxel-space-mips.glsl"
+
+layout (std430, binding=9) buffer outTerminationBuffer {
+  RayTermination out_termination[];
+};
+
+layout (std430, binding=10) buffer blueNoiseBuffer {
+  vec4 blueNoise[];
+};
+
+#define ITERATIONS 5
+
+vec3 cdir(in uint seed, in vec3 normal) {
+  // uint slice = (time % 64) * 4096;
+
+  vec2 bn = 2.0 * blueNoise[(seed * time) % (4096 * 64)].xy - 0.5;
+
+  float u = bn.x;
+  float v = bn.y;
+
+	// // method 3 by fizzer: http://www.amietia.com/lambertnotangent.html
+  float a = 6.2831853 * v;
+  //u = 2.0*u - 1.0;
+  return normalize(
+    normal + vec3(sqrt(1.0-u*u) * vec2(cos(a), sin(a)), u)
+  );
+}
+
+float trace_sky(vec3 pos, vec3 normal) {
+  vec3 cd = normalize(cdir(
+    uint(
+      gl_GlobalInvocationID.x +
+      gl_GlobalInvocationID.y * resolution.x
+    ),
+    normal
+  )); // roughness
+
+  int mip = 0;
+  vec3 new_ray_dir = vec3(0.0, 1.0, 0.0) * cd;//* float(1<<mip);
+  vec3 origin = pos + normal + new_ray_dir;
+  vec3 p = origin;
+  float t = 0;
+  vec3 id = 1.0 / new_ray_dir;
+  uint8_t noop;
+
+  for (int i=0; i<ITERATIONS; i++) {
+    if (
+      any(lessThan(p, vec3(0.0))) ||
+      any(greaterThan(p, vec3(dims)))
+    ) {
+      break;
+    }
+
+    bool hit = voxel_mip(p, mip, noop);
+    if (hit && noop > uint8_t(4)) {
+      return -1.0;
+    }
+    mip++;
+
+    vec3 deltas = (step(0.0, new_ray_dir) - 2.0*fract(p/* * invMipSize*/)) * id;
+    float dt = max(mincomp(deltas), 0.0001);// * mipSize;
+    t += max(0.1, t * 0.9) * float(1<<(mip+1));
+    p = origin + new_ray_dir + cd * t;
+  }
+  return 0.0;
+}
+
+void main() {
+  uvec2 screen_pos = gl_GlobalInvocationID.xy;
+  if (any(greaterThanEqual(screen_pos, resolution))) {
+    return;
+  }
+
+  uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
+  // FIXME: use the correct TAA slab
+  vec3 p = out_termination[screen_idx].position.xyz;
+  if (all(equal(p, vec3(-1.0)))) {
+    return;
+  }
+  vec3 n = out_termination[screen_idx].normal.xyz;
+
+  float i = trace_sky(p, n);
+
+  out_termination[screen_idx].color += i * 0.15;
+}

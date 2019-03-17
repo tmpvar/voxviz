@@ -28,7 +28,7 @@ uniform float debug;
 uniform uint terminationBufferIdx;
 
 bool read(ivec2 pos, out RayTermination termination) {
-  if (pos.x < 0 || pos.y < 0 || pos.x >= resolution.x || pos.y >= resolution.y) {
+  if (any(lessThan(pos, ivec2(0))) || any(greaterThanEqual(pos, resolution))) {
     return false;
   }
 
@@ -60,9 +60,9 @@ void main() {
   RayTermination o;
   read(pos, o);
 
-  out_color[idx] = in_termination[idx].color;
+  //out_color[idx] = vec4(in_termination[idx].position.xyz / vec3(dims), 1.0);
 
-  //out_color[idx] = o.color;
+  out_color[idx] = in_termination[idx].color;
 }
 
 void main1() {
