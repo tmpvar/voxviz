@@ -3,7 +3,7 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-layout( local_size_x = 4, local_size_y = 1, local_size_z = 4 ) in;
+layout( local_size_x = 16, local_size_y = 1, local_size_z = 16 ) in;
 
 layout (std430, binding=1) buffer volumeSlab {
   uint8_t volume[];
@@ -66,7 +66,7 @@ void main() {
 
     vec2 uv = last_pos.xz / dims.xz;
     vec2 bn = 2.0 * blueNoise[time + (last_pos.z * last_pos.x % 4096) * (time % 64)].xy - 0.5;
-return;
+    return;
     volume[dest_idx] = uint8_t(
        //dest_idx % 200 + 2
       length(bn) < 0.0515  ? uint8_t(16) : volume[dest_idx]

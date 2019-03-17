@@ -44,15 +44,28 @@ vec4 readT(ivec2 pos) {
     return color;
   }
 
-  for (uint i=time+1; i<time+64; i++) {
-    uint idx = (pos.x + pos.y * resolution.x) + (resolution.x * resolution.y * (i % 64));
-    color += in_termination[idx].color;//((1 + float(i % 64)) / 64.0);
+  for (uint i=1; i<=16; i++) {
+    uint idx = (pos.x + pos.y * resolution.x) + (resolution.x * resolution.y * ((time + i) % 16));
+    color += in_termination[idx].color;// * (1.0 * float(i) / 16.0);//((1 + float(i % 64)) / 64.0);
  }
 
-  return color;
+  return color / 8;
 }
 
+
 void main() {
+
+  ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+  uint idx = pos.x + pos.y * resolution.x;
+  RayTermination o;
+  read(pos, o);
+
+  out_color[idx] = in_termination[idx].color;
+
+  //out_color[idx] = o.color;
+}
+
+void main1() {
 
   ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
   uint idx = pos.x + pos.y * resolution.x;

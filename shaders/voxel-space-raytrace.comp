@@ -10,6 +10,7 @@ layout( local_size_x = 128, local_size_y = 8, local_size_z = 1 ) in;
 #include "palette.glsl"
 #include "cosine-direction.glsl"
 #include "voxel-space.glsl"
+#include "hsl.glsl"
 
 uniform uvec2 out_color_dims;
 uniform mat4 VP;
@@ -35,15 +36,23 @@ layout (std430, binding=5) buffer volumeSlabMip4 {
   uint8_t volumeMip4[];
 };
 
-layout (std430, binding=6) buffer outColorBuffer {
+layout (std430, binding=6) buffer volumeSlabMip5 {
+  uint8_t volumeMip5[];
+};
+
+layout (std430, binding=7) buffer volumeSlabMip6 {
+  uint8_t volumeMip6[];
+};
+
+layout (std430, binding=8) buffer outColorBuffer {
   vec4 out_color[];
 };
 
-layout (std430, binding=7) buffer outTerminationBuffer {
+layout (std430, binding=9) buffer outTerminationBuffer {
   RayTermination out_termination[];
 };
 
-layout (std430, binding=8) buffer blueNoiseBuffer {
+layout (std430, binding=10) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
@@ -61,20 +70,21 @@ uniform vec3 lightColor;
 
 uniform vec3 characterPos;
 
-#define ITERATIONS 800
+#define ITERATIONS 256
 
 bool voxel_get(vec3 pos, out uint8_t palette_idx) {
+  vec3 p = floor(pos);
   if (
-    any(lessThan(pos, vec3(0))) ||
-    any(greaterThanEqual(pos, vec3(dims)))
+    any(lessThan(p, vec3(0))) ||
+    any(greaterThanEqual(p, vec3(dims)))
   ) {
     return false;
   }
 
   uint idx = uint(
-    pos.x +
-    pos.y * dims.x +
-    pos.z * dims.x * dims.y
+    p.x +
+    p.y * dims.x +
+    p.z * dims.x * dims.y
   );
 
   palette_idx = volumeMip0[idx];
@@ -85,8 +95,8 @@ bool voxel_get(vec3 pos, out uint8_t palette_idx) {
 bool voxel_get_mip1(vec3 pos, out uint8_t palette_idx) {
   // vec3 d = dims / 2.0;
   // pos = pos / 2.0;
-  vec3 d = dims / 2.0;
-  vec3 p = pos;
+  vec3 d = floor(dims / 2.0);
+  vec3 p = floor(pos / 2.0);
   if (
     any(lessThan(p, vec3(0.0))) ||
     any(greaterThanEqual(p, vec3(d)))
@@ -110,8 +120,8 @@ bool voxel_get_mip1(vec3 pos, out uint8_t palette_idx) {
 bool voxel_get_mip2(vec3 pos, out uint8_t palette_idx) {
   // vec3 d = dims / 2.0;
   // pos = pos / 2.0;
-  vec3 d = dims / 4.0;
-  vec3 p = pos;
+  vec3 d = floor(dims / 4.0);
+  vec3 p = floor(pos / 4.0);
   if (
     any(lessThan(p, vec3(0.0))) ||
     any(greaterThanEqual(p, vec3(d)))
@@ -133,35 +143,72 @@ bool voxel_get_mip2(vec3 pos, out uint8_t palette_idx) {
 }
 
 bool voxel_get_mip3(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = dims / 8.0;
-  if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(d)))) {
+  vec3 d = floor(dims / 8.0);
+  vec3 p = floor(pos / 8.0);
+  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
     return false;
   }
 
   uint idx = uint(
-    pos.x +
-    pos.y * d.x +
-    pos.z * d.x * d.y
+    p.x +
+    p.y * d.x +
+    p.z * d.x * d.y
   );
 
   palette_idx = volumeMip3[idx];
-
   return palette_idx > uint8_t(0);
 }
 
 bool voxel_get_mip4(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = dims / 16.0;
-  if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(d)))) {
+  vec3 d = floor(dims / 16.0);
+  vec3 p = floor(pos / 16.0);
+  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
     return false;
   }
 
   uint idx = uint(
-    pos.x +
-    pos.y * d.x +
-    pos.z * d.x * d.y
+    p.x +
+    p.y * d.x +
+    p.z * d.x * d.y
   );
 
-  palette_idx = volumeMip3[idx];
+  palette_idx = volumeMip4[idx];
+
+  return palette_idx > uint8_t(0);
+}
+
+bool voxel_get_mip5(vec3 pos, out uint8_t palette_idx) {
+  vec3 d = floor(dims / 32.0);
+  vec3 p = floor(pos / 32.0);
+  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
+    return false;
+  }
+
+  uint idx = uint(
+    p.x +
+    p.y * d.x +
+    p.z * d.x * d.y
+  );
+
+  palette_idx = volumeMip5[idx];
+
+  return palette_idx > uint8_t(0);
+}
+
+bool voxel_get_mip6(vec3 pos, out uint8_t palette_idx) {
+  vec3 d = floor(dims / 64.0);
+  vec3 p = floor(pos / 64.0);
+  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
+    return false;
+  }
+
+  uint idx = uint(
+    p.x +
+    p.y * d.x +
+    p.z * d.x * d.y
+  );
+
+  palette_idx = volumeMip5[idx];
 
   return palette_idx > uint8_t(0);
 }
@@ -242,6 +289,7 @@ float trace_light1(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
 float trace_light(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
   vec3 normal = vec3(cursor.mask);
   const uint steps = 128;
+  float div = 1.0;
   vec3 cd = cdir(
     uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * resolution.x),
     normal
@@ -249,37 +297,38 @@ float trace_light(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
 
 
   //vec3 new_ray_dir = cd + lightPos - mapPos / div;
-  vec3 new_ray_dir = cd + (worldLightPos - cursor.rayPos);
+  vec3 new_ray_dir = (worldLightPos - (floor(cursor.rayPos) + 0.5));
   new_ray_dir = normalize(new_ray_dir);
 
   uint8_t noop;
-  vec3 pos = cursor.rayPos + cd + normal * 2.0 + new_ray_dir;
+  vec3 pos = (cursor.rayPos + normal * 0.1 + new_ray_dir)  / div;
+  vec3 origin = pos;
   float intensity = 1.0;//(distance(lightPos, pos) / float(steps));
-  if (distance(lightPos, pos) > float(steps * 5)) {
-    return -intensity;
+  if (distance(worldLightPos, cursor.rayPos) > float(steps * div * 2)) {
+    return 0.0;
   }
 
 
   for (int i=0; i<steps; i++) {
     //
-    if (voxel_get(floor(pos), noop)) {
-      //return -float(i)/float(steps);
-      return -intensity;
+    if (voxel_get(round(pos), noop)) {
+
+      return 0.00001;// - distance(origin, worldLightPos) / 64.0;
     }
 
-    if (distance(pos, worldLightPos) < 3.0) {
-      return intensity;
+    if (distance(pos, round(worldLightPos / div)) < div * 3.0) {
+      return intensity * 0.75;
     }
 
-    pos += (new_ray_dir * 1.0);
+    pos += (new_ray_dir * (div * 0.75));
 
   }
-  return -intensity;
+  return 0.0;
 }
 
 float trace_sky(in DDACursor cursor, vec2 uv) {
   vec3 normal = vec3(cursor.mask);
-  float div = 4.0;
+  float div = 2.0;
   vec3 mapPos = cursor.mapPos / div;
   vec3 hd = (dims * 0.5) / div;
 
@@ -295,7 +344,7 @@ float trace_sky(in DDACursor cursor, vec2 uv) {
     0.0,
     1.0,
     0.0
-  ) + cd ;
+  ) ;
   new_ray_dir = normalize(new_ray_dir) * div;
 
   DDACursor c = dda_cursor_create(
@@ -313,14 +362,14 @@ float trace_sky(in DDACursor cursor, vec2 uv) {
   uint8_t noop;
   vec3 found_normal;
   for (int i=0; i<64; i++) {
-    if (voxel_get_mip2(c.mapPos, noop)) {
+    if (voxel_get_mip1(c.mapPos, noop)) {
     // if (voxel_get_mip1(pos, noop)) {
-      return -0.75;
+      return -1.0;
     }
     dda_cursor_step(c, found_normal);
     // pos += new_ray_dir;
   }
-  return c.mapPos.y >= dims.y / 4.0 ? 1.0 : -1.0;
+  return c.mapPos.y >= dims.y / 4.0 ? 0.5 : -1.0;
 }
 
 vec3 trace_reflection(in DDACursor cursor, vec2 uv) {
@@ -359,13 +408,50 @@ vec3 trace_reflection(in DDACursor cursor, vec2 uv) {
 vec3 compute_ray_dir(vec2 uv, mat4 inv) {
   vec4 far = inv * vec4(-uv.x, uv.y, 1.0, 1.0);
   far /= far.w;
-  vec4 near = inv * vec4(-uv.x, uv.y, 0.1, 1.0);
+  vec4 near = inv * vec4(-uv.x, uv.y, 0.5, 1.0);
   near /= near.w;
 
-  return (far.xyz - near.xyz);
+  return normalize(far.xyz - near.xyz);
 }
 
 float sum(vec3 v) { return dot(v, vec3(1.0)); }
+
+bool voxel_mip(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
+  vec3 gridPos = pos;// * dims;
+  if (mip == 0) {
+    return voxel_get(gridPos, palette_idx);
+  }
+
+  if (mip == 1) {
+    return voxel_get_mip1(gridPos, palette_idx);
+  }
+
+  if (mip == 2) {
+    return voxel_get_mip2(gridPos, palette_idx);
+  }
+
+  if (mip == 3) {
+    return voxel_get_mip3(gridPos, palette_idx);
+  }
+
+  if (mip == 4) {
+    return voxel_get_mip4(gridPos, palette_idx);
+  }
+
+  if (mip == 5) {
+    return voxel_get_mip5(gridPos, palette_idx);
+  }
+
+  if (mip == 6) {
+    return voxel_get_mip6(gridPos, palette_idx);
+  }
+
+  return false;
+}
+
+float mincomp(vec3 v) {
+  return min(v.x, min(v.y, v.z));
+}
 
 void main() {
   if (any(greaterThanEqual(gl_GlobalInvocationID.xy, resolution))) {
@@ -375,94 +461,93 @@ void main() {
   vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(resolution) * 2.0 - 1.0;
   uvec2 out_color_pos = gl_GlobalInvocationID.xy;
   uint out_color_idx = out_color_pos.x + out_color_pos.y * resolution.x;
-  uint out_termination_idx = out_color_idx + terminationBufferIdx;
-
+  uint out_termination_idx = out_color_idx;// + terminationBufferIdx;
   vec3 in_ray_dir = compute_ray_dir(uv, inverse(VP));
 
   float found_distance;
   vec3 found_normal;
   vec3 hd = dims * 0.5;
-  bool hit = ailaWaldHitAABox(
-    hd,
-    hd,
-    eye,
-    in_ray_dir,
-    1.0 / in_ray_dir,
-    found_distance,
-    found_normal
-  );
 
-  if (hit) {
+  bool hit;
+  if (all(greaterThanEqual(eye, vec3(0.0))) && all(lessThan(eye, dims))) {
+    hit = true;//pos = eye + in_ray_dir * 0.001;
+    found_distance = 0.0;
+  } else {
+    hit = ailaWaldHitAABox(
+      hd,
+      hd,
+      eye,
+      in_ray_dir,
+      1.0 / in_ray_dir,
+      found_distance,
+      found_normal
+    );
+    found_distance += 0.1;
+  }
+  out_termination[out_termination_idx].color = vec4(0.2);
+  if (!hit) {
+    return;
+  }
 
-    vec3 pos = eye + in_ray_dir * found_distance;
+  uint8_t palette_idx;
+  vec3 c = vec3(0.2);
+  int i;
 
-    if (all(greaterThanEqual(eye, vec3(0.0))) && all(lessThanEqual(eye, dims))) {
-      pos = eye + in_ray_dir * 0.001;
+  int mip = 4;
+  vec3 d = in_ray_dir;
+  vec3 id = 1.0 / d;
+  vec3 p = eye + d * found_distance;
+  //d = vec3(0.0, 0.0, 1.0/dims.z);
+  //pos = vec3( gl_GlobalInvocationID.xy / resolution, 1);
+
+  float dt = 1.0 / length(dims);
+  float t = found_distance;
+  float opacityDiv = 1.0 / 8.0;
+
+  int minMip = 0;
+  int maxMip = 5;
+  mip = maxMip;
+  float mipSize = (float(1<<(mip)));
+  float invMipSize = 1.0 / mipSize;
+  for (i=0; i<ITERATIONS; i++) {
+    if (
+      any(lessThan(p, vec3(0.0))) ||
+      any(greaterThan(p, vec3(dims)))
+    ) {
+      break;
     }
 
-    //vec3 pos = (eye + in_ray_dir * found_distance) * dims;
-    vec3 rayPos = (pos - in_ray_dir * 0.001);
-    DDACursor cursor = dda_cursor_create(
-      rayPos,//- hd,
-      hd,
-      hd,
-      in_ray_dir
-    );
-    float bounced = 0.0;
-    vec3 agg;
-    uint8_t palette_idx;
-
-    bool lighting = false;
-    vec3 c = vec3(0.2);
-    float intensity = 0.0;//0.67;
-    vec3 reflectColor = vec3(0.0);
-    int i;
-
-    vec3 lightPos = vec3(
-      0.0,
-      (55 + sin(float(time)/100.00) * 50) / 2.0,
-      0.0
-    );
-
-    for (i=0; i<ITERATIONS; i++) {
-      if (voxel_get(cursor.mapPos, palette_idx)) {
-        intensity += (trace_light(cursor, uv, lightPos)) * 0.333;
-        intensity += (trace_light(cursor, uv, characterPos + vec3(10.0, 0.0, 0.0))) * 0.333;
-        intensity += trace_sky(cursor, uv) * .95;
-        if (cursor.mapPos.y < 10) {
-          vec3 rpos = trace_reflection(cursor, uv);
-          if (rpos.x >= 0.0 && voxel_get(rpos, palette_idx)) {
-            reflectColor = palette_color(palette_idx) / 2.0;
-          }
-        } else {
-            c = palette_color(palette_idx);
-        }
+    if (voxel_mip(p, mip, palette_idx)) {
+      if (mip == minMip) {
+        c = vec3(float(palette_idx) / 8.0);
+        //voxel_mip(p, 0, palette_idx);
+        c = palette_color(palette_idx);
         break;
       }
 
-      dda_cursor_step(cursor, found_normal);
+      mip = max(mip - 1, minMip);
+      t -= dt * 0.00125;
+
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      continue;
+    }
+    else if (mip < maxMip && !voxel_mip(p, min(mip + 1, maxMip), palette_idx)) {
+      mip++;
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      t += dt * 0.00125;
     }
 
-    if (i < ITERATIONS) {
-      //out_color[out_color_idx] = vec4(c + reflectColor * 0.2 + intensity * 0.2 * lightColor, 1.0);
-      vec3 lcolor = vec3(1.0, abs(sin(float(time) / 100.0) * 0.1 + 0.9), 0.7);
-
-      RayTermination termination;
-      vec3 outp = cursor.rayDir / sum(cursor.mask * cursor.rayDir) * sum(cursor.mask * (cursor.mapPos + vec3(lessThan(cursor.rayDir, vec3(0))) - rayPos)) + rayPos;
-      out_termination[out_termination_idx].position = vec4(cursor.rayPos, 0.0);
-      out_termination[out_termination_idx].normal = vec4(cursor.mask, 0.0);
-      out_termination[out_termination_idx].color = vec4(
-        c * 0.5 + reflectColor * .5 + intensity * 0.5 * lcolor, 1.0
-      );
-    } else {
-      out_termination[out_termination_idx].position = vec4(0.0);
-      out_termination[out_termination_idx].normal = vec4(0.0);
-      out_termination[out_termination_idx].color = vec4(0.0);
-    }
-  } else {
-    //out_color[out_color_idx] = vec4(0.2);
-    out_termination[out_termination_idx].position = vec4(0.0);
-    out_termination[out_termination_idx].normal = vec4(0.0);
-    out_termination[out_termination_idx].color = vec4(0.0);
+    vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
+    dt = max(mincomp(deltas), 0.0001) * mipSize;
+    t += dt;
+    t += max(0.1,t/256);
+    p = eye + d * t;// * t;// * (float(1<<(mip)));
   }
+  if (debug == 1.0) {
+    c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
+  }
+
+  out_termination[out_termination_idx].color = vec4(c, 1.0);
 }

@@ -444,6 +444,8 @@ int main(void) {
   SSBO *voxelSpaceSSBOMip2 = new SSBO(voxelSpaceBytes / 16);
   SSBO *voxelSpaceSSBOMip3 = new SSBO(voxelSpaceBytes / 32);
   SSBO *voxelSpaceSSBOMip4 = new SSBO(voxelSpaceBytes / 64);
+  SSBO *voxelSpaceSSBOMip5 = new SSBO(voxelSpaceBytes / 128);
+  SSBO *voxelSpaceSSBOMip6 = new SSBO(voxelSpaceBytes / 128);
 
   Program *fillVoxelSpace = new Program();
   fillVoxelSpace->add(Shaders::get("voxel-space-fill.comp"))->link();
@@ -476,7 +478,7 @@ int main(void) {
     static_cast<uint64_t>(windowDimensions[0]) *
     static_cast<uint64_t>(windowDimensions[1]) * 48;
 
-  #define TAA_HISTORY_LENGTH 64
+  #define TAA_HISTORY_LENGTH 16
   SSBO *terminationOutput = new SSBO(terminationBytes * static_cast<uint64_t>(TAA_HISTORY_LENGTH));
 
   cout << "window dimensions: " << windowDimensions[0] << ", " << windowDimensions[1] << endl;
@@ -733,22 +735,18 @@ int main(void) {
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     // Regenerate world
-    if (true) {
+    if (false) {
       // Clear the voxel space volume
       glm::uvec3 sdfDims(40, 40, 40);
+
       clearVoxelSpaceSDF
         ->use()
         ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
         ->uniform1ui("time", lastCharacterTime)
         ->uniformVec3("offset", lastCharacterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
-        ->uniformVec3ui("dims", voxelSpaceDims);
-
-      glDispatchCompute(
-        sdfDims.x,
-        sdfDims.y,
-        sdfDims.z
-      );
+        ->uniformVec3ui("dims", voxelSpaceDims)
+        ->compute(sdfDims);
 
       // Fill the voxel space volume
       fillVoxelSpaceSDF
@@ -757,29 +755,23 @@ int main(void) {
         ->uniform1ui("time", time)
         ->uniformVec3("offset", characterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
-        ->uniformVec3ui("dims", voxelSpaceDims);
-
-      glDispatchCompute(
-        sdfDims.x,
-        sdfDims.y,
-        sdfDims.z
-      );
+        ->uniformVec3ui("dims", voxelSpaceDims)
+        ->compute(sdfDims);
       
       // Apply gravity to the scene
-      //if (time % 5 == 0) {
+      if (time % 5 == 0) {
         gravityVoxelSpace
           ->use()
           ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
           ->ssbo("blueNoise", blue_noise->ssbo, 2)
           ->uniform1ui("time", time)
-          ->uniformVec3ui("dims", voxelSpaceDims);
-
-        glDispatchCompute(
-          voxelSpaceDims.x / 4,
-          1,
-          voxelSpaceDims.z / 4
-        );
-      //}
+          ->uniformVec3ui("dims", voxelSpaceDims)
+          ->compute(glm::uvec3(
+            voxelSpaceDims.x,
+            1,
+            voxelSpaceDims.z
+          ));
+      }
       lastCharacterTime = time;
 
       uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
@@ -790,21 +782,17 @@ int main(void) {
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
     
-    // Generate mipmap for SSBO (level 1)
-    {
+    // Generate mipmaps
+    if (true ||time % 5 == 0) {
+      double mipStart = glfwGetTime();
+      // Generate mipmap for SSBO (level 1)
       glm::uvec3 mipDims = voxelSpaceDims / glm::uvec3(2);
       mipmapVoxelSpace
         ->use()
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("dims", mipDims);
-
-      glDispatchCompute(
-        mipDims.x / 128,
-        mipDims.y / 8,
-        mipDims.z / 1
-      );
+        ->uniformVec3ui("destDims", mipDims)
+        ->compute(mipDims);
       gl_error();
     
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
@@ -815,72 +803,56 @@ int main(void) {
         ->use()
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("dims", mipDims);
-
-      glDispatchCompute(
-        mipDims.x / 128,
-        mipDims.y / 8,
-        mipDims.z / 1
-      );
+        ->uniformVec3ui("destDims", mipDims)
+        ->compute(mipDims);
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
+      
       // Generate mipmap for SSBO (level 3)
       mipDims = mipDims / glm::uvec3(2);
       mipmapVoxelSpace
         ->use()
         ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
         ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("dims", mipDims);
-
-      glDispatchCompute(
-        mipDims.x / 128,
-        mipDims.y / 8,
-        mipDims.z / 1
-      );
+        ->uniformVec3ui("destDims", mipDims)
+        ->compute(mipDims);
+      gl_error();
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+       
+      // Generate mipmap for SSBO (level 4)
+      mipDims = mipDims / glm::uvec3(2);
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip3, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip4, 2)
+        ->uniformVec3ui("destDims", mipDims)
+        ->compute(mipDims);
       gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-
-      /*
-      // Generate mipmap for SSBO
-      if (time % 10 == 0) {
-        mipmapVoxelSpace
-          ->use()
-          ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
-          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
-          ->uniform1ui("time", time)
-          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(8));
-
-        glDispatchCompute(
-          voxelSpaceDims.x / 2,
-          voxelSpaceDims.y / 2,
-          voxelSpaceDims.z / 2
-        );
-        gl_error();
-      }
+      // Generate mipmap for SSBO (level 5)
+      mipDims = mipDims / glm::uvec3(2);
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip4, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip5, 2)
+        ->uniformVec3ui("destDims", mipDims)
+        ->compute(mipDims);
+      gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-      // Generate mipmap for SSBO
-      if (time % 10 == 0) {
-        mipmapVoxelSpace
-          ->use()
-          ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip3, 1)
-          ->ssbo("destVolumeSlab", voxelSpaceSSBOMip4, 2)
-          ->uniform1ui("time", time)
-          ->uniformVec3ui("dims", voxelSpaceDims / glm::uvec3(16));
-
-        glDispatchCompute(
-          voxelSpaceDims.x / 2,
-          voxelSpaceDims.y / 2,
-          voxelSpaceDims.z / 2
-        );
-        gl_error();
-      }
+      // Generate mipmap for SSBO (level 6)
+      mipDims = mipDims / glm::uvec3(2);
+      mipmapVoxelSpace
+        ->use()
+        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip5, 1)
+        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip6, 2)
+        ->uniformVec3ui("destDims", mipDims)
+        ->compute(mipDims);
+      gl_error();
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
-      */
+
+      ImGui::Text("mipmaps: %f", (glfwGetTime() - mipStart) * 1000.0);
     }
     
     // Render the voxel space volume
@@ -920,9 +892,16 @@ int main(void) {
           ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
           ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
           ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
+          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
+          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip6, 7)
+          ->ssbo("outColorBuffer", raytraceOutput, 8)
+          ->ssbo("outTerminationBuffer", terminationOutput, 9)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
+
           ->uniformFloat("maxDistance", 10000)
           ->uniformMat4("VP", VP)
           ->uniform1ui("time", time)
+          ->uniformFloat("debug", debug)
           ->uniformVec3ui("lightPos", glm::uvec3(
             10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
             20,
@@ -934,10 +913,7 @@ int main(void) {
           ->uniformVec3("characterPos", catModel->getPosition())
 
           ->uniformVec2ui("resolution", res)
-          ->ssbo("outColorBuffer", raytraceOutput, 6)
-          ->ssbo("outTerminationBuffer", terminationOutput, 7)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 8)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
+          ->uniform1ui("terminationBufferIdx", 0);//res.x * res.y * (time%TAA_HISTORY_LENGTH));
 
         glDispatchCompute(
           windowDimensions[0] / 128 + 1,

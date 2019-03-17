@@ -3,7 +3,7 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-layout( local_size_x = 128, local_size_y = 8, local_size_z = 1 ) in;
+layout( local_size_x = 8, local_size_y = 1, local_size_z = 1 ) in;
 
 layout (std430, binding=1) buffer sourceVolumeSlab {
   uint8_t src_volume[];
@@ -14,57 +14,46 @@ layout (std430, binding=2) buffer destVolumeSlab {
 };
 
 
-uniform uvec3 dims;
-uniform uint time;
+uniform uvec3 destDims;
+uniform uvec3 sourceScale;
 
-void main() {
-  uvec3 pos = gl_GlobalInvocationID.xyz;
-
-  if (any(greaterThanEqual(pos, dims))) {
-    return;
-  }
-
-  uint dst_idx = (
+uint read(uvec3 pos, uvec3 dims) {
+  uint idx = (
     pos.x +
     pos.y * dims.x +
     pos.z * dims.x * dims.y
   );
+  return uint(src_volume[idx]) > 0 ? 1 : 0;
+}
 
-  uvec3 src_dims = dims * 2;
-  dest_volume[dst_idx] = uint8_t(0);
-  for (int x = 0; x<2; x++) {
-    for (int y = 0; y<2; y++) {
-      for (int z = 0; z<2; z++) {
+void write(uvec3 pos, uint val) {
+  uint idx = (
+    pos.x +
+    pos.y * destDims.x +
+    pos.z * destDims.x * destDims.y
+  );
+  dest_volume[idx] = uint8_t(val);
+}
 
-        uvec3 src_pos = uvec3(
-          (x + pos.x * 2),
-          (y + pos.y * 2),
-          (z + pos.z * 2)
-        );
-
-        if (any(greaterThanEqual(src_pos, src_dims))) {
-          continue;
-        }
-
-        uint src_idx = (
-          src_pos.x +
-          src_pos.y * src_dims.x +
-          src_pos.z * src_dims.x * src_dims.y
-        );
-
-        // TODO: there should be two types of grids:
-        // 1. traversal grid: where each voxel is represented by a single bit
-        // 2. material grid: where each voxel contains material information
-        // mimapping should probably only occur on the traversal grid as we
-        // should be able to resolve voxel materials once we have the grid pos
-        // where the ray terminates.
-        //
-        //  Not sure how to represent things like smoke in this system though.
-        if (src_volume[src_idx] != uint8_t(0)) {
-          dest_volume[dst_idx] = uint8_t(src_idx % 64 + 1);
-          break;
-        }
-      }
-    }
+void main() {
+  uvec3 dest_pos = gl_GlobalInvocationID.xyz;
+  if (any(greaterThan(dest_pos, destDims))) {
+    return;
   }
+
+  uint scale = 2;
+  uvec3 src_pos = dest_pos * scale;
+  uvec3 src_dims = destDims * scale;
+  uint density = 0;
+
+  density += read(src_pos + uvec3(0, 0, 0), src_dims) != 0 ? 1 : 0;
+  density += read(src_pos + uvec3(1, 0, 0), src_dims) != 0 ? 1 : 0;
+  density += read(src_pos + uvec3(1, 1, 0), src_dims) != 0 ? 1 : 0;
+  density += read(src_pos + uvec3(0, 1, 0), src_dims) != 0 ? 1 : 0;
+  density += read(src_pos + uvec3(0, 0, 1), src_dims) != 0 ? 1 : 0;
+  density += read(src_pos + uvec3(1, 0, 1), src_dims) != 0 ? 1 : 0;
+  density += read(src_pos + uvec3(1, 1, 1), src_dims) != 0 ? 1 : 0;
+  density += read(src_pos + uvec3(0, 1, 1), src_dims) != 0 ? 1 : 0;
+
+  write(dest_pos, density);
 }
