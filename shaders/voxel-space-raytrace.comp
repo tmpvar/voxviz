@@ -367,7 +367,7 @@ void main() {
   for (i=0; i<ITERATIONS; i++) {
     if (
       any(lessThan(p, vec3(0.0))) ||
-      any(greaterEqualThan(p, vec3(dims)))
+      any(greaterThanEqual(p, vec3(dims)))
     ) {
       miss = true;
       break;
