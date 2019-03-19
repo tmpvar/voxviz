@@ -471,6 +471,15 @@ int main(void) {
   SSBO *voxelSpaceSSBOMip5 = new SSBO(voxelSpaceBytes / 128);
   SSBO *voxelSpaceSSBOMip6 = new SSBO(voxelSpaceBytes / 128);
 
+
+  glm::uvec3 lightBufferDims(voxelSpaceDims / glm::uvec3(1));
+  uint64_t lightBufferBytes =
+    static_cast<uint64_t>(lightBufferDims.x) *
+    static_cast<uint64_t>(lightBufferDims.y) *
+    static_cast<uint64_t>(lightBufferDims.z) * 16;
+  SSBO *lightBuffer = new SSBO(lightBufferBytes);
+  
+  
   Program *fillVoxelSpace = new Program();
   fillVoxelSpace->add(Shaders::get("voxel-space-fill.comp"))->link();
 
@@ -496,6 +505,8 @@ int main(void) {
   Program *gravityVoxelSpace = new Program();
   gravityVoxelSpace->add(Shaders::get("voxel-space-gravity.comp"))->link();
 
+  Program *fillLightBuffer = new Program();
+  fillLightBuffer->add(Shaders::get("light-buffer-fill.comp"))->link();
 
   uint64_t outputBytes =
     static_cast<uint64_t>(windowDimensions[0]) *
@@ -892,6 +903,37 @@ int main(void) {
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
     
+    // Generate light buffer
+    {
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      
+      fillLightBuffer
+        ->use()
+        ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
+        ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
+        ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
+        ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
+        ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
+        ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
+        ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip5, 7)
+        ->ssbo("outLightBuffer", lightBuffer, 8)
+        ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+        ->uniformVec3("lightBufferDims", glm::vec3(lightBufferDims))
+        ->uniformVec3("scale", glm::vec3(4.0))
+        ->uniformVec3i("dir", glm::uvec3(1, 0, 0))
+        ->timedCompute(
+          "light",
+          glm::uvec3(
+            lightBufferDims.y,
+            lightBufferDims.z,
+            1
+          )
+        );
+
+      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    }
+
     // Render the voxel space volume
     if (false) {
       raytraceVoxelSpace
@@ -997,13 +1039,14 @@ int main(void) {
           ->ssbo("outColorBuffer", raytraceOutput, 1)
           ->ssbo("inTerminationBuffer", terminationOutput, 2)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
-
-        glDispatchCompute(
-          windowDimensions[0] / 128 + 1,
-          windowDimensions[1] / 8 + 1,
-          1
-        );
+          ->ssbo("inLightBuffer", lightBuffer, 8)
+          ->uniformVec3ui("lightDims", lightBufferDims)
+          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->timedCompute("blur", glm::uvec3(
+            windowDimensions[0],
+            windowDimensions[1],
+            1
+          ));
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
       // Debug rendering

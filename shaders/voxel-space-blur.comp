@@ -6,7 +6,7 @@
 #include "voxel-space.glsl"
 #include "cosine-direction.glsl"
 
-layout( local_size_x = 128, local_size_y = 8, local_size_z = 1 ) in;
+layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 
 layout (std430, binding=1) buffer outColorBuffer {
   vec4 out_color[];
@@ -19,6 +19,9 @@ layout (std430, binding=7) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
+layout (std430, binding=8) buffer inLightBuffer {
+  vec4 lightBuffer[];
+};
 
 uniform uvec2 resolution;
 uniform uint time;
@@ -26,6 +29,7 @@ uniform vec3 eye;
 uniform vec3 dims;
 uniform float debug;
 uniform uint terminationBufferIdx;
+uniform uvec3 lightDims;
 
 bool read(ivec2 pos, out RayTermination termination) {
   if (any(lessThan(pos, ivec2(0))) || any(greaterThanEqual(pos, resolution))) {
@@ -52,17 +56,31 @@ vec4 readT(ivec2 pos) {
   return color / 8;
 }
 
-
 void main() {
 
   ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
   uint idx = pos.x + pos.y * resolution.x;
   RayTermination o;
-  read(pos, o);
-
+  //read(pos, o);
+  o = in_termination[idx];
   //out_color[idx] = vec4(in_termination[idx].position.xyz / vec3(dims), 1.0);
+  //o = in_termination[idx];
+  // if (any(equal(vec3(-1.0), o.position.xyz))) {
+  //   out_color[idx] = o.color;
+  //   return;
+  // }
+  //out_color[idx] = in_termination[idx].color;
 
+  uvec3 d = lightDims;
+  uvec3 p = uvec3(o.position.xyz) / 4;
+  uint light_idx = (p.x + p.y * d.x + p.z * d.x * d.y);
+
+  vec4 v = lightBuffer[light_idx];
   out_color[idx] = in_termination[idx].color;
+  out_color[idx] = vec4(v.a);
+  //out_color[idx] = vec4(o.position.xyz / 4.0 / d.xyz, 1.0);
+  // out_color[idx] = vec4(v.xyz / lightDims * v.a, 1.0);
+  // out_color[idx] = vec4(o.position.xyz / vec3(lightDims) / 4 * v.a, 1.0);
 }
 
 void main1() {
@@ -77,6 +95,4 @@ void main1() {
     readT(pos),
     0.0//float(pos.x) > float(resolution.x) / 2.0 ? 1.0 : 0.0
   );
-
-  //out_color[idx] = o.color;
 }

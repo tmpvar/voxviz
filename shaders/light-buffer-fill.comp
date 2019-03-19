@@ -1,0 +1,76 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 8, local_size_y = 1, local_size_z = 1 ) in;
+
+uniform vec3 dims;
+uniform vec3 lightBufferDims;
+
+// uses bindings 1-7 and requires `dims`
+#include "voxel-space-mips.glsl"
+
+layout (std430, binding=8) buffer outLightBuffer {
+  vec4 lightBuffer[];
+};
+
+vec4 get(uvec3 p, uvec3 d) {
+
+  if (any(greaterThanEqual(p, uvec3(d)))) {
+    return vec4(-1.0);
+  }
+
+  uint idx = (p.x + p.y * d.x + p.z * d.x * d.y);
+  return lightBuffer[idx];
+}
+
+void set(uvec3 p, uvec3 d, vec4 v) {
+  if (any(greaterThanEqual(p, uvec3(d)))) {
+    return;
+  }
+
+  uint idx = (p.x + p.y * d.x + p.z * d.x * d.y);
+  lightBuffer[idx] = v;
+}
+
+void main() {
+  uvec3 p = uvec3(
+    1,
+    gl_GlobalInvocationID.x,
+    gl_GlobalInvocationID.y
+  );
+
+  uvec3 d = uvec3(lightBufferDims);
+  if (any(greaterThanEqual(p, d))) {
+    return;
+  }
+  float prev = 1.0;
+  float m = float(d.x);
+
+  uint8_t palette_idx;
+  bool occluded = false;
+  for (; p.x<d.x; p.x++) {
+    occluded = occluded || voxel_mip(
+      p * 2,
+      0,
+      palette_idx
+    );
+
+    if (occluded) {
+       prev *= 0.90;
+    }
+
+    float intensity = min(prev, 1.0 - float(p.x) / float(d.x));
+
+    set(
+      p,
+      d,
+      vec4(p, intensity)
+    );
+
+    prev = intensity;
+
+  }
+
+}
