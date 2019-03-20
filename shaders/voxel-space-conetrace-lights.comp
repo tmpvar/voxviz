@@ -1,0 +1,213 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 32 , local_size_y = 1, local_size_z = 1 ) in;
+
+#include "ray-aabb.glsl"
+#include "dda-cursor.glsl"
+#include "palette.glsl"
+#include "cosine-direction.glsl"
+#include "voxel-space.glsl"
+#include "hsl.glsl"
+
+uniform uvec2 out_color_dims;
+uniform mat4 VP;
+uniform uvec2 resolution;
+uniform float debug;
+uniform vec3 eye;
+uniform vec3 dims;
+uniform uint time;
+uniform uint terminationBufferIdx;
+uniform uint lightCount;
+
+// uses bindings 1-7 and requires `dims`
+#include "voxel-space-mips.glsl"
+
+layout (std430, binding=9) buffer outTerminationBuffer {
+  RayTermination out_termination[];
+};
+
+layout (std430, binding=10) buffer blueNoiseBuffer {
+  vec4 blueNoise[];
+};
+
+struct Light {
+  vec4 position;
+  vec4 color;
+};
+
+layout (std430, binding=11) buffer lightBuffer {
+  Light lights[];
+};
+
+
+vec3 sphereRandom(vec2 r) {
+    float cosPhi = r.x * 2.0 - 1.0;
+    float sinPhi = sqrt(1 - (cosPhi * cosPhi));
+    float theta = r.y * 2.0 * 3.1415927;
+    return vec3(sinPhi * cos(theta), sinPhi * cos(theta), cosPhi);
+}
+
+vec3 hemisphereRandom(vec2 r) {
+    vec3 s = sphereRandom(r);
+    return vec3(s.x, s.y, s.z);
+}
+
+vec3 cdir(in uint seed, in vec3 normal) {
+  // uint slice = (time % 64) * 4096;
+
+  vec2 bn = blueNoise[(seed * time / 10000) % (4096 * 64)].xy;
+  vec3 d = sphereRandom(bn);
+
+  if (normal.x == 1.0) {
+    d.x = abs(d.x);
+  }
+
+  if (normal.y == 1.0) {
+    d.y = abs(d.y);
+  }
+
+  if (normal.z == 1.0) {
+    d.z = abs(d.z);
+  }
+  return d;
+
+
+  float u = bn.x;
+  float v = bn.y;
+
+	// // method 3 by fizzer: http://www.amietia.com/lambertnotangent.html
+  float a = 6.2831853 * v;
+  //u = 2.0*u - 1.0;
+  return normalize(
+    normal + vec3(sqrt(1.0-u*u) * vec2(cos(a), sin(a)), u)
+  );
+}
+
+
+
+float trace_light(RayTermination r, Light light) {
+  vec3 normal = r.normal.xyz;
+  vec3 origin = r.position.xyz + normal;
+  vec3 rayDir = r.rayDir.xyz;
+  vec3 lightPos = light.position.xyz;
+  const uint steps = 64;
+
+  vec3 cd = cdir(
+    uint(
+      gl_GlobalInvocationID.x +
+      gl_GlobalInvocationID.y * resolution.x
+    ),
+    normal
+  ); // roughness
+
+  //vec3 new_ray_dir = cd + lightPos - mapPos / div;
+  vec3 pos = origin;
+  vec3 d = (lightPos - pos) + cd * 2.0;
+  float dt = 1.0 / length(dims);
+  d = normalize(d);
+  vec3 id = 1.0 / d;
+
+  uint8_t palette_idx;
+
+  float intensity = 1.0;
+
+  float mip = 0;
+  float minMip = 0;
+  float maxMip = 5;
+  float mipSize = float(1<<uint(mip));
+  float invMipSize = 1.0/mipSize;
+  float t = 0.0;
+  for (int i=0; i<steps; i++) {
+    if (
+      any(lessThan(pos, vec3(0.0))) ||
+      any(greaterThanEqual(pos, vec3(dims)))
+    ) {
+      return -1.0;
+    }
+
+    intensity = 2.0 - t / float(steps*2);
+
+    if (intensity <= -0.9) {
+      return intensity;
+    }
+
+    bool hit = voxel_mip(pos, uint(floor(mip)), palette_idx);
+    if (hit) {
+      if (mip == minMip) {
+        if (palette_idx < uint8_t(4)) {
+          intensity -= 0.1;
+        } else {
+          return -1.0;
+        }
+      } else {
+        mip -= 1.0;
+        t -= dt * 0.00125;
+
+        mipSize = (float(1<<uint(mip)));
+        invMipSize = 1.0 / mipSize;
+        continue;
+      }
+    }
+    else if (mip < maxMip) {//} && !voxel_mip(pos, uint(mip + 1.0), palette_idx)) {
+      mip += 1.0;
+      mipSize = (float(1<<uint(mip)));
+      invMipSize = 1.0 / mipSize;
+      t += dt * 0.00125;
+    }
+
+    if (distance(pos, lightPos) <  10.0) {
+      return intensity;
+    }
+
+    vec3 deltas = (step(0.0, d) - fract(pos * invMipSize)) * id;
+    dt = max(mincomp(deltas), 0.001) * mipSize;
+    t += dt;
+   //t += max(0.1, t / 16);
+    pos = origin + d * t;
+  }
+  return -1.0;
+}
+
+struct RayHit {
+  vec3 pos;
+  vec3 dir;
+  float t;
+  vec3 normal;
+};
+
+float sum(vec3 v) { return dot(v, vec3(1.0)); }
+
+void main() {
+  uvec2 screen_pos = gl_GlobalInvocationID.xy * 2;
+  uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
+  uint out_idx = screen_idx;// + terminationBufferIdx;
+
+  if (any(greaterThanEqual(gl_GlobalInvocationID.xy, resolution))) {
+    out_termination[out_idx].color = vec4(0.0);
+    return;
+  }
+
+  if (debug > 0.0) {
+    return;
+  }
+
+  RayTermination o = out_termination[out_idx];
+
+  if (all(equal(o.position, vec4(-1.0)))) {
+    return;
+  }
+
+  vec4 voxelColor = vec4(0.0);//o.color;
+  float intensity = 0.0;
+  for (int i=0; i<lightCount; i++) {
+    Light light = lights[i];
+    voxelColor = max(voxelColor, light.color * trace_light(o, light));
+  }
+
+  out_termination[out_idx].color = voxelColor;//vec4(intensity);
+  // out_termination[out_idx].color = vec4(0.5 * voxelColor, 1.0);
+
+}

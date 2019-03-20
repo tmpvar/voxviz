@@ -81,10 +81,10 @@ void main() {
 
     vec2 uv = last_pos.xz / d.xz;
     vec2 bn = 2.0 * blueNoise[time + (last_pos.z * last_pos.x % 4096) * (time % 64)].xy - 0.5;
-return;
+
     volumeMip0[dest_idx] = uint8_t(
        //dest_idx % 200 + 2
-      length(bn) < 0.002515  ? uint8_t(16) : volumeMip0[dest_idx]
+      length(bn) < 0.2515  ? uint8_t(16) : volumeMip0[dest_idx]
     );
   }
 }

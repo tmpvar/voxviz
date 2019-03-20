@@ -44,7 +44,10 @@ SSBO *raytraceOutput = nullptr;
 #define TAA_HISTORY_LENGTH 16
 #define RAY_TERMINATION_BYTES 64
 SSBO *terminationOutput = nullptr;
-
+typedef struct Light {
+  glm::vec4 position;
+  glm::vec4 color;
+};
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -470,6 +473,11 @@ int main(void) {
   SSBO *voxelSpaceSSBOMip4 = new SSBO(voxelSpaceBytes / 64);
   SSBO *voxelSpaceSSBOMip5 = new SSBO(voxelSpaceBytes / 128);
   SSBO *voxelSpaceSSBOMip6 = new SSBO(voxelSpaceBytes / 128);
+  
+  #define MAX_LIGHTS 4
+  SSBO *lightBuffer = new SSBO(
+    16 * MAX_LIGHTS // light position + color,intensity
+  );
 
   Program *fillVoxelSpace = new Program();
   fillVoxelSpace->add(Shaders::get("voxel-space-fill.comp"))->link();
@@ -496,6 +504,9 @@ int main(void) {
   Program *gravityVoxelSpace = new Program();
   gravityVoxelSpace->add(Shaders::get("voxel-space-gravity.comp"))->link();
 
+  Program *lightRays_Compute = new Program();
+  lightRays_Compute->add(Shaders::get("voxel-space-conetrace-lights.comp"))->link();
+
 
   uint64_t outputBytes =
     static_cast<uint64_t>(windowDimensions[0]) *
@@ -506,7 +517,7 @@ int main(void) {
     static_cast<uint64_t>(windowDimensions[0]) *
     static_cast<uint64_t>(windowDimensions[1]) * RAY_TERMINATION_BYTES;
 
-  #define TAA_HISTORY_LENGTH 16
+  #define TAA_HISTORY_LENGTH 1
   terminationOutput = new SSBO(terminationBytes * static_cast<uint64_t>(TAA_HISTORY_LENGTH));
 
   cout << "window dimensions: " << windowDimensions[0] << ", " << windowDimensions[1] << endl;
@@ -950,7 +961,7 @@ int main(void) {
           ->uniformVec3("characterPos", catModel->getPosition())
 
           ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", 0) //res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
           ->timedCompute(
             "primary rays",
             glm::uvec3(
@@ -959,8 +970,10 @@ int main(void) {
               1
             )
           );
-
-
+      }
+     
+      // Trace sky rays
+      {
         skyRays_Compute
           ->use()
           ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
@@ -976,9 +989,57 @@ int main(void) {
           ->uniformFloat("debug", debug)
           ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
           ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", 0) //res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
           ->timedCompute(
             "sky rays",
+            glm::uvec3(res, 1)
+          );
+      }
+
+      {
+
+        Light *lights = (Light *)lightBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
+        Light light;
+
+        light.position = glm::vec4(
+          1.0,
+          60.0, //30.0 + sin(time / 100.0) * 30.0,
+          1.0,
+          1.0
+        );
+        light.color = glm::vec4(1.0, 1.0, 1.0, 1.0);
+
+        memcpy(&lights[0], &light, sizeof(light));
+
+
+        light.position = glm::vec4(catModel->getPosition() + glm::vec3(0.0, 20, 0.0), 0.0);
+        light.color = glm::vec4(1.0, 0.0, 0.0, 1.0);
+
+        memcpy(&lights[1], &light, sizeof(light));
+
+        lightBuffer->endMap();
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+        lightRays_Compute
+          ->use()
+          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
+          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
+          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
+          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
+          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
+          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
+          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip6, 7)
+          ->ssbo("outTerminationBuffer", terminationOutput, 9)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
+          ->ssbo("lightBuffer", lightBuffer, 11)
+          ->uniform1ui("time", time)
+          ->uniformFloat("debug", debug)
+          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+          ->uniformVec2ui("resolution", res)
+          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->uniform1ui("lightCount", 2) // TODO: only send the actual count
+          ->timedCompute(
+            "lights",
             glm::uvec3(res, 1)
           );
       }
@@ -997,13 +1058,15 @@ int main(void) {
           ->ssbo("outColorBuffer", raytraceOutput, 1)
           ->ssbo("inTerminationBuffer", terminationOutput, 2)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH));
-
-        glDispatchCompute(
-          windowDimensions[0] / 128 + 1,
-          windowDimensions[1] / 8 + 1,
-          1
-        );
+          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->timedCompute(
+            "taa",
+            glm::uvec3(
+              windowDimensions[0],
+              windowDimensions[1],
+              1
+            )
+          );
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
       // Debug rendering
@@ -1024,7 +1087,7 @@ int main(void) {
     {
       static float f = 0.0f;
       static int counter = 0;
-      ImGui::Text("%.1fFPS (%.3f ms)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("%.1fFPS (%.3f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
       ImGui::Text("camera(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
     }
 

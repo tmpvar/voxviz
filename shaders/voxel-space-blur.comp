@@ -6,11 +6,12 @@
 #include "voxel-space.glsl"
 #include "cosine-direction.glsl"
 
-layout( local_size_x = 128, local_size_y = 8, local_size_z = 1 ) in;
+layout( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
 
 layout (std430, binding=1) buffer outColorBuffer {
   vec4 out_color[];
 };
+
 layout (std430, binding=2) buffer inTerminationBuffer {
   RayTermination in_termination[];
 };
@@ -26,6 +27,8 @@ uniform vec3 eye;
 uniform vec3 dims;
 uniform float debug;
 uniform uint terminationBufferIdx;
+
+#define TAA_SAMPLES 16
 
 bool read(ivec2 pos, out RayTermination termination) {
   if (any(lessThan(pos, ivec2(0))) || any(greaterThanEqual(pos, resolution))) {
@@ -44,24 +47,27 @@ vec4 readT(ivec2 pos) {
     return color;
   }
 
-  for (uint i=1; i<=16; i++) {
-    uint idx = (pos.x + pos.y * resolution.x) + (resolution.x * resolution.y * ((time + i) % 16));
+  for (uint i=1; i<=TAA_SAMPLES; i++) {
+    uint idx = (pos.x + pos.y * resolution.x) + (resolution.x * resolution.y * ((time + i) % TAA_SAMPLES));
     color += in_termination[idx].color;// * (1.0 * float(i) / 16.0);//((1 + float(i % 64)) / 64.0);
  }
 
-  return color / 8;
+  return color / TAA_SAMPLES;
 }
 
 
 void main() {
 
   ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-  uint idx = pos.x + pos.y * resolution.x;
+  if (any(greaterThanEqual(pos, resolution))) {
+    return;
+  }
+
   RayTermination o;
   read(pos, o);
 
   //out_color[idx] = vec4(in_termination[idx].position.xyz / vec3(dims), 1.0);
-
+  uint idx = pos.x + pos.y * resolution.x;
   out_color[idx] = in_termination[idx].color;
 }
 
@@ -69,6 +75,11 @@ void main1() {
 
   ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
   uint idx = pos.x + pos.y * resolution.x;
+  if (any(greaterThanEqual(pos, resolution))) {
+
+    return;
+  }
+
   RayTermination o;
   read(pos, o);
 
