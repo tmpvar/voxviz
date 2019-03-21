@@ -72,6 +72,19 @@ vec3 cdir(in uint seed, in vec3 normal) {
   if (normal.z == 1.0) {
     d.z = abs(d.z);
   }
+
+  if (normal.x == -1.0) {
+    d.x = -abs(d.x);
+  }
+
+  if (normal.y == -1.0) {
+    d.y = -abs(d.y);
+  }
+
+  if (normal.z == -1.0) {
+    d.z = -abs(d.z);
+  }
+
   return d;
 
 
@@ -105,7 +118,7 @@ float trace_light(RayTermination r, Light light) {
 
   //vec3 new_ray_dir = cd + lightPos - mapPos / div;
   vec3 pos = origin;
-  vec3 d = (lightPos - pos) + cd * 2.0;
+  vec3 d = (lightPos - pos) + cd;
   float dt = 1.0 / length(dims);
   d = normalize(d);
   vec3 id = 1.0 / d;
