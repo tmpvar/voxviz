@@ -25,7 +25,7 @@ TEST_CASE("[obb] basic", "obb") {
   vec3 resizeVec(20.0);
   OBB *resize = obb->resize(resizeVec);
   REQUIRE(obb == resize);
-  REQUIRE(all(equal(resize->getRadius(), resizeVec)));w
+  REQUIRE(all(equal(resize->getRadius(), resizeVec)));
 
 
 }

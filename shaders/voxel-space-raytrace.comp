@@ -36,168 +36,11 @@ layout (std430, binding=10) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
+layout (std430, binding=11) buffer rayMaskBuffer {
+  uint rayMask[];
+};
 
-
-#define ITERATIONS 256
-
-vec2 noise2d(uvec3 pos) {
-  uint idx = (pos.x % 64) + (pos.y%64) * 64 + (pos.z%64) * 64 * 64;
-  return 2.0 * blueNoise[idx].xy - 1.0;
-}
-
-vec3 cangle(uvec3 pos, vec3 normal) {
-  vec2 uv = noise2d(pos) * 0.1;
-  float a = 6.2831853 * uv.y;
-  float u = uv.x;//2.0*uv.x - 1.0;
-  return normalize( normal + vec3(sqrt(1.0-u*u) * vec2(cos(a), sin(a)), u) );
-}
-
-vec3 cdir(in uint seed, in vec3 normal) {
-  // uint slice = (time % 64) * 4096;
-
-  vec2 bn = 2.0 * blueNoise[(seed * time * 1000) % (4096 * 64)].xy - 0.5;
-
-  float u = bn.x;
-  float v = bn.y;
-
-	// // method 3 by fizzer: http://www.amietia.com/lambertnotangent.html
-  float a = 6.2831853 * v;
-  //u = 2.0*u - 1.0;
-  return normalize(
-    normal + vec3(sqrt(1.0-u*u) * vec2(cos(a), sin(a)), u)
-  );
-}
-
-float trace_light1(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
-  vec3 normal = vec3(cursor.mask);
-  float div = 1.0;
-
-  vec3 mapPos = cursor.mapPos / div;
-  vec3 hd = (dims * 0.5) / div;
-  vec3 lightPos = (worldLightPos / div);
-  const uint steps = 512;
-  vec3 cd = cdir(
-    uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * resolution.x),
-    normal
-  ) * 0.5; // roughness
-
-  // float intensity = (1.0 - distance(lightPos, mapPos) / float(steps)) * 2.0;
-  // if (distance(lightPos, mapPos) > float(steps)) {
-  //   return -intensity;
-  // }
-  float intensity = 1.0;
-
-  //vec3 new_ray_dir = cd + lightPos - mapPos / div;
-  vec3 new_ray_dir = (lightPos - mapPos);
-  new_ray_dir = normalize(new_ray_dir);
-
-  DDACursor c = dda_cursor_create(
-    (mapPos - hd + sign(new_ray_dir) * normal),
-    vec3(0.0),
-    hd,
-    new_ray_dir
-  );
-
-  uint8_t noop;
-  vec3 found_normal;
-  for (int i=0; i<steps; i++) {
-    if (voxel_get(c.mapPos, noop)) {
-      return -intensity;
-    }
-
-    if (distance(c.rayPos + hd, worldLightPos) < 1.0) {
-      return intensity;
-    }
-    dda_cursor_step(c, found_normal);
-  }
-  return -intensity;//2.0 - length((lightPos - cursor.rayPos)/vec3(dims));
-}
-
-float trace_light(in DDACursor cursor, vec2 uv, vec3 worldLightPos) {
-  vec3 normal = vec3(cursor.mask);
-  const uint steps = 128;
-  float div = 1.0;
-  vec3 cd = cdir(
-    uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * resolution.x),
-    normal
-  ); // roughness
-
-
-  //vec3 new_ray_dir = cd + lightPos - mapPos / div;
-  vec3 new_ray_dir = (worldLightPos - (floor(cursor.rayPos) + 0.5));
-  new_ray_dir = normalize(new_ray_dir);
-
-  uint8_t noop;
-  vec3 pos = (cursor.rayPos + normal * 0.1 + new_ray_dir)  / div;
-  vec3 origin = pos;
-  float intensity = 1.0;//(distance(lightPos, pos) / float(steps));
-  if (distance(worldLightPos, cursor.rayPos) > float(steps * div * 2)) {
-    return 0.0;
-  }
-
-
-  for (int i=0; i<steps; i++) {
-    //
-    if (voxel_get(round(pos), noop)) {
-
-      return 0.00001;// - distance(origin, worldLightPos) / 64.0;
-    }
-
-    if (distance(pos, round(worldLightPos / div)) < div * 3.0) {
-      return intensity * 0.75;
-    }
-
-    pos += (new_ray_dir * (div * 0.75));
-
-  }
-  return 0.0;
-}
-
-float trace_sky1(in DDACursor cursor, vec2 uv) {
-  vec3 normal = vec3(cursor.mask);
-  float div = 2.0;
-  vec3 mapPos = cursor.mapPos / div;
-  vec3 hd = (dims * 0.5) / div;
-
-  vec3 cd = normalize(cdir(
-    uint(
-      gl_GlobalInvocationID.x +
-      gl_GlobalInvocationID.y * resolution.x
-    ),
-    normal
-  )); // roughness
-
-  vec3 new_ray_dir = vec3(
-    0.0,
-    1.0,
-    0.0
-  ) ;
-  new_ray_dir = normalize(new_ray_dir) * div;
-
-  DDACursor c = dda_cursor_create(
-    (cursor.mapPos / div - hd + new_ray_dir + sign(new_ray_dir) * normal + cd * 0.5),
-    vec3(0.0),
-    hd,
-    new_ray_dir
-  );
-  // vec3 pos = cursor.mapPos / 2.0;// + normal*div + new_ray_dir;// + normal;// + new_ray_dir*div;// + (normal*div + cd *div * 2.0 +  new_ray_dir * div + cd * div * 0.5) * div;// normal * 4;// + cd * 0.005;
-  // pos += normal + vec3(0.0, dims.y/2.0-, 0.0);
-  // pos += sign(new_ray_dir);
-  // pos += cd;
-  // //pos += sign(new_ray_dir) * 2.0 + normal * 2.0 + new_ray_dir;
-
-  uint8_t noop;
-  vec3 found_normal;
-  for (int i=0; i<64; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
-    // if (voxel_get_mip1(pos, noop)) {
-      return -1.0;
-    }
-    dda_cursor_step(c, found_normal);
-    // pos += new_ray_dir;
-  }
-  return c.mapPos.y >= dims.y / 4.0 ? 0.5 : -1.0;
-}
+#define ITERATIONS 1024
 
 struct RayHit {
   vec3 pos;
@@ -205,84 +48,6 @@ struct RayHit {
   float t;
   vec3 normal;
 };
-
-float trace_sky(RayHit hit) {
-  // vec3 normal = vec3(cursor.mask);
-  // float div = 2.0;
-  // vec3 mapPos = cursor.mapPos / div;
-  // vec3 hd = (dims * 0.5) / div;
-  //
-  vec3 cd = normalize(cdir(
-    uint(
-      gl_GlobalInvocationID.x +
-      gl_GlobalInvocationID.y * resolution.x
-    ),
-    //uint(hit.pos.x + hit.pos.y * dims.x + hit.pos.z * dims.x * dims.y),
-    hit.normal
-  )); // roughness
-
-  vec3 new_ray_dir = cd * 4.0;
-  vec3 origin = hit.pos + hit.normal * 2.0 + new_ray_dir;
-  vec3 p = origin;
-  float t = 0;
-  vec3 id = 1.0 / new_ray_dir;
-  uint8_t noop;
-
-  for (int i=0; i<3; i++) {
-    if (
-      any(lessThan(p, vec3(0.0))) ||
-      any(greaterThan(p, vec3(dims)))
-    ) {
-      break;
-    }
-
-    bool hit = voxel_mip(p, 1, noop);
-    if (hit && noop > uint8_t(2)) {
-      return -1.0;
-    }
-
-    vec3 deltas = (step(0.0, new_ray_dir) - 2.0*fract(p/* * invMipSize*/)) * id;
-    float dt = max(mincomp(deltas), 0.0001);// * mipSize;
-    //t += dt;
-    t += max(0.1, t * 0.9) * 2.0;
-    p = origin + new_ray_dir + cd * t;
-    //p += new_ray_dir;
-  }
-  return 1.0;
-}
-
-vec3 trace_reflection(in DDACursor cursor, vec2 uv) {
-  vec3 hd = (dims * 0.5) / 2;
-  vec3 normal = normalize(vec3(cursor.mask));
-  vec3 mapPos = cursor.mapPos / 2.0;
-
-  vec3 cd = vec3(0.0);
-
-  cd = cdir(
-    uint(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * resolution.x),
-    normal
-  ) * 0.15; // roughness
-
-  vec3 new_ray_dir = reflect(normalize(cursor.rayDir) + cd, normal);
-  new_ray_dir = normalize(new_ray_dir);
-
-  DDACursor c = dda_cursor_create(
-    cursor.rayPos / 2.0 + sign(new_ray_dir) + normal * 2.0 + new_ray_dir,
-    hd,
-    hd,
-    new_ray_dir
-  );
-
-  uint8_t noop;
-  vec3 found_normal;
-  for (int i=0; i<64; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
-      return c.mapPos * 2.0;
-    }
-    dda_cursor_step(c, found_normal);
-  }
-  return vec3(-1.0);
-}
 
 vec3 compute_ray_dir(vec2 uv, mat4 inv) {
   vec4 far = inv * vec4(-uv.x, uv.y, 1.0, 1.0);
@@ -294,8 +59,6 @@ vec3 compute_ray_dir(vec2 uv, mat4 inv) {
 }
 
 float sum(vec3 v) { return dot(v, vec3(1.0)); }
-
-
 
 void main() {
   if (any(greaterThanEqual(gl_GlobalInvocationID.xy, resolution))) {
@@ -338,6 +101,7 @@ void main() {
 
 
   uint8_t palette_idx;
+  uint8_t noop;
   vec3 c = vec3(0.0);
   int i;
 
@@ -354,18 +118,17 @@ void main() {
   float opacityDiv = 1.0 / 8.0;
 
   int minMip = 0;
-  int maxMip = 5;
+  int maxMip = 3;
   mip = 0;
   float mipSize = (float(1<<(mip)));
   float invMipSize = 1.0 / mipSize;
   vec3 mask;
-  bool miss = false;
+  bool miss = true;
   for (i=0; i<ITERATIONS; i++) {
     if (
       any(lessThan(p, vec3(0.0))) ||
       any(greaterThanEqual(p, vec3(dims)))
     ) {
-      miss = true;
       break;
     }
 
@@ -380,17 +143,12 @@ void main() {
                           step(prevP.xyz, prevP.yzx) *
                           step(prevP.xyz, prevP.zxy);
         }
-
-        RayHit hit;
-        hit.pos = p;
-        hit.dir = d;
-        hit.t = t;
-        hit.normal = found_normal;
+        miss = false;
         break;
       }
 
       mip = max(mip - 1, minMip);
-      t -= dt * 0.00125;
+      t -= dt * 0.0125;
 
       mipSize = (float(1<<(mip)));
       invMipSize = 1.0 / mipSize;
@@ -400,16 +158,16 @@ void main() {
       mip++;
       mipSize = (float(1<<(mip)));
       invMipSize = 1.0 / mipSize;
-      t += dt * 0.00125;
+      t += dt * 0.0125;
     }
 
     vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
-    dt = max(mincomp(deltas), 0.0001) * mipSize;
+    dt = max(mincomp(deltas), 0.00005) * mipSize;
     t += dt;
     // FIXME: we get ~1ms back if this is enabled, but lose the ability to
     //        compute good face normals. There is likely a better mechanism
     //        for increasing marching speed at further distances (cone marching?)
-    // t += max(0.1,t/1024);
+    //t += max(0.1,t * 0.01);
     prevP = deltas;
     p = eye + d * t;
   }
@@ -417,8 +175,148 @@ void main() {
     c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
   }
 
+  out_termination[out_termination_idx].normal = vec4(0.0);
+  out_termination[out_termination_idx].position = vec4(-1.0);
+  out_termination[out_termination_idx].color = vec4(c, 0.0);
+
+  if (miss) {
+    return;
+  }
+
+  if (voxel_mip(p + found_normal, 0, noop)) {
+    return;
+  }
+
+  uvec3 on = uvec3(notEqual(vec3(0.0), found_normal));
+  uvec3 negative = uvec3(lessThan(vec3(0.0), found_normal));
+
+  // b00110100
+  //    ||||||_ x non-zero (false)
+  //    |||||_ x negative (false)
+  //    ||||_ y non-zero (true)
+  //    |||_ y negative (false)
+  //    ||_ z non-zero (true)
+  //    |_ z negative (true)
+  uint update =
+    (on.x << 0) | (negative.x << 1) |
+    (on.y << 2) | (negative.y << 3) |
+    (on.z << 4) | (negative.z << 5);
+
+  atomicOr(rayMask[voxel_get_idx(p)], update);
+
   out_termination[out_termination_idx].color = vec4(c, 1.0);
-  out_termination[out_termination_idx].position = miss ? vec4(-1.0) : vec4(p, 1.0);
+  out_termination[out_termination_idx].position = vec4(p, 1.0);
   out_termination[out_termination_idx].normal = vec4(found_normal, 1.0);
+}
+
+void main_dda() {
+  if (any(greaterThanEqual(gl_GlobalInvocationID.xy, resolution))) {
+    return;
+  }
+
+  vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(resolution) * 2.0 - 1.0;
+  uvec2 out_color_pos = gl_GlobalInvocationID.xy;
+  uint out_color_idx = out_color_pos.x + out_color_pos.y * resolution.x;
+  uint out_termination_idx = out_color_idx + terminationBufferIdx;
+  vec3 in_ray_dir = compute_ray_dir(uv, inverse(VP));
+
+  float found_distance;
+  vec3 found_normal = vec3(0.0);
+  vec3 hd = dims * 0.5;
+
+  bool hit;
+  if (all(greaterThanEqual(eye, vec3(0.0))) && all(lessThan(eye, dims))) {
+    hit = true;//pos = eye + in_ray_dir * 0.001;
+    found_distance = 0.0;
+  } else {
+    hit = ourIntersectBoxCommon(
+      hd,
+      hd,
+      eye,
+      in_ray_dir,
+      1.0 / in_ray_dir,
+      found_distance,
+      found_normal
+    );
+    found_distance += 0.1;
+  }
+
+  out_termination[out_termination_idx].position = vec4(-1.0);
+  out_termination[out_termination_idx].color = vec4(0.0);
+  out_termination[out_termination_idx].normal = vec4(0.0);
+  out_termination[out_termination_idx].rayDir = vec4(in_ray_dir, 1.0);
+
+  if (!hit) {
+    return;
+  }
+
+  vec3 p = eye + in_ray_dir * found_distance;
+
+  DDACursor cursor = dda_cursor_create(
+    p,
+    vec3(dims)/2.0,
+    vec3(dims)/2.0,
+    in_ray_dir
+  );
+
+  bool miss = true;
+  vec3 c = vec3(0.0);
+  int i = 0;
+  uint8_t palette_idx;
+  for (i=0; i<ITERATIONS; i++) {
+    if (voxel_mip(cursor.rayPos, 0, palette_idx)) {
+      c = palette_color(palette_idx);
+      miss = false;
+      break;
+    }
+
+    dda_cursor_step(cursor, found_normal);
+  }
+
+  if (debug == 1.0) {
+    c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
+  }
+
+  if (miss) {
+    return;
+  }
+
+  out_termination[out_termination_idx].normal = vec4(found_normal, 1.0);
+  out_termination[out_termination_idx].color = vec4(c, 1.0);
+  out_termination[out_termination_idx].position = vec4(cursor.rayPos, 1.0);
+
+  if (voxel_mip(cursor.rayPos + found_normal, 0, palette_idx)) {
+    return;
+  }
+
+  uvec3 on = uvec3(notEqual(vec3(0.0), found_normal));
+  uvec3 negative = uvec3(lessThan(vec3(0.0), found_normal));
+
+  // b00110100
+  //    ||||||_ x non-zero (false)
+  //    |||||_ x negative (false)
+  //    ||||_ y non-zero (true)
+  //    |||_ y negative (false)
+  //    ||_ z non-zero (true)
+  //    |_ z negative (true)
+  uint update =
+    (on.x << 0) | (negative.x << 1) |
+    (on.y << 2) | (negative.y << 3) |
+    (on.z << 4) | (negative.z << 5);
+
+  atomicOr(rayMask[voxel_get_idx(cursor.rayPos)], update);
+
+  // out_termination[out_termination_idx].normal = vec4(
+  //   (update & (1<<0)) > 0 ? 1.0 : 0.0,
+  //   (update & (1<<2)) > 0 ? 1.0 : 0.0,
+  //   (update & (1<<4)) > 0 ? 1.0 : 0.0,
+  //   1.0
+  // );
+  // // out_termination[out_termination_idx].normal = vec4(1.0);
+  // // return;
+  //
+  // out_termination[out_termination_idx].color = vec4(c, 1.0);
+  // out_termination[out_termination_idx].position = miss ? vec4(-1.0) : vec4(p, 1.0);
+  // out_termination[out_termination_idx].normal = vec4(found_normal, 1.0);
 
 }

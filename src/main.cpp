@@ -326,6 +326,13 @@ int main(void) {
     ->output("outColor")
     ->link();
 
+  Program *points_program = new Program();
+  points_program
+    ->add(Shaders::get("points.vert"))
+    ->add(Shaders::get("points.frag"))
+    ->output("outColor")
+    ->link();
+
   { // query up the workgroups
     int work_grp_size[3], work_grp_inv;
     // maximum global work group (total work in a dispatch)
@@ -474,6 +481,32 @@ int main(void) {
   SSBO *voxelSpaceSSBOMip5 = new SSBO(voxelSpaceBytes / 128);
   SSBO *voxelSpaceSSBOMip6 = new SSBO(voxelSpaceBytes / 128);
   
+  // Create an atomic buffer of uints that stores the normal of the surface hit
+  // by a primary ray. This is an attempt to optimize further lighting passes by
+  // only computing a fixed number of cone traces per voxel face.
+  SSBO *rayMaskSSBO = new SSBO(voxelSpaceBytes * 4);
+
+
+  typedef  struct {
+    GLuint  count;
+    GLuint  primCount;
+    GLuint  first;
+    GLuint  baseInstance;
+  } DrawArraysIndirectCommand;
+
+  uint32_t total_points = voxelSpaceBytes / 16;
+
+  SSBO *pointsSSBO = new SSBO(total_points * 16 /* vec4 */);
+  SSBO *pointsIndirectSSBO = new SSBO(sizeof(DrawArraysIndirectCommand));
+  {
+    DrawArraysIndirectCommand *buf = (DrawArraysIndirectCommand *)pointsIndirectSSBO->beginMap();
+    buf->count = 1;
+    buf->primCount = total_points;
+    buf->first = 0;
+    buf->baseInstance = 0;
+    pointsIndirectSSBO->endMap();
+  }
+
   #define MAX_LIGHTS 4
   SSBO *lightBuffer = new SSBO(
     16 * MAX_LIGHTS // light position + color,intensity
@@ -506,6 +539,12 @@ int main(void) {
 
   Program *lightRays_Compute = new Program();
   lightRays_Compute->add(Shaders::get("voxel-space-conetrace-lights.comp"))->link();
+
+  Program *clearRayMask_Compute = new Program();
+  clearRayMask_Compute->add(Shaders::get("raymask-ssbo-clear.comp"))->link();
+
+  Program *pointsCollect_Compute = new Program();
+  pointsCollect_Compute->add(Shaders::get("points-collect.comp"))->link();
 
 
   uint64_t outputBytes =
@@ -775,7 +814,7 @@ int main(void) {
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     // Regenerate world
-    if (true) {
+    if (false) {
       // Clear the voxel space volume
       glm::uvec3 sdfDims(40, 40, 40);
 
@@ -830,7 +869,7 @@ int main(void) {
     }
     
     // Generate mipmaps
-    if (time) {
+    if (false && time) {
 
 
       double mipStart = glfwGetTime();
@@ -926,8 +965,70 @@ int main(void) {
       fullscreen_surface->render(raytraceVoxelSpace);
     }
 
+    // Clear the raymask ssbo
+    if (false) {
+      clearRayMask_Compute
+        ->use()
+        ->ssbo("rayMaskBuffer", rayMaskSSBO, 1)
+        ->uniformVec3ui("dims", voxelSpaceDims)
+        ->timedCompute("clear raymask", voxelSpaceDims);
+    }
+
+    // Splat voxels
+    if (true || debug > 0.0) {
+
+      // Reset the primCount prior to filling the byte buffer
+      {
+        DrawArraysIndirectCommand *buf = (DrawArraysIndirectCommand *)pointsIndirectSSBO->beginMap();
+        buf->primCount = 0;
+        pointsIndirectSSBO->endMap();
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      }
+       
+      // Collect the points that we will render
+      if (true) {
+        pointsCollect_Compute
+          ->use()
+          ->uniform1ui("maxPoints", 1000000)
+
+          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
+          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
+          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
+          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
+          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
+          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
+          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip6, 7)
+
+          ->ssbo("pointsBuffer", pointsSSBO, 9)
+          ->ssbo("pointsIndirectBuffer", pointsIndirectSSBO, 10)
+
+          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+          ->timedCompute("point collect", glm::uvec3(100, 100, 100));
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      }
+
+
+      {
+        DrawArraysIndirectCommand *buf = (DrawArraysIndirectCommand *)pointsIndirectSSBO->beginMap(SSBO::MAP_READ_ONLY);
+        ImGui::Text("primCount: %u", buf->primCount);
+        pointsIndirectSSBO->endMap();
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      }
+
+
+      glPointSize(10.0);
+      pointsIndirectSSBO->bind(GL_DRAW_INDIRECT_BUFFER);
+      points_program
+        ->use()
+        ->uniformMat4("VP", perspectiveMatrix * viewMatrix)
+        ->uniform1ui("maxPoints", total_points)
+        ->ssbo("pointsBuffer", pointsSSBO, 0);
+      glDrawArraysIndirect(GL_POINTS, 0);
+      pointsIndirectSSBO->unbind(GL_DRAW_INDIRECT_BUFFER);
+    }
+
     // Raytrace in compute
-    {
+    if (false) {
       // Raytrace into `raytraceOutput`
       glm::uvec2 res = glm::uvec2(windowDimensions[0], windowDimensions[1]);
       {
@@ -945,6 +1046,7 @@ int main(void) {
           ->ssbo("outColorBuffer", raytraceOutput, 8)
           ->ssbo("outTerminationBuffer", terminationOutput, 9)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
+          ->ssbo("rayMaskBuffer", rayMaskSSBO, 11)
 
           ->uniformFloat("maxDistance", 10000)
           ->uniformMat4("VP", VP)
@@ -961,7 +1063,7 @@ int main(void) {
           ->uniformVec3("characterPos", catModel->getPosition())
 
           ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->uniform1ui("terminationBufferIdx", 0)//res.x * res.y * (time%TAA_HISTORY_LENGTH))
           ->timedCompute(
             "primary rays",
             glm::uvec3(
@@ -971,9 +1073,9 @@ int main(void) {
             )
           );
       }
-     
+      
       // Trace sky rays
-      {
+      if (false){
         skyRays_Compute
           ->use()
           ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
@@ -989,14 +1091,15 @@ int main(void) {
           ->uniformFloat("debug", debug)
           ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
           ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->uniform1ui("terminationBufferIdx", 0)// res.x * res.y * (time%TAA_HISTORY_LENGTH))
           ->timedCompute(
             "sky rays",
             glm::uvec3(res, 1)
           );
       }
 
-      {
+      // Cone trace lights
+      if (false){
 
         Light *lights = (Light *)lightBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
         Light light;
@@ -1032,11 +1135,12 @@ int main(void) {
           ->ssbo("outTerminationBuffer", terminationOutput, 9)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
           ->ssbo("lightBuffer", lightBuffer, 11)
+          ->ssbo("rayMaskBuffer", rayMaskSSBO, 12)
           ->uniform1ui("time", time)
           ->uniformFloat("debug", debug)
           ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
           ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->uniform1ui("terminationBufferIdx", 0) //res.x * res.y * (time%TAA_HISTORY_LENGTH))
           ->uniform1ui("lightCount", 2) // TODO: only send the actual count
           ->timedCompute(
             "lights",
@@ -1058,7 +1162,8 @@ int main(void) {
           ->ssbo("outColorBuffer", raytraceOutput, 1)
           ->ssbo("inTerminationBuffer", terminationOutput, 2)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->ssbo("rayMaskBuffer", rayMaskSSBO, 8)
+          ->uniform1ui("terminationBufferIdx", 0)//res.x * res.y * (time%TAA_HISTORY_LENGTH))
           ->timedCompute(
             "taa",
             glm::uvec3(

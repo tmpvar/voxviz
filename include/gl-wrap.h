@@ -195,15 +195,15 @@ public:
     this->mapped = false;
   }
 
-  GLuint bind() {
+  GLuint bind(GLenum type = GL_SHADER_STORAGE_BUFFER) {
     if (this->handle != 0) {
-      glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->handle); gl_error();
+      glBindBuffer(type, this->handle); gl_error();
     }
     return this->handle;
   }
 
-  void unbind() {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
+  void unbind(GLenum type = GL_SHADER_STORAGE_BUFFER) {
+    glBindBuffer(type, 0); gl_error();
   }
 
   size_t size() {
@@ -888,3 +888,5 @@ public:
     );
   }
 };
+
+

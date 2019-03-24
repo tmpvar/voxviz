@@ -32,10 +32,11 @@ DDACursor dda_cursor_create(
 
 void dda_cursor_step(in out DDACursor cursor, out vec3 normal) {
   vec3 sideDist = cursor.sideDist;
-  normal = vec3(1.0);//cursor.mask;
+
   cursor.mask = step(sideDist.xyz, sideDist.yzx) *
                 step(sideDist.xyz, sideDist.zxy);
   cursor.sideDist += cursor.mask * cursor.deltaDist;
   cursor.mapPos += cursor.mask * cursor.rayStep;
   cursor.rayPos += cursor.mask * cursor.rayStep;
+  normal = -sign(cursor.rayDir) * cursor.mask;
 }

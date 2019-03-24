@@ -26,6 +26,15 @@ layout (std430, binding=7) buffer volumeSlabMip6 {
   uint8_t volumeMip6[];
 };
 
+uint voxel_get_idx(vec3 pos) {
+  vec3 p = floor(pos);
+  return uint(
+    p.x +
+    p.y * dims.x +
+    p.z * dims.x * dims.y
+  );
+}
+
 bool voxel_get(vec3 pos, out uint8_t palette_idx) {
   vec3 p = floor(pos);
   if (
