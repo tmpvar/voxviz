@@ -74,16 +74,9 @@ public:
         ifs.seekg(4, ifs.cur);
       }
       else if (cmp(chunk_id, "SIZE")) {
-        uint32_t size;
-                
-        ifs.read((char *)&size, 4);
-        vox->dims.x = size;
-
-        ifs.read((char *)&size, 4);
-        vox->dims.y = size;
-
-        ifs.read((char *)&size, 4);
-        vox->dims.z = size;
+        ifs.read((char *)&vox->dims.x, 4);
+        ifs.read((char *)&vox->dims.y, 4);
+        ifs.read((char *)&vox->dims.z, 4);
         
         const uint64_t bytes = vox->dims.x*vox->dims.y*vox->dims.z;
         vox->buffer = (uint8_t *)malloc(bytes);
