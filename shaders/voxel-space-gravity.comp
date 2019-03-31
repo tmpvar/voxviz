@@ -47,7 +47,7 @@ uint8_t get(uvec3 pos) {
 }
 
 void main() {
-  return;
+
   uvec3 last_pos = uvec3(gl_GlobalInvocationID.x, 0, gl_GlobalInvocationID.z);
 
   if (any(greaterThanEqual(last_pos, dims))) {

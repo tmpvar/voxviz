@@ -3,18 +3,8 @@
 #extension GL_ARB_bindless_texture : require
 #extension GL_ARB_compute_shader: enable
 
-
-uniform uvec2 resolution;
-uniform uint time;
-uniform vec3 eye;
-uniform vec3 dims;
-uniform float debug;
-uniform uint terminationBufferIdx;
-
-
 #include "voxel-space.glsl"
 #include "cosine-direction.glsl"
-#include "voxel-space-mips.glsl"
 
 layout( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
 
@@ -30,9 +20,13 @@ layout (std430, binding=7) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
-layout (std430, binding=8) buffer rayMaskBuffer {
-  uint rayMask[];
-};
+
+uniform uvec2 resolution;
+uniform uint time;
+uniform vec3 eye;
+uniform vec3 dims;
+uniform float debug;
+uniform uint terminationBufferIdx;
 
 #define TAA_SAMPLES 16
 
@@ -61,6 +55,7 @@ vec4 readT(ivec2 pos) {
   return color / TAA_SAMPLES;
 }
 
+
 void main() {
 
   ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
@@ -71,26 +66,9 @@ void main() {
   RayTermination o;
   read(pos, o);
 
-  uint idx = pos.x + pos.y * resolution.x;
-  // if (any(lessThan(vec3(0.0), o.position.xyz)) || any(greaterThanEqual(dims, o.position.xyz))) {
-  //   out_color[idx] = vec4(0.0);
-  //   return;
-  // }
-
   //out_color[idx] = vec4(in_termination[idx].position.xyz / vec3(dims), 1.0);
-
-  if (debug == 0.0) {
-      uint hit_mask = rayMask[voxel_get_idx(o.position.xyz)];
-      out_color[idx] = vec4(
-        (hit_mask & (1<<0)) > 0 ? 1.0 : 0.0,
-        (hit_mask & (1<<2)) > 0 ? 1.0 : 0.0,
-        (hit_mask & (1<<4)) > 0 ? 1.0 : 0.0,
-        1.0
-      );
-      return;
-  }
-
-  out_color[idx] = in_termination[idx].normal;
+  uint idx = pos.x + pos.y * resolution.x;
+  out_color[idx] = in_termination[idx].color;
 }
 
 void main1() {

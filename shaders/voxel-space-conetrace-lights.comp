@@ -42,9 +42,6 @@ layout (std430, binding=11) buffer lightBuffer {
   Light lights[];
 };
 
-layout (std430, binding=12) buffer rayMaskBuffer {
-  uint rayMask[];
-};
 
 vec3 sphereRandom(vec2 r) {
     float cosPhi = r.x * 2.0 - 1.0;
@@ -121,7 +118,6 @@ float trace_light(RayTermination r, Light light) {
 
   //vec3 new_ray_dir = cd + lightPos - mapPos / div;
   vec3 pos = origin;
-
   vec3 d = (lightPos - pos) + cd;
   float dt = 1.0 / length(dims);
   d = normalize(d);
@@ -212,24 +208,10 @@ void main() {
   }
 
   RayTermination o = out_termination[out_idx];
-  if (o.position.x < 0) {
-    return;
-  }
-
-  uint hit_mask = rayMask[voxel_get_idx(o.position.xyz)];
-  out_termination[out_idx].normal = vec4(
-    (hit_mask & (1<<0)) > 0 ? 1.0 : 0.0,
-    (hit_mask & (1<<2)) > 0 ? 1.0 : 0.0,
-    (hit_mask & (1<<4)) > 0 ? 1.0 : 0.0,
-    1.0
-  );
-  return;
-
 
   if (all(equal(o.position, vec4(-1.0)))) {
     return;
   }
-
 
   vec4 voxelColor = vec4(0.0);//o.color;
   float intensity = 0.0;
