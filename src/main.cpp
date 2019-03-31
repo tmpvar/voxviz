@@ -927,7 +927,7 @@ int main(void) {
     }
 
     // Raytrace in compute
-    {
+    if (true) {
       // Raytrace into `raytraceOutput`
       glm::uvec2 res = glm::uvec2(windowDimensions[0], windowDimensions[1]);
       {
