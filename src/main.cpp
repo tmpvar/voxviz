@@ -996,8 +996,8 @@ int main(void) {
           );
       }
 
-      {
-
+      // Conetrace lights
+      if (true) {
         Light *lights = (Light *)lightBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
         Light light;
 

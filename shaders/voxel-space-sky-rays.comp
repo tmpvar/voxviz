@@ -35,12 +35,12 @@ layout (std430, binding=10) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
-#define ITERATIONS 5
+#define ITERATIONS 128
 
 vec3 cdir(in uint seed, in vec3 normal) {
   // uint slice = (time % 64) * 4096;
 
-  vec2 bn = 2.0 * blueNoise[(seed * time) % (4096 * 64)].xy - 0.5;
+  vec2 bn = 2.0 * blueNoise[(seed * time) % (4096 * 64)].xy - 1.0;
 
   float u = bn.x;
   float v = bn.y;
@@ -54,20 +54,23 @@ vec3 cdir(in uint seed, in vec3 normal) {
 }
 
 float trace_sky(vec3 pos, vec3 normal) {
+  float cdScale = 2.0;
   vec3 cd = normalize(cdir(
     uint(
       gl_GlobalInvocationID.x +
       gl_GlobalInvocationID.y * resolution.x
     ),
     normal
-  )); // roughness
-
-  int mip = 0;
-  vec3 new_ray_dir = vec3(0.0, 1.0, 0.0) * cd;//* float(1<<mip);
-  vec3 origin = pos + normal + new_ray_dir;
+  )) * cdScale;
+  cd = vec3(1.0);
+  float mip = 0;
+  // vec3 new_ray_dir = normalize(vec3(cd.x, 0.5 + abs(cd.y), cd.z));//* float(1<<mip);
+  vec3 new_ray_dir = vec3(0.0, 1.0, 0.0);//normalize(vec3(cd.x, cdScale + abs(cd.y), cd.z));//* float(1<<mip);
+  vec3 origin = pos + normal;
   vec3 p = origin;
   float t = 0;
   vec3 id = 1.0 / new_ray_dir;
+
   uint8_t noop;
 
   for (int i=0; i<ITERATIONS; i++) {
@@ -78,16 +81,19 @@ float trace_sky(vec3 pos, vec3 normal) {
       break;
     }
 
-    bool hit = voxel_mip(p, mip, noop);
-    if (hit && noop > uint8_t(4)) {
-      return -1.0;
+    bool hit = voxel_mip(p, int(mip), noop);
+    if (hit) {
+      return -1.0;//-(1.0 - float(i)/float(ITERATIONS));
     }
-    mip++;
+    //mip = float(i)/float(ITERATIONS*2) * 6;
 
-    vec3 deltas = (step(0.0, new_ray_dir) - 2.0*fract(p/* * invMipSize*/)) * id;
-    float dt = max(mincomp(deltas), 0.0001);// * mipSize;
-    t += max(0.1, t * 0.9) * float(1<<(mip+1));
-    p = origin + new_ray_dir + cd * t;
+    float mipSize = 1<<int(mip);
+    float invMipSize = 1.0 / mipSize;
+
+    vec3 deltas = (step(0.0, new_ray_dir) - 2.0*fract(p * invMipSize)) * id;
+    float dt = max(mincomp(deltas), 0.0001) * mipSize;
+    t += max(0.1, t * 0.9) * float(1<<(int(mip)+1));
+    p = origin + new_ray_dir * t;
   }
   return 0.0;
 }

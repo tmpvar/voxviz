@@ -106,7 +106,7 @@ float trace_light(RayTermination r, Light light) {
   vec3 origin = r.position.xyz + normal;
   vec3 rayDir = r.rayDir.xyz;
   vec3 lightPos = light.position.xyz;
-  const uint steps = 64;
+  const uint steps = 128;
 
   vec3 cd = cdir(
     uint(
@@ -118,7 +118,7 @@ float trace_light(RayTermination r, Light light) {
 
   //vec3 new_ray_dir = cd + lightPos - mapPos / div;
   vec3 pos = origin;
-  vec3 d = (lightPos - pos) + cd;
+  vec3 d = (lightPos - pos);// + cd;
   float dt = 1.0 / length(dims);
   d = normalize(d);
   vec3 id = 1.0 / d;

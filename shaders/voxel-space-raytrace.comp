@@ -341,7 +341,7 @@ void main() {
   vec3 c = vec3(0.0);
   int i;
 
-  int mip = 0;
+  int mip = 3;
   vec3 d = in_ray_dir;
   vec3 id = 1.0 / d;
   vec3 p = eye + d * found_distance;
@@ -355,7 +355,7 @@ void main() {
 
   int minMip = 0;
   int maxMip = 5;
-  mip = 0;
+  mip = 5;
   float mipSize = (float(1<<(mip)));
   float invMipSize = 1.0 / mipSize;
   vec3 mask;

@@ -162,7 +162,7 @@ bool voxel_get_mip6(vec3 pos, out uint8_t palette_idx) {
     p.z * d.x * d.y
   );
 
-  palette_idx = volumeMip5[idx];
+  palette_idx = volumeMip6[idx];
 
   return palette_idx > uint8_t(0);
 }

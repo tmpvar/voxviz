@@ -30,6 +30,20 @@ uint read(uvec3 pos, uvec3 dims) {
   return uint(src_volume[idx]) > 0 ? 1 : 0;
 }
 
+/*
+       ________
+     /
+    /
+   /
+  /__________
+
+
+
+
+*/
+
+
+
 void write(uvec3 pos, uint val) {
   uint idx = (
     pos.x +
@@ -50,14 +64,14 @@ void main() {
   uvec3 src_dims = destDims * scale;
   uint density = 0;
 
-  density += read(src_pos + uvec3(0, 0, 0), src_dims) != 0 ? 1 : 0;
-  density += read(src_pos + uvec3(1, 0, 0), src_dims) != 0 ? 1 : 0;
-  density += read(src_pos + uvec3(1, 1, 0), src_dims) != 0 ? 1 : 0;
-  density += read(src_pos + uvec3(0, 1, 0), src_dims) != 0 ? 1 : 0;
-  density += read(src_pos + uvec3(0, 0, 1), src_dims) != 0 ? 1 : 0;
-  density += read(src_pos + uvec3(1, 0, 1), src_dims) != 0 ? 1 : 0;
-  density += read(src_pos + uvec3(1, 1, 1), src_dims) != 0 ? 1 : 0;
-  density += read(src_pos + uvec3(0, 1, 1), src_dims) != 0 ? 1 : 0;
+  density |= read(src_pos + uvec3(0, 0, 0), src_dims) != 0 ? 1<<0 : 0;
+  density |= read(src_pos + uvec3(1, 0, 0), src_dims) != 0 ? 1<<1 : 0;
+  density |= read(src_pos + uvec3(1, 1, 0), src_dims) != 0 ? 1<<2 : 0;
+  density |= read(src_pos + uvec3(0, 1, 0), src_dims) != 0 ? 1<<3 : 0;
+  density |= read(src_pos + uvec3(0, 0, 1), src_dims) != 0 ? 1<<4 : 0;
+  density |= read(src_pos + uvec3(1, 0, 1), src_dims) != 0 ? 1<<5 : 0;
+  density |= read(src_pos + uvec3(1, 1, 1), src_dims) != 0 ? 1<<6 : 0;
+  density |= read(src_pos + uvec3(0, 1, 1), src_dims) != 0 ? 1<<7 : 0;
 
   write(dest_pos, density);
 }
