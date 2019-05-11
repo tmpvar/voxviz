@@ -10,6 +10,7 @@
 #include "glm/gtc/integer.hpp"
 #include "glm/gtx/hash.hpp"
 #include <unordered_map>
+#include <vector>
 #include <queue>
 #include <imgui.h>
 #include <limits>
@@ -103,7 +104,8 @@ class Volume {
 protected:
   bool dirty;
 public:
-  unordered_map <glm::ivec3, Brick *>bricks;
+  //unordered_map <glm::ivec3, Brick *>bricks;
+  vector<Brick*> bricks;
   glm::vec3 rotation;
   glm::vec3 position;
   glm::vec3 scale;
@@ -175,8 +177,8 @@ public:
   }
 
   ~Volume() {
-    for (auto& it : this->bricks) {
-      Brick *brick = it.second;
+    for (Brick *brick : this->bricks) {
+      //Brick *brick = it.second;
       delete brick;
     }
     this->bricks.clear();
@@ -187,7 +189,7 @@ public:
   // TODO: consider denoting this as relative
   Brick *AddBrick(glm::ivec3 index, q3BoxDef *boxDef = nullptr) {
     Brick *brick = new Brick(index);
-    this->bricks.emplace(index, brick);
+    this->bricks.push_back(brick);//.emplace(index, brick);
 
     this->dirty = true;
     /*
@@ -211,6 +213,8 @@ public:
   }
 
   Brick *getBrick(glm::ivec3 index, bool createIfNotFound = false) {
+    /*
+    FIXME: scan the bricks because we're using a vector now...
     auto it = this->bricks.find(index);
     Brick *found = nullptr;
 
@@ -223,8 +227,11 @@ public:
       found->createGPUMemory();
       found->fillConst(0);
     }
+    
 
     return found;
+    */
+    return false;
   }
 
 
@@ -292,8 +299,8 @@ public:
     float *positions = (float *)malloc(total_position_mem);
     GLuint64 *pointers = (GLuint64 *)malloc(total_brick_pointer_mem);
     size_t loc = 0;
-    for (auto& it : this->bricks) {
-      Brick *brick = it.second;
+    for (Brick *brick : this->bricks) {
+      //Brick *brick = it.second;
       /*if (this->occluded(brick->index)) {
         continue;
       }*/
@@ -413,9 +420,8 @@ public:
       glm::vec3(0.0, 0.0, 1.0)
     };
 
-    Brick *toolBrick;
-    for (auto& it : tool->bricks) {
-      toolBrick = it.second;
+    
+    for (Brick *toolBrick : tool->bricks) {
 
       for (int vertIdx = 0; vertIdx < 8; vertIdx++) {
         toolVerts[vertIdx] = txPoint(toolToStock, glm::vec3(toolBrick->index) + offsets[vertIdx]);

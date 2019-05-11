@@ -106,8 +106,7 @@ public:
         }
       }
 
-      for (auto& it : volume->bricks) {
-        Brick *brick = it.second;
+      for (Brick *brick: volume->bricks) {
         brick->createGPUMemory();
       }
     }

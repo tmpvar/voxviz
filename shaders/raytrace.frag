@@ -111,7 +111,8 @@ void main() {
 
   // move the location to positive space to better align with the underlying grid
   vec3 pos = brickSurfacePos * BRICK_DIAMETER;
-
+  outColor = vec4(normalize(brickSurfacePos), 1.0);
+  //return;
   float hit = march(pos, dir, voxelCenter, normal, iterations);
   //float hit = march_groundtruth(pos, dir, voxelCenter, normal, iterations);
   if (hit < 0.0) {

@@ -1,0 +1,58 @@
+#version 430 core
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+#include "../include/core.h"
+
+layout( local_size_x = 1, local_size_y = 1, local_size_z = 1 ) in;
+
+layout (std430, binding=1) buffer aBufferIndexSlab
+{
+  uint index[];
+};
+
+layout (std430, binding=2) buffer aBufferValueSlab
+{
+  ABufferCell value[];
+};
+
+uint valueIndex(uvec3 pos, uvec3 dims) {
+  return pos.x + pos.y * dims.x + pos.z * dims.x * dims.y;
+}
+
+//Bubble sort used to sort fragments
+void bubbleSort(uvec3 pos, uvec3 dims) {
+  int m = int(min(dims.z - 2, ABUFFER_MAX_DEPTH_COMPLEXITY));
+  bool swapped;
+  for (int i = m; i >= 0; --i) {
+    swapped = false;
+    for (uint j = 0; j <= i; ++j) {
+      uvec3 aPos = uvec3(pos.x, pos.y, j);
+      uvec3 bPos = uvec3(pos.x, pos.y, j+1);
+
+      uint aIndex = valueIndex(aPos, dims);
+      uint bIndex = valueIndex(bPos, dims);
+
+      if (value[aIndex].depth > value[bIndex].depth) {
+        ABufferCell tmp = value[bIndex];
+        value[bIndex] = value[aIndex];
+        value[aIndex] = tmp;
+        swapped = true;
+      }
+    }
+    if (swapped == false) {
+      return;
+    }
+  }
+}
+
+void main() {
+  uvec3 dims = gl_NumWorkGroups * gl_WorkGroupSize;
+  uint idx = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * dims.x;
+  dims.z = min(ABUFFER_MAX_DEPTH_COMPLEXITY, index[idx]);
+  if (dims.z < 2) {
+    return;
+  }
+
+  bubbleSort(gl_GlobalInvocationID, dims);
+}

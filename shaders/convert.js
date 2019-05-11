@@ -153,8 +153,22 @@ function processIncludes(file, deps, lines) {
   let out = []
   const baseDir = path.dirname(file)
   lines.unshift(`// start: ${path.basename(file)}`)
-
+  var skip = false;
   lines.forEach(line => {
+    if (line.indexOf('#ifdef _WIN32') > -1) {
+      skip = true;
+      return
+    }
+
+    if (line.indexOf('#endif') > -1 && skip) {
+      skip = false;
+      return
+    }
+
+    if (skip) {
+      return
+    }
+
     if (line.indexOf('#include') > -1) {
       const matches = line.match(includeExp)
       if (!matches) {

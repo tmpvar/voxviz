@@ -17,6 +17,7 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <imgui.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -116,7 +117,7 @@ public:
 
     GLint isCompiled = 0;
     glGetShaderiv(new_handle, GL_COMPILE_STATUS, &isCompiled);
-    
+
     if (!isCompiled) {
       gl_shader_log(new_handle);
       return false;
@@ -135,7 +136,7 @@ public:
 
 // TODO: consider renaming this to MappableSlab or something less gl specific
 class SSBO {
-  size_t total_bytes = 0;
+  GLsizeiptr total_bytes = 0;
   GLuint handle = 0;
   bool mapped = false;
 public:
@@ -146,11 +147,13 @@ public:
     MAP_WRITE_ONLY = GL_WRITE_ONLY,
   };
 
-  SSBO(size_t bytes) {
+  SSBO(uint64_t bytes) {
     this->resize(bytes);
   }
 
-  SSBO *resize(size_t bytes) {
+  SSBO *resize(uint64_t bytes) {
+    std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+
     if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
     }
@@ -159,9 +162,11 @@ public:
       return this;
     }
 
+
+
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_COPY); gl_error();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_DRAW); gl_error();
     this->unbind();
 
     this->total_bytes = bytes;
@@ -274,7 +279,7 @@ public:
     this->attributes.clear();
     this->outputs.clear();
     this->uniforms.clear();
-    
+
     this->handle = glCreateProgram();
     this->compositeName = "";
     for (auto const& v : this->shader_versions) {
@@ -297,7 +302,7 @@ public:
   }
 
   Program *use() {
-    #ifdef SHADER_HOTRELOAD
+#ifdef SHADER_HOTRELOAD
     for (auto& it : this->shader_versions) {
       Shader *shader = it.first;
       size_t version = it.second;
@@ -308,7 +313,7 @@ public:
         break;
       }
     }
-    #endif
+#endif
 
     static int used = 0;
     glUseProgram(this->handle);
@@ -348,6 +353,12 @@ public:
   Program *uniformVec2(string name, glm::vec2 v) {
     GLint loc = this->uniformLocation(name);
     glUniform2f(loc, v[0], v[1]);
+    return this;
+  }
+
+  Program *uniformVec2ui(string name, glm::uvec2 v) {
+    GLint loc = this->uniformLocation(name);
+    glUniform2ui(loc, v[0], v[1]);
     return this;
   }
 
@@ -451,6 +462,40 @@ public:
     ssbo->unbind();
     return this;
   }
+
+
+  Program *compute(glm::uvec3 dims) {
+    GLint local_layout[3];
+    glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &local_layout[0]);
+    glDispatchCompute(
+      (dims.x / local_layout[0]) + 1,
+      (dims.y / local_layout[1]) + 1,
+      (dims.z / local_layout[2]) + 1
+    );
+    gl_error();
+    return this;
+  }
+
+  Program *timedCompute(const char *str, glm::uvec3 dims) {
+    GLuint query;
+    GLuint64 elapsed_time;
+    GLint done = 0;
+    glGenQueries(1, &query);
+    glBeginQuery(GL_TIME_ELAPSED, query);
+
+    this->compute(dims);
+
+    glEndQuery(GL_TIME_ELAPSED);
+    while (!done) {
+      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+    }
+
+    // get the query result
+    glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+    ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+
+    return this;
+  }
 };
 
 class GPUSlab {
@@ -462,6 +507,7 @@ class GPUSlab {
 public:
 
   GPUSlab(uint32_t bytes) {
+    cout << "create GPUSlab of " << bytes << " bytes" << endl;
     this->resize(bytes);
   }
 

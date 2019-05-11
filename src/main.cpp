@@ -22,6 +22,7 @@
 #include <glm/glm.hpp>
 #include "parser/vzd/vzd.h"
 #include "parser/magicavoxel/vox.h"
+#include "a-buffer.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -292,6 +293,9 @@ int main(void) {
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
 
+  ABuffer *abuffer = new ABuffer(windowDimensions[0], windowDimensions[1]);
+
+
   Program *fillSphereProgram = new Program();
   fillSphereProgram
     ->add(Shaders::get("fill-sphere.comp"))
@@ -391,12 +395,12 @@ int main(void) {
     bodyDef
   );*/
 
-  VOXParser::parse(
+  /*VOXParser::parse(
     "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
     volumeManager,
     physicsScene,
     bodyDef
-  );
+  );*/
 
   Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
   Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
@@ -438,10 +442,10 @@ int main(void) {
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
-
-  for (int x = 0; x < 32; x++) {
+  for (int z = 0; z < 32; z++) {
     for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 32; z++) {
+      for (int x = 0; x < 32; x++) {
+      
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
@@ -449,9 +453,8 @@ int main(void) {
 
   //fillAllProgram->use()->uniform1ui("val", 0xFFFFFFFF);
   size_t i = 0;
-  for (auto& it : floor->bricks) {
+  for (Brick *brick : floor->bricks) {
     i++;
-    Brick *brick = it.second;
     brick->createGPUMemory();
     i % 5 > 0 ? brick->fillConst(0xFFFFFFFF) : brick->fill(fillSphereProgram);
     //brick->fill(fillSphereProgram);
@@ -625,6 +628,9 @@ int main(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
 
+    abuffer->clear();
+
+
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     for (int i = 0; i < 512; i++) {
@@ -633,44 +639,73 @@ int main(void) {
       }
     }
 
-    for (auto& volume : volumeManager->volumes) {
-      if (volume->bricks.size() == 0) {
-        continue;
+    // Render into ABuffer
+    {
+      GLuint query;
+      GLuint64 elapsed_time;
+      GLint done = 0;
+      glGenQueries(1, &query);
+      glBeginQuery(GL_TIME_ELAPSED, query);
+
+      for (auto& volume : volumeManager->volumes) {
+        if (volume->bricks.size() == 0) {
+          continue;
+        }
+        abuffer->renderVolume(volume, VP, currentEye, debug);
+      }
+      glEndQuery(GL_TIME_ELAPSED);
+      while (!done) {
+        glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
       }
 
-      glm::mat4 volumeModel = volume->getModelMatrix();
-      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
-      raytracer->program->use()
-        ->uniformMat4("MVP", VP * volumeModel)
-        ->uniformVec3("invEye", glm::vec3(
-          invEye.x / invEye.w,
-          invEye.y / invEye.w,
-          invEye.z / invEye.w
-        ))
-        ->uniformMat4("model", volumeModel)
-        ->uniformVec3("eye", currentEye)
-        ->uniformFloat("maxDistance", max_distance)
-        ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformVec4("material", volume->material);
+      // get the query result
+      glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+      ImGui::Text("render volumes: %.3f.ms", elapsed_time / 1000000.0);
 
-      /*raytracer->program->uniformFloat(
-        "debug",
-        volume != tool && tool->overlaps(volume) ? 1.0 : 0.0
-      );*/
+      //abuffer->sort();
 
-      gl_error();
-      size_t activeBricks = volume->bind();
-      //raytracer->render(volume, raytracer->program);
+      //abuffer->debug();
 
-      glDrawElementsInstanced(
-        GL_TRIANGLES,
-        volume->mesh->faces.size(),
-        GL_UNSIGNED_INT,
-        0,
-        //volume->bricks.size()
-        activeBricks
-      );
-      gl_error();
+      
+    }
+
+    // Brute force raytrace every brick
+    if (0) {
+      for (auto& volume : volumeManager->volumes) {
+        if (volume->bricks.size() == 0) {
+          continue;
+        }
+
+        glm::mat4 volumeModel = volume->getModelMatrix();
+        glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
+        raytracer->program->use()
+          ->uniformMat4("MVP", VP * volumeModel)
+          ->uniformVec3("invEye", glm::vec3(
+            invEye.x / invEye.w,
+            invEye.y / invEye.w,
+            invEye.z / invEye.w
+          ))
+          ->uniformMat4("model", volumeModel)
+          ->uniformVec3("eye", currentEye)
+          ->uniformFloat("maxDistance", max_distance)
+          ->uniform1i("showHeat", raytracer->showHeat)
+          ->uniformVec4("material", volume->material);
+
+
+        gl_error();
+        size_t activeBricks = volume->bind();
+        //raytracer->render(volume, raytracer->program);
+
+        glDrawElementsInstanced(
+          GL_TRIANGLES,
+          volume->mesh->faces.size(),
+          GL_UNSIGNED_INT,
+          0,
+          //volume->bricks.size()
+          activeBricks
+        );
+        gl_error();
+      }
     }
 
     //volumeManager->volumes[0]->rotation.x += 0.0001;
@@ -753,7 +788,7 @@ int main(void) {
         tool->position.y,
         tool->position.z
       );
-      ImGui::Text("%i floor bricks", floor->bricks.size());
+      ImGui::Text("%i floor bricks (%i voxels)", floor->bricks.size(), floor->bricks.size() * BRICK_VOXEL_COUNT);
     }
 
     ImGui::Render();
