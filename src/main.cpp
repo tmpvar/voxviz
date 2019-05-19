@@ -13,6 +13,8 @@
 
 #include <shaders/built.h>
 #include <iostream>
+#include <sstream>
+#include <filesystem>
 
 #include <uv.h>
 #include <imgui.h>
@@ -22,6 +24,9 @@
 #include <glm/glm.hpp>
 #include "parser/vzd/vzd.h"
 #include "parser/magicavoxel/vox.h"
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -94,51 +99,6 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   }
   
 }
-
-/*void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
-  const cl_uint total = (cl_uint)raytracer->bricks.size();
-  cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
-  cl_command_queue queue = compute->job.command_queues[0];
-
-  for (cl_uint i = 0; i < total; i++) {
-    mem[i] = raytracer->bricks[i]->computeBuffer;
-  }
-
-  cl_event opengl_get_completion;
-  CL_CHECK_ERROR(clEnqueueAcquireGLObjects(queue, total, mem, 0, nullptr, &opengl_get_completion));
-  clWaitForEvents(1, &opengl_get_completion);
-  clReleaseEvent(opengl_get_completion);
-
-  for (cl_uint i = 0; i < total; i++) {
-    compute->fill("sphere", queue, raytracer->bricks[i], time);
-  }
-
-  CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
-  clFinish(queue);
-  free(mem);
-}
-*/
-
-/*void apply_tool(Raytracer *raytracer, Compute *compute) {
-  const cl_uint total = (cl_uint)raytracer->bricks.size();
-  cl_mem *mem = (cl_mem *)malloc(sizeof(cl_mem) * total);
-  cl_command_queue queue = compute->job.command_queues[0];
-
-  for (cl_uint i = 0; i < total; i++) {
-    mem[i] = raytracer->bricks[i]->computeBuffer;
-  }
-
-  cl_event opengl_get_completion;
-  CL_CHECK_ERROR(clEnqueueAcquireGLObjects(queue, total, mem, 0, nullptr, &opengl_get_completion));
-  clWaitForEvents(1, &opengl_get_completion);
-  clReleaseEvent(opengl_get_completion);
- 
-  compute->opCut(raytracer->bricks[0], raytracer->bricks[1]);
-
-  CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
-  free(mem);
-}
-*/
 
 /* LIBUV JUNK*/
 typedef struct {
@@ -214,7 +174,21 @@ void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
 }
 /* LIBUV JUNK*/
 
-int main(void) {
+
+static std::vector<char> ReadAllBytes(char const* filename)
+{
+  ifstream ifs(filename, ios::binary | ios::ate);
+  ifstream::pos_type pos = ifs.tellg();
+
+  std::vector<char>  result(pos);
+
+  ifs.seekg(0, ios::beg);
+  ifs.read(&result[0], pos);
+
+  return result;
+}
+
+int main(int argc, char* argv) {
   VolumeManager *volumeManager = new VolumeManager();
   float dt = 1.0f / 60.0f;
   q3Scene *physicsScene = new q3Scene(dt);
@@ -223,6 +197,25 @@ int main(void) {
   q3BoxDef boxDef;
 
   memset(keys, 0, sizeof(keys));
+
+  stbtt_fontinfo font;
+  size_t ttf_buffer_len = 1 << 25;
+  /*
+  std::ostringstream buf;
+  std::ifstream f;
+
+  std::ios_base::iostate exceptionMask = f.exceptions() | std::ios::failbit;
+  f.exceptions(exceptionMask);
+  f.open(FONT_PATH);
+  buf << f.rdbuf();
+  */
+
+  auto buf = ReadAllBytes(FONT_PATH);
+  
+  cout << "read " << buf.size() << endl;
+  
+  unsigned char *file_buffer = reinterpret_cast<unsigned char *>(buf.data());
+  stbtt_InitFont(&font, file_buffer, stbtt_GetFontOffsetForIndex(file_buffer, 0));
 
   int d = BRICK_DIAMETER;
   float fd = (float)d;

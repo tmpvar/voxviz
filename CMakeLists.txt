@@ -4,6 +4,10 @@ project(VoxelViz)
 
 find_package(OpenGL REQUIRED)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 # find opencl on osx/linux
 IF(UNIX)
 	set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps/cmake-findopencl/cmake")
@@ -41,9 +45,12 @@ include_directories(
   deps/imgui
   deps/imgui/examples
   deps/catch2/include
+	deps/stb
 )
 
 file(GLOB_RECURSE SHADER_FILES shaders/*.frag shaders/*.vert shaders/*.cl shaders/*.comp shaders/*.glsl)
+
+add_definitions(-DFONT_PATH="$<TARGET_FILE_DIR:voxviz>/static/fonts/Monoid/Monoid-Regular.ttf")
 
 add_executable(
   voxviz
@@ -94,3 +101,7 @@ target_link_libraries(
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
  )
+
+ add_custom_command(TARGET voxviz POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory
+								 ${CMAKE_SOURCE_DIR}/static $<TARGET_FILE_DIR:voxviz>/static)
