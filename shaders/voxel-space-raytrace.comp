@@ -39,6 +39,10 @@ layout (std430) buffer outColorBuffer {
   vec4 out_color[];
 };
 
+// TODO: move this into separate include
+layout (std430, binding) buffer lightSlabBuffer {
+  vec4 lightSlab[];
+};
 
 #define ITERATIONS 256
 
@@ -155,6 +159,19 @@ void main() {
       any(lessThan(p, vec3(0.0))) ||
       any(greaterThanEqual(p, vec3(volumeSlabDims)))
     ) {
+      break;
+    }
+
+    // test light space
+    uvec3 up = uvec3(p);
+    uvec3 ud = uvec3(dims);
+    uint idx = (up.x + up.y * ud.x + up.z * ud.x * ud.y);
+    vec4 lightValue = lightBuffer[idx];
+    if (lightValue.a > 0.0) {
+      c = lightValue.rgb;
+      found_normal = -sign(d) *
+                      step(prevP.xyz, prevP.yzx) *
+                      step(prevP.xyz, prevP.zxy);
       break;
     }
 

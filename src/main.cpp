@@ -254,8 +254,8 @@ int main(void) {
     total_voxel_bytes += a;
   }
 
-
   SSBO *voxelSpaceSSBO = new SSBO(total_voxel_bytes);
+  SSBO *lightSpaceSSBO = new SSBO(voxelSpaceBytes * 4);
   
   #define MAX_LIGHTS 4
   SSBO *lightBuffer = new SSBO(
@@ -288,6 +288,12 @@ int main(void) {
 
   //Program *lightRays_Compute = new Program();
   //lightRays_Compute->add(Shaders::get("voxel-space-conetrace-lights.comp"))->link();
+
+  Program *lightSpaceClear_Compute = new Program();
+  lightSpaceClear_Compute->add(Shaders::get("light-space-clear.comp"))->link();
+
+  Program *lightSpaceFill_Compute = new Program();
+  lightSpaceFill_Compute->add(Shaders::get("light-space-fill.comp"))->link();
 
 
   uint64_t outputBytes =
@@ -334,13 +340,13 @@ int main(void) {
   BlueNoise1x64x64x64 *blue_noise = new BlueNoise1x64x64x64();
   blue_noise->upload();
 
+  VoxEntity *catModel;
   // Load vox models
-  VoxEntity *catModel = new VoxEntity(
-    "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
-    glm::vec3(10.0, 10.0, 10.0)
-  );
-
   {
+    catModel = new VoxEntity(
+      "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
+      glm::vec3(10.0, 10.0, 10.0)
+    );
 
     VoxEntity *voxMonu1 = new VoxEntity(
       "D:\\work\\voxel-model\\vox\\monument\\monu1.vox",
@@ -589,6 +595,32 @@ int main(void) {
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
     
+    // Light space
+    {
+      lightSpaceClear_Compute
+        ->use()
+        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+        ->timedCompute("lightspace: clear", voxelSpaceDims);
+
+      lightSpaceFill_Compute
+        ->use()
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+        ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+
+        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+        ->uniformVec3("lightSlabDims", voxelSpaceDims)
+
+        ->uniformVec3ui("lightPos", glm::uvec3(
+          20,
+          10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
+          16
+        ))
+        ->uniform1ui("time", time)
+        ->uniformVec3("lightColor", glm::vec3(1.0, 0.0, 0.0))
+        ->timedCompute("lightspace: fill", glm::uvec3(8, 0, 0));
+    }
+
+
     // Generate mipmaps
     if (true) {
       double mipStart = glfwGetTime();
@@ -624,6 +656,9 @@ int main(void) {
           ->uniformVec3("eye", currentEye)
           ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
           ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+
+          ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+          ->uniformVec3("lightSlabDims", voxelSpaceDims)
 
           ->ssbo("outTerminationBuffer", terminationOutput)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo)

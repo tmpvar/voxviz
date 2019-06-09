@@ -38,8 +38,6 @@ void bounce(in DDACursor cursor, vec3 normal) {
   vec3 hd = dims * 0.5;
   cursor = dda_cursor_create(
     cursor.mapPos - hd + normal,// + new_ray_dir * 0.00001,
-    vec3(0.0),
-    hd,
     new_ray_dir
   );
   // new_ray_dir += cosine_direction(
@@ -51,8 +49,6 @@ void bounce(in DDACursor cursor, vec3 normal) {
   //
   // cursor = dda_cursor_create(
   //   (cursor.mapPos - hd) + sign(new_ray_dir) * normalize(normal) + new_ray_dir,
-  //   vec3(0.0),
-  //   hd,
   //   new_ray_dir
   // );
 }
@@ -80,8 +76,6 @@ float trace_light(in DDACursor cursor) {
 
   DDACursor c = dda_cursor_create(
     (mapPos - hd + sign(new_ray_dir) * normal + new_ray_dir),
-    vec3(0.0),
-    hd,
     new_ray_dir
   );
 
@@ -119,8 +113,6 @@ float trace_sky(in DDACursor cursor) {
 
   DDACursor c = dda_cursor_create(
     (mapPos - hd + sign(new_ray_dir) * normal + new_ray_dir * 2) + cd,
-    vec3(0.0),
-    hd,
     new_ray_dir
   );
 
@@ -155,8 +147,6 @@ vec3 trace_reflection(in DDACursor cursor) {
   DDACursor c = dda_cursor_create(
     //(mapPos - hd + sign(new_ray_dir) * normal + new_ray_dir * 2)
     (mapPos - hd) + sign(new_ray_dir) * normal + new_ray_dir,// + cd,
-    vec3(0.0),
-    hd,
     new_ray_dir
   );
 
@@ -225,8 +215,6 @@ void main() {
     //vec3 pos = (eye + in_ray_dir * found_distance) * dims;
     DDACursor cursor = dda_cursor_create(
       pos - in_ray_dir * 0.0001,
-      vec3(0.0),
-      hd,
       in_ray_dir
     );
     float bounced = 0.0;

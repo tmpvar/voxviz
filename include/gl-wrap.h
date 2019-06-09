@@ -542,7 +542,7 @@ public:
     // get the query result
     glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
     ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
-
+    glDeleteQueries(1, &query);
     return this;
   }
 };

@@ -10,8 +10,6 @@ struct DDACursor {
 
 DDACursor dda_cursor_create(
   in const vec3 pos,
-  in const vec3 gridCenter,
-  in const vec3 gridRadius,
   in const vec3 rayDir
 ) {
   DDACursor cursor;
