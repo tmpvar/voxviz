@@ -44,7 +44,7 @@ layout (std430, binding) buffer lightSlabBuffer {
   vec4 lightSlab[];
 };
 
-#define ITERATIONS 256
+#define ITERATIONS 512
 
 vec2 noise2d(uvec3 pos) {
   uint idx = (pos.x % 64) + (pos.y%64) * 64 + (pos.z%64) * 64 * 64;
@@ -167,13 +167,13 @@ void main() {
     uvec3 ud = uvec3(dims);
     uint idx = (up.x + up.y * ud.x + up.z * ud.x * ud.y);
     vec4 lightValue = lightBuffer[idx];
-    if (lightValue.a > 0.0) {
-      c = lightValue.rgb;
-      found_normal = -sign(d) *
-                      step(prevP.xyz, prevP.yzx) *
-                      step(prevP.xyz, prevP.zxy);
-      break;
-    }
+    // if (lightValue.a > 0.0) {
+    //   c = lightValue.rgb;
+    //   found_normal = -sign(d) *
+    //                   step(prevP.xyz, prevP.yzx) *
+    //                   step(prevP.xyz, prevP.zxy);
+    //   break;
+    // }
 
     if (voxel_mip_get(p, mip, palette_idx)) {
       if (mip == minMip) {
@@ -198,8 +198,8 @@ void main() {
       invMipSize = 1.0 / mipSize;
       continue;
     }
-    else if (mip < maxMip && !voxel_mip_get(p, min(mip + 1, maxMip), palette_idx)) {
-      mip++;
+    else if (mip < maxMip && !voxel_mip(p, min(mip + 1, maxMip), palette_idx)) {
+      mip = min(maxMip, mip+1);
       mipSize = (float(1<<(mip)));
       invMipSize = 1.0 / mipSize;
       t += dt * 0.00125;

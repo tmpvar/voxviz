@@ -255,7 +255,7 @@ int main(void) {
   }
 
   SSBO *voxelSpaceSSBO = new SSBO(total_voxel_bytes);
-  SSBO *lightSpaceSSBO = new SSBO(voxelSpaceBytes * 4);
+  SSBO *lightSpaceSSBO = new SSBO(voxelSpaceBytes * uint64_t(16));
   
   #define MAX_LIGHTS 4
   SSBO *lightBuffer = new SSBO(
@@ -295,7 +295,9 @@ int main(void) {
   Program *lightSpaceFill_Compute = new Program();
   lightSpaceFill_Compute->add(Shaders::get("light-space-fill.comp"))->link();
 
-
+  Program *lightSpaceConeTrace_Compute = new Program();
+  lightSpaceConeTrace_Compute->add(Shaders::get("light-space-conetrace.comp"))->link();
+  
   uint64_t outputBytes =
     static_cast<uint64_t>(windowDimensions[0]) *
     static_cast<uint64_t>(windowDimensions[1]) * 16;
@@ -600,6 +602,7 @@ int main(void) {
       lightSpaceClear_Compute
         ->use()
         ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+        ->uniformVec3("lightSlabDims", voxelSpaceDims)
         ->timedCompute("lightspace: clear", voxelSpaceDims);
 
       lightSpaceFill_Compute
@@ -610,6 +613,7 @@ int main(void) {
         ->ssbo("lightSlabBuffer", lightSpaceSSBO)
         ->uniformVec3("lightSlabDims", voxelSpaceDims)
 
+        ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
         ->uniformVec3ui("lightPos", glm::uvec3(
           20,
           10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
@@ -617,7 +621,7 @@ int main(void) {
         ))
         ->uniform1ui("time", time)
         ->uniformVec3("lightColor", glm::vec3(1.0, 0.0, 0.0))
-        ->timedCompute("lightspace: fill", glm::uvec3(8, 0, 0));
+        ->timedCompute("lightspace: fill", glm::uvec3(4096, 0, 0));
     }
 
 
@@ -679,6 +683,26 @@ int main(void) {
           );
       }
 
+      // Conetrace light buffer
+      {
+        lightSpaceConeTrace_Compute
+          ->use()
+          ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+          ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+
+          ->ssbo("outTerminationBuffer", terminationOutput)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+
+          ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+          ->uniformVec3("lightSlabDims", voxelSpaceDims)
+
+          ->uniform1ui("time", time)
+          ->uniformFloat("debug", debug)
+          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
+          ->uniformVec2ui("resolution", res)
+          ->timedCompute("lightspace: conetrace", glm::uvec3(res, 1));
+      }
+
       // Blur the results
       if (false) {
         raytraceVoxelSpace_Blur
@@ -709,7 +733,7 @@ int main(void) {
         fullscreen_surface->render(debugBindless);
       }
     }
-    
+
     {
       static float f = 0.0f;
       static int counter = 0;

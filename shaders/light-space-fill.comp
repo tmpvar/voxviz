@@ -5,55 +5,262 @@
 
 layout( local_size_x = 1, local_size_y = 1, local_size_z = 1 ) in;
 
+#define TAU 6.283185307179586
+#define PI 3.141592653589793
+
 //uniform vec3 lightPos;
-uniform vec3 lightColor;
+//uniform vec3 lightColor;
 uniform vec3 dims;
 uniform uint time;
 
 // uses bindings 1-7 and requires `dims`
 #include "voxel-space-mips.glsl"
-#include "dda-cursor.glsl"
 
-layout (std430, binding=8) buffer lightSlab {
+layout (std430, binding=8) buffer blueNoiseBuffer {
+  vec4 blueNoise[];
+};
+
+layout (std430, binding=9) buffer lightSlab {
   vec4 light[];
 };
 
-#define DIR_COUNT 8
-const vec3 dirs[DIR_COUNT] = {
-  vec3(1.0, 0.0, 0.0),
-  vec3(1.0, 1.0, 0.0),
-  vec3(1.0, -1.0, 0.0),
-  vec3(0.0, 1.0, 0.0),
+vec3 randomSpherePoint(uint seed) {
+  //vec2 bn =  blueNoise[(time + seed + 10) % (4096 * 64)].xy / 2.0;
+  vec2 rand = blueNoise[(seed) % (4096)].xy - 0.5;
+  float ang1 = (rand.x + 1.0) * PI; // [-1..1) -> [0..2*PI)
+  float u = rand.y; // [-1..1), cos and acos(2v-1) cancel each other out, so we arrive at [-1..1)
+  float u2 = u * u;
+  float sqrt1MinusU2 = sqrt(1.0 - u2);
+  float x = sqrt1MinusU2 * cos(ang1);
+  float y = sqrt1MinusU2 * sin(ang1);
+  float z = u;
+  return vec3(x, y, z);
+}
 
-  vec3(-1.0, 0.0, 0.0),
-  vec3(-1.0, 1.0, 0.0),
-  vec3(-1.0, -1.0, 0.0),
-  vec3(0.0, -1.0, 0.0),
-};
+vec3 sphereRandom(vec2 r) {
+    float cosPhi = r.x * 2.0 - 1.0;
+    float sinPhi = sqrt(1 - (cosPhi * cosPhi));
+    float theta = r.y * 2.0 * 3.1415927;
+    return vec3(sinPhi * cos(theta), sinPhi * cos(theta), cosPhi);
+}
+
+vec3 hemisphereRandom(vec2 r) {
+    vec3 s = sphereRandom(r);
+    return vec3(s.x, s.y, s.z);
+}
+
+vec3 cdir(in uint seed, in vec3 normal) {
+  vec2 bn = blueNoise[(seed) % (4096 * 64)].xy;
+  vec3 d = sphereRandom(bn);
+
+  if (normal.x > 1.0) {
+    d.x = abs(d.x);
+  }
+
+  if (normal.y > 0.0) {
+    d.y = abs(d.y);
+  }
+
+  if (normal.z > 0.0) {
+    d.z = abs(d.z);
+  }
+
+  if (normal.x < 0.0) {
+    d.x = -abs(d.x);
+  }
+
+  if (normal.y < 0.0) {
+    d.y = -abs(d.y);
+  }
+
+  if (normal.z < 0.0) {
+    d.z = -abs(d.z);
+  }
+
+  return d;
+}
+
+
+
+bool outOfBounds(vec3 p) {
+  if (
+    any(lessThan(p, vec3(0.0))) ||
+    any(greaterThanEqual(p, vec3(dims)))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+void write(vec3 p, vec3 color) {
+  if (
+    any(lessThan(p, vec3(0.0))) ||
+    any(greaterThanEqual(p, vec3(dims)))
+  ) {
+    return;
+  }
+
+  uvec3 up = uvec3(p);
+  uvec3 d = uvec3(dims);
+  uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
+  light[idx] = vec4(color, 1.0);
+}
+
+void fillDirection(vec3 origin, vec3 dir) {
+  uint8_t noop;
+  uint steps = 128;
+  float ratio = 1 / float(steps);
+  float t = 0.0;
+  uvec3 d = uvec3(dims);
+  for (uint i=0; i<steps; i++) {
+
+    vec3 p = origin + dir * t;
+
+    if (outOfBounds(p)) {
+      break;
+    }
+
+    uvec3 up = uvec3(p);
+    uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
+    vec4 v = light[idx];
+    if (voxel_mip(up, 0, noop)) {
+      break;
+    }
+    light[idx] = min(vec4(1.0), (vec4(1.0, 1.0, 1.0, 1.0 - t * ratio)  + v * 0.95));
+
+
+
+    t += 2.0;//max(0.1, t*0.5);// 16.0;// ratio * float(i) * 64;
+  }
+}
 
 void main() {
   uint dir_idx = gl_GlobalInvocationID.x;
-  if (dir_idx >= DIR_COUNT) {
-    return;
-  }
+  // uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+  // float dir_p = float(dir_idx) / float(total_dirs);
+
   uvec3 d = uvec3(dims);
   vec3 lightPos = vec3(
-      64,
-      64 + sin(float(time) / 100.0) * 5,
-      0
+      230,// + sin(float(time) / 10.0) * 15.0,
+      40,// + cos(float(time) / 10.0) * 16.0,// + sin(float(time) / 100.0) * 32,
+      32 + cos(float(time) / 100.0) * 32.0
+  );
+  vec3 lightColor = vec3(1.0);
+  vec3 mapPos = vec3(lightPos);
+
+  // vec3 dir = normalize(dirs[dir_idx]);
+
+  //dir = normalize(vec3(0.0, 1.0, 1.0));
+
+  // vec3 dir = normalize(randomSpherePoint(dir_idx * time));
+  // vec2 rand = blueNoise[(dir_idx * time) % (4096 * 64)].xy;
+  // vec3 dir = sphereRandom(rand);
+  // vec3 dir = cdir(dir_idx, vec3(1.0, 0.0, 0.0));
+  vec2 bn = blueNoise[(dir_idx * time) % (4096 * 64)].xy;
+  fillDirection(lightPos, normalize(vec3(
+      2.0 * blueNoise[(dir_idx * time) % (4096 * 64)].x - 1.0,
+      2.0 * blueNoise[(dir_idx * time * 2) % (4096 * 64)].x - 1.0,
+      2.0 * blueNoise[(dir_idx * time * 4) % (4096 * 64)].x - 1.0
+    ))
   );
 
-  vec3 mapPos = vec3(lightPos);
-  vec3 dir = normalize(dirs[dir_idx]);
-  DDACursor c = dda_cursor_create(
-    lightPos + 0.5 + dir,
-    dir
+  // fillDirection(lightPos, cdir(dir_idx, vec3(1.0, 0.0, 0.0)));
+  // fillDirection(lightPos, cdir(dir_idx, vec3(-1.0, 0.0, 0.0)));
+  // fillDirection(lightPos, cdir(dir_idx, vec3(0.0, 1.0, 0.0)));
+  // fillDirection(lightPos, cdir(dir_idx, vec3(0.0, 0.0, 1.0)));
+
+  // uint8_t noop;
+  // uint steps = 64;
+  // float ratio = 1 / float(steps);
+  // float t = 1.0;
+  // for (uint i=0; i<steps; i++) {
+  //
+  //   vec3 p = lightPos + dir * t;
+  //
+  //   if (outOfBounds(p)) {
+  //     break;
+  //   }
+  //
+  //   uvec3 up = uvec3(p);
+  //   uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
+  //
+  //   if (voxel_mip(up, 0, noop)) {
+  //     break;
+  //   }
+  //
+  //   light[idx] = vec4(1.0, 1.0, 1.0, 1.0 - t * ratio);
+  //
+  //   t+= max(0.1, t*0.5);// 16.0;// ratio * float(i) * 64;
+  // }
+}
+
+void main1() {
+
+  //uint dir_idx = gl_GlobalInvocationID.x;
+  // uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+  // float dir_p = float(dir_idx) / float(total_dirs);
+
+  uvec3 d = uvec3(dims);
+  vec3 lightPos = vec3(
+      200,// + sin(float(time) / 1000.0) * 150.0,
+      40,// + cos(float(time) / 100.0) * 16.0,// + sin(float(time) / 100.0) * 32,
+      16
   );
+  vec3 lightColor = vec3(1.0);
+  vec3 mapPos = vec3(lightPos);
 
   uint8_t noop;
-  vec3 found_normal;
-  for (uint i=0; i<512; i++) {
-    vec3 p = lightPos + dir * float(i);
+  float steps = 16;
+  float s = 2.0;
+  for (float i = 1.0; i<steps; i+=s) {
+    for (float z=-i; z<=i; z+=s) {
+      for (float x=-i; x<=i; x+=s) {
+        write(lightPos + vec3(x, i * s, z * s), lightColor);
+        write(lightPos + vec3(x, -i * s, z * s), lightColor);
+      }
+
+      for (float y=-i; y<i; y+=s) {
+        write(lightPos + vec3(i * s, y, z * s), lightColor);
+        write(lightPos + vec3(-i * s, y, z * s), lightColor);
+      }
+    }
+  }
+}
+
+void main3() {
+  uint dir_idx = gl_GlobalInvocationID.x;
+  // uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+  // float dir_p = float(dir_idx) / float(total_dirs);
+
+  uvec3 d = uvec3(dims);
+  vec3 lightPos = vec3(
+      200 + sin(float(time) / 1000.0) * 150.0,
+      40 + cos(float(time) / 100.0) * 16.0,// + sin(float(time) / 100.0) * 32,
+      0
+  );
+  vec3 lightColor = vec3(1.0);
+
+  vec3 mapPos = vec3(lightPos);
+
+  // vec3 dir = normalize(vec3(
+  //   sin(dir_p * PI) * cos(dir_p * TAU),
+  //   sin(dir_p * PI) * sin(dir_p * TAU),
+  //   cos(dir_p * TAU)
+  // ));
+
+  // vec3 dir = normalize(dirs[dir_idx]);
+  vec3 dir = normalize(randomSpherePoint(dir_idx + time));
+  //dir = normalize(vec3(0.0, 1.0, 1.0));
+  uint8_t noop;
+  uint steps = 128;
+
+  float ratio = 1 / float(steps) * 0.5;
+  float t = 0;
+  for (uint i=0; i<steps; i++) {
+    vec3 p = lightPos + dir * t;
+    uvec3 up = uvec3(p);
+    uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
+
     if (
       any(lessThan(p, vec3(0.0))) ||
       any(greaterThanEqual(p, vec3(dims)))
@@ -61,15 +268,75 @@ void main() {
       break;
     }
 
-    uvec3 up = uvec3(p);
-    uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
+    if (voxel_mip(up, 0, noop)) {
+      break;
+    }
 
-    if (voxel_get(up, noop)) {
-      light[idx] = vec4(0.0, 1.0, 0.0, 1.0);
+    light[idx] = vec4(1.0, 1.0, 1.0, 1.0 - float(t)/float(steps));
+
+    t+=1;// ratio * float(i) * 16;
+  }
+}
+
+void main2() {
+  uint dir_idx = gl_GlobalInvocationID.x;
+  uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
+  float dir_p = float(dir_idx) / float(total_dirs);
+
+  uvec3 d = uvec3(dims);
+  vec3 lightPos = vec3(
+      200,// + sin(float(time) / 100.0) * 8.0,
+      50,// + sin(float(time) / 100.0) * 16.0,// + sin(float(time) / 100.0) * 32,
+      8
+  );
+  vec3 lightColor = vec3(1.0);
+
+  vec3 mapPos = vec3(lightPos);
+
+  vec3 dir = normalize(vec3(
+    cos(dir_p * TAU),
+    sin(dir_p * TAU),
+    0.0
+  ));
+
+  uint8_t noop;
+  uint steps = 16;
+  vec3 found_normal;
+  float ratio = 1 / float(steps) * 0.5;
+  float t = 0;
+  for (uint i=0; i<steps; i+=2) {
+    vec3 p = lightPos + dir * t;
+    if (
+      any(lessThan(p, vec3(0.0))) ||
+      any(greaterThanEqual(p, vec3(dims)))
+    ) {
+      break;
+    }
+
+    float r = 1.0;//float(i) * ratio * 30.0;
+    float m = r * r;
+    float found = 0;
+    for (float x = -r; x<r; x++) {
+      for (float y = -r; y<r; y++) {
+        for (float z = -r; z<r; z++) {
+
+          uvec3 up = uvec3(p + vec3(x, y, z));
+          uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
+          if (voxel_mip(up, 0, noop)) {
+            //light[idx] = vec4(0.0, 1.0, 0.0, 1.0);
+            found++;
+            continue;
+          }
+
+          light[idx] = vec4(lightColor, 1.0);
+        }
+      }
+    }
+
+    if (found > 0) {
       return;
     }
 
-    light[idx] = vec4(lightColor, 1.0);
-    dda_cursor_step(c, found_normal);
+    t+=ratio * float(i) * 32;
   }
 }

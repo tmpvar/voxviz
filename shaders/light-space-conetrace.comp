@@ -1,0 +1,222 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 32 , local_size_y = 1, local_size_z = 1 ) in;
+
+#include "ray-aabb.glsl"
+#include "dda-cursor.glsl"
+#include "palette.glsl"
+#include "cosine-direction.glsl"
+#include "voxel-space.glsl"
+#include "hsl.glsl"
+
+uniform uvec2 out_color_dims;
+uniform mat4 VP;
+uniform uvec2 resolution;
+uniform float debug;
+uniform vec3 eye;
+uniform vec3 dims;
+uniform uint time;
+uniform uint terminationBufferIdx;
+uniform uint lightCount;
+
+// uses bindings 1-7 and requires `dims`
+#include "voxel-space-mips.glsl"
+
+layout (std430, binding=9) buffer outTerminationBuffer {
+  RayTermination out_termination[];
+};
+
+layout (std430, binding=10) buffer blueNoiseBuffer {
+  vec4 blueNoise[];
+};
+
+layout (std430, binding=11) buffer lightSpaceBuffer {
+  vec4 light[];
+};
+
+vec3 sphereRandom(vec2 r) {
+    float cosPhi = r.x * 2.0 - 1.0;
+    float sinPhi = sqrt(1 - (cosPhi * cosPhi));
+    float theta = r.y * 2.0 * 3.1415927;
+    return vec3(sinPhi * cos(theta), sinPhi * cos(theta), cosPhi);
+}
+
+vec3 hemisphereRandom(vec2 r) {
+    vec3 s = sphereRandom(r);
+    return vec3(s.x, s.y, s.z);
+}
+
+vec3 cdir(in uint seed, in vec3 normal) {
+  // uint slice = (time % 64) * 4096;
+
+  vec2 bn = blueNoise[(seed * time / 10000) % (4096 * 64)].xy;
+  vec3 d = hemisphereRandom(bn);
+
+  if (normal.x == 1.0) {
+    d.x = abs(d.x);
+  }
+
+  if (normal.y == 1.0) {
+    d.y = abs(d.y);
+  }
+
+  if (normal.z == 1.0) {
+    d.z = abs(d.z);
+  }
+
+  if (normal.x == -1.0) {
+    d.x = -abs(d.x);
+  }
+
+  if (normal.y == -1.0) {
+    d.y = -abs(d.y);
+  }
+
+  if (normal.z == -1.0) {
+    d.z = -abs(d.z);
+  }
+
+  return d;
+
+
+  float u = bn.x;
+  float v = bn.y;
+
+	// // method 3 by fizzer: http://www.amietia.com/lambertnotangent.html
+  float a = 6.2831853 * v;
+  //u = 2.0*u - 1.0;
+  return normalize(
+    normal + vec3(sqrt(1.0-u*u) * vec2(cos(a), sin(a)), u)
+  );
+}
+
+float sum(vec3 v) { return dot(v, vec3(1.0)); }
+
+void main1() {
+  //return;
+  uvec2 screen_pos = gl_GlobalInvocationID.xy;
+  uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
+  uint out_idx = screen_idx;// + terminationBufferIdx;
+
+  RayTermination o = out_termination[out_idx];
+
+  if (all(equal(o.position, vec4(-1.0)))) {
+    return;
+  }
+
+  uvec3 up = uvec3(o.position + o.normal);
+  uvec3 udims = uvec3(dims);
+  uint light_idx = (up.x + up.y * udims.x + up.z * udims.x * udims.y);
+  vec4 v = light[light_idx];
+  out_termination[out_idx].color = vec4(o.color.rgb * v.rgb * v.a, 1.0);
+}
+
+void main() {
+  //return;
+  uvec2 screen_pos = gl_GlobalInvocationID.xy;
+  uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
+  uint out_idx = screen_idx;// + terminationBufferIdx;
+
+  if (debug > 0.0) {
+    return;
+  }
+
+  RayTermination o = out_termination[out_idx];
+
+  if (all(equal(o.position, vec4(-1.0)))) {
+    return;
+  }
+
+  vec3 normal = o.normal.xyz;
+  vec3 origin = o.position.xyz + normal;
+  vec3 rayDir = o.rayDir.xyz;
+  vec4 voxelColor = o.color;
+  // float intensity = 0.0;
+
+  uvec3 udims = uvec3(dims);
+  uint8_t palette_idx;
+  float t = 0.0;
+  float steps = 16.0;
+  vec3 acc = vec3(0.0);
+  float ticks = 0.0;
+  for (float r = 0; r<1.0; r++) {
+    bool done = false;
+    for (t=0.0; t<steps; t+=1) {
+      vec3 cd = cdir(
+        uint(
+          t/steps *
+          gl_GlobalInvocationID.x +
+          gl_GlobalInvocationID.y * resolution.x
+        ),
+        normal
+      );
+      vec3 dir = normalize(normal + cd * 2.0);
+
+      vec3 p = origin + dir * t;
+
+      if (
+        any(lessThan(p, vec3(0.0))) ||
+        any(greaterThanEqual(p, vec3(dims)))
+      ) {
+        acc += vec3(1.0, 0.0, 0.0);
+        done = true;
+        break;
+      }
+
+      if (true) {
+        uvec3 up = uvec3(p);
+        uint light_idx = (up.x + up.y * udims.x + up.z * udims.x * udims.y);
+        vec4 v = light[light_idx];
+        if (v.a > 0.0) {
+          acc += light[light_idx].rgb * light[light_idx].a;// * 1.0/distance(origin, p + cd);
+        }
+      } else {
+        float radius = 1.0;//t/4.0;
+        vec3 local = vec3(0.0);
+        for (float x = -radius; x<=radius; x+=1) {
+          for (float y = -radius; y<=radius; y+=1) {
+            for (float z = -radius; z<=radius; z+=2) {
+
+              uvec3 up = uvec3(p + vec3(x, y, z));
+              uint light_idx = (up.x + up.y * udims.x + up.z * udims.x * udims.y);
+
+              vec4 v = light[light_idx];
+              if (v.a > 0.0) {
+                // local += light[light_idx].rgb * 1.0/distance(origin, p +  vec3(x, y, z) + cd);
+                local += light[light_idx].rgb * light[light_idx].a;
+              }
+            }
+          }
+        }
+        acc += local / (radius *radius * radius);
+        if (done) {
+          break;
+        }
+      }
+
+
+      if (voxel_mip(p, 0, palette_idx)) {
+        // TODO: light bleed
+        //acc += palette_color(palette_idx) * 0.5;
+        //dvoxelColor = vec4(1.0, 0.0, 1.0, 1.0);
+        break;
+      }
+
+    //   Light light = lights[i];
+    //   voxelColor = max(voxelColor, light.color * trace_light(o, light));
+    }
+    ticks++;
+  }
+  out_termination[out_idx].color =  max(
+    voxelColor * 0.2,
+    sqrt(voxelColor * vec4(vec3(acc/(ticks * 2)), 1.0))
+  );
+  //vec4(intensity);
+  // out_termination[out_idx].color = vec4(0.5 * voxelColor, 1.0);
+
+  // Primitive AO
+  //out_termination[out_idx].color = vec4(t/steps);
+}
