@@ -22,6 +22,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
 using namespace std;
 
 #define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
@@ -468,9 +472,9 @@ public:
     GLint local_layout[3];
     glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &local_layout[0]);
     glDispatchCompute(
-      (dims.x / local_layout[0])+1,
-      (dims.y / local_layout[1])+1,
-      (dims.z / local_layout[2])+1
+      max((dims.x / local_layout[0]), 1),
+      max((dims.y / local_layout[1]), 1),
+      max((dims.z / local_layout[2]), 1)
     );
     gl_error();
     return this;
