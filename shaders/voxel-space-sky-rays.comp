@@ -81,7 +81,7 @@ float trace_sky(vec3 pos, vec3 normal) {
       break;
     }
 
-    bool hit = voxel_mip(p, int(mip), noop);
+    bool hit = voxel_mip_get(p, int(mip), noop);
     if (hit) {
       return -1.0;//-(1.0 - float(i)/float(ITERATIONS));
     }

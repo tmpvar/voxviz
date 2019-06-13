@@ -9,20 +9,6 @@
 
 in vec3 in_ray_dir;
 layout(location = 0) out vec4 outColor;
-layout (std430, binding=1) buffer volumeSlabMip0 {
-  uint8_t volumeMip0[];
-};
-layout (std430, binding=2) buffer volumeSlabMip1 {
-  uint8_t volumeMip1[];
-};
-
-layout (std430, binding=3) buffer volumeSlabMip2 {
-  uint8_t volumeMip2[];
-};
-
-layout (std430, binding=4) buffer volumeSlabMip3 {
-  uint8_t volumeMip3[];
-};
 
 // main binds
 uniform float debug;
@@ -37,57 +23,7 @@ uniform vec3 lightColor;
 
 #define ITERATIONS 768
 
-bool voxel_get(vec3 pos, out uint8_t palette_idx) {
-  if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(dims)))) {
-    return false;
-  }
-
-  uint idx = uint(
-    pos.x +
-    pos.y * dims.x +
-    pos.z * dims.x * dims.y
-  );
-
-  palette_idx = volumeMip0[idx];
-
-  return palette_idx > uint8_t(0);
-}
-
-bool voxel_get_mip1(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = dims / 2.0;
-
-  if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(d)))) {
-    return false;
-  }
-
-  uint idx = uint(
-    pos.x +
-    pos.y * d.x +
-    pos.z * d.x * d.y
-  );
-
-  palette_idx = volumeMip1[idx];
-
-  return palette_idx > uint8_t(0);
-}
-
-bool voxel_get_mip2(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = dims / 4.0;
-  if (any(lessThan(pos, ivec3(0))) || any(greaterThanEqual(pos, ivec3(d)))) {
-    return false;
-  }
-
-  uint idx = uint(
-    pos.x +
-    pos.y * d.x +
-    pos.z * d.x * d.y
-  );
-
-  palette_idx = volumeMip2[idx];
-
-  return palette_idx > uint8_t(0);
-}
-
+#include "voxel-space-mips.glsl"
 
 void bounce(in DDACursor cursor, vec3 normal) {
   vec3 cd = cosine_direction(
@@ -152,7 +88,7 @@ float trace_light(in DDACursor cursor) {
   uint8_t noop;
   vec3 found_normal;
   for (int i=0; i<128; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
+    if (voxel_mip_get(c.mapPos, 1, noop)) {
       return -1.0;
     }
     dda_cursor_step(c, found_normal);
@@ -191,7 +127,7 @@ float trace_sky(in DDACursor cursor) {
   uint8_t noop;
   vec3 found_normal;
   for (int i=0; i<20; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
+    if (voxel_mip_get(c.mapPos, 1, noop)) {
       return -1.0;
     }
     dda_cursor_step(c, found_normal);
@@ -227,7 +163,7 @@ vec3 trace_reflection(in DDACursor cursor) {
   uint8_t noop;
   vec3 found_normal;
   for (int i=0; i<64; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
+    if (voxel_mip_get(c.mapPos, 1, noop)) {
       return c.mapPos * 2;
     }
     dda_cursor_step(c, found_normal);

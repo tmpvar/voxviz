@@ -46,156 +46,29 @@ bool voxel_get(vec3 pos, out uint8_t palette_idx) {
   return palette_idx > uint8_t(0);
 }
 
-bool voxel_get_mip1(vec3 pos, out uint8_t palette_idx) {
-  // vec3 d = dims / 2.0;
-  // pos = pos / 2.0;
-  vec3 d = floor(dims / 2.0);
-  vec3 p = floor(pos / 2.0);
+bool voxel_mip_get(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
   if (
-    any(lessThan(p, vec3(0.0))) ||
-    any(greaterThanEqual(p, vec3(d)))
+    any(lessThan(pos, vec3(0.0))) ||
+    any(greaterThanEqual(pos, vec3(dims)))
   ) {
     return false;
   }
 
-  uint idx = uint(
-    (
-      p.x +
-      p.y * d.x +
-      p.z * d.x * d.y
-    )
-  );
+  float r = 1.0 / float(1<<mip);
+  vec3 d = floor(dims * r);
+  vec3 p = floor(pos * r);
 
-  palette_idx = volumeMip1[idx];
+  uint idx = uint(p.x + p.y * d.x + p.z * d.x * d.y);
+
+  switch (mip) {
+    case 0: palette_idx = volumeMip0[idx]; break;
+    case 1: palette_idx = volumeMip1[idx]; break;
+    case 2: palette_idx = volumeMip2[idx]; break;
+    case 3: palette_idx = volumeMip3[idx]; break;
+    case 4: palette_idx = volumeMip4[idx]; break;
+    case 5: palette_idx = volumeMip5[idx]; break;
+    case 6: palette_idx = volumeMip6[idx]; break;
+  }
 
   return palette_idx > uint8_t(0);
-}
-
-bool voxel_get_mip2(vec3 pos, out uint8_t palette_idx) {
-  // vec3 d = dims / 2.0;
-  // pos = pos / 2.0;
-  vec3 d = floor(dims / 4.0);
-  vec3 p = floor(pos / 4.0);
-  if (
-    any(lessThan(p, vec3(0.0))) ||
-    any(greaterThanEqual(p, vec3(d)))
-  ) {
-    return false;
-  }
-
-  uint idx = uint(
-    (
-      p.x +
-      p.y * d.x +
-      p.z * d.x * d.y
-    )
-  );
-
-  palette_idx = volumeMip2[idx];
-
-  return palette_idx > uint8_t(0);
-}
-
-bool voxel_get_mip3(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = floor(dims / 8.0);
-  vec3 p = floor(pos / 8.0);
-  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
-    return false;
-  }
-
-  uint idx = uint(
-    p.x +
-    p.y * d.x +
-    p.z * d.x * d.y
-  );
-
-  palette_idx = volumeMip3[idx];
-  return palette_idx > uint8_t(0);
-}
-
-bool voxel_get_mip4(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = floor(dims / 16.0);
-  vec3 p = floor(pos / 16.0);
-  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
-    return false;
-  }
-
-  uint idx = uint(
-    p.x +
-    p.y * d.x +
-    p.z * d.x * d.y
-  );
-
-  palette_idx = volumeMip4[idx];
-
-  return palette_idx > uint8_t(0);
-}
-
-bool voxel_get_mip5(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = floor(dims / 32.0);
-  vec3 p = floor(pos / 32.0);
-  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
-    return false;
-  }
-
-  uint idx = uint(
-    p.x +
-    p.y * d.x +
-    p.z * d.x * d.y
-  );
-
-  palette_idx = volumeMip5[idx];
-
-  return palette_idx > uint8_t(0);
-}
-
-bool voxel_get_mip6(vec3 pos, out uint8_t palette_idx) {
-  vec3 d = floor(dims / 64.0);
-  vec3 p = floor(pos / 64.0);
-  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, ivec3(d)))) {
-    return false;
-  }
-
-  uint idx = uint(
-    p.x +
-    p.y * d.x +
-    p.z * d.x * d.y
-  );
-
-  palette_idx = volumeMip6[idx];
-
-  return palette_idx > uint8_t(0);
-}
-
-bool voxel_mip(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
-  vec3 gridPos = pos;// * dims;
-  if (mip == 0) {
-    return voxel_get(gridPos, palette_idx);
-  }
-
-  if (mip == 1) {
-    return voxel_get_mip1(gridPos, palette_idx);
-  }
-
-  if (mip == 2) {
-    return voxel_get_mip2(gridPos, palette_idx);
-  }
-
-  if (mip == 3) {
-    return voxel_get_mip3(gridPos, palette_idx);
-  }
-
-  if (mip == 4) {
-    return voxel_get_mip4(gridPos, palette_idx);
-  }
-
-  if (mip == 5) {
-    return voxel_get_mip5(gridPos, palette_idx);
-  }
-
-  if (mip == 6) {
-    return voxel_get_mip6(gridPos, palette_idx);
-  }
-
-  return false;
 }

@@ -147,7 +147,7 @@ float trace_light(RayTermination r, Light light) {
       return intensity;
     }
 
-    bool hit = voxel_mip(pos, uint(floor(mip)), palette_idx);
+    bool hit = voxel_mip_get(pos, uint(floor(mip)), palette_idx);
     if (hit) {
       if (mip == minMip) {
         if (palette_idx < uint8_t(4)) {
@@ -164,7 +164,7 @@ float trace_light(RayTermination r, Light light) {
         continue;
       }
     }
-    else if (mip < maxMip) {//} && !voxel_mip(pos, uint(mip + 1.0), palette_idx)) {
+    else if (mip < maxMip) {//} && !voxel_mip_get(pos, uint(mip + 1.0), palette_idx)) {
       mip += 1.0;
       mipSize = (float(1<<uint(mip)));
       invMipSize = 1.0 / mipSize;

@@ -189,8 +189,7 @@ float trace_sky1(in DDACursor cursor, vec2 uv) {
   uint8_t noop;
   vec3 found_normal;
   for (int i=0; i<64; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
-    // if (voxel_get_mip1(pos, noop)) {
+    if (voxel_mip_get(c.mapPos, 1, noop)) {
       return -1.0;
     }
     dda_cursor_step(c, found_normal);
@@ -236,7 +235,7 @@ float trace_sky(RayHit hit) {
       break;
     }
 
-    bool hit = voxel_mip(p, 1, noop);
+    bool hit = voxel_mip_get(p, 1, noop);
     if (hit && noop > uint8_t(2)) {
       return -1.0;
     }
@@ -276,7 +275,7 @@ vec3 trace_reflection(in DDACursor cursor, vec2 uv) {
   uint8_t noop;
   vec3 found_normal;
   for (int i=0; i<64; i++) {
-    if (voxel_get_mip1(c.mapPos, noop)) {
+    if (voxel_mip_get(c.mapPos, 1, noop)) {
       return c.mapPos * 2.0;
     }
     dda_cursor_step(c, found_normal);
@@ -294,8 +293,6 @@ vec3 compute_ray_dir(vec2 uv, mat4 inv) {
 }
 
 float sum(vec3 v) { return dot(v, vec3(1.0)); }
-
-
 
 void main() {
   if (any(greaterThanEqual(gl_GlobalInvocationID.xy, resolution))) {
@@ -355,7 +352,7 @@ void main() {
 
   int minMip = 0;
   int maxMip = 5;
-  mip = 5;
+  mip = maxMip;
   float mipSize = (float(1<<(mip)));
   float invMipSize = 1.0 / mipSize;
   vec3 mask;
@@ -369,7 +366,7 @@ void main() {
       break;
     }
 
-    if (voxel_mip(p, mip, palette_idx)) {
+    if (voxel_mip_get(p, mip, palette_idx)) {
       if (mip == minMip) {
         c = palette_color(palette_idx);
 
@@ -396,7 +393,7 @@ void main() {
       invMipSize = 1.0 / mipSize;
       continue;
     }
-    else if (mip < maxMip && !voxel_mip(p, min(mip + 1, maxMip), palette_idx)) {
+    else if (mip < maxMip && !voxel_mip_get(p, min(mip + 1, maxMip), palette_idx)) {
       mip++;
       mipSize = (float(1<<(mip)));
       invMipSize = 1.0 / mipSize;

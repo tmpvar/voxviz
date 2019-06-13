@@ -30,20 +30,6 @@ uint read(uvec3 pos, uvec3 dims) {
   return uint(src_volume[idx]) > 0 ? 1 : 0;
 }
 
-/*
-       ________
-     /
-    /
-   /
-  /__________
-
-
-
-
-*/
-
-
-
 void write(uvec3 pos, uint val) {
   uint idx = (
     pos.x +
