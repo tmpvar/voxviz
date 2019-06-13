@@ -21,6 +21,6 @@ console.error()
 
 console.log('// precomputed voxel lod buffer position and size ratios')
 console.log('// vec2(start, length)')
-console.log('const vec2 lod_defs[%s] = [', levels)
+console.log('const vec2 lod_defs[%s] = vec2[%s](', levels, levels)
 console.log('  ' + parts.join(',\n  '))
-console.log('];')
+console.log(');')

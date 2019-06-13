@@ -27,6 +27,7 @@
 
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <sstream>
 #include <string.h>
 #include <queue>
 
@@ -43,6 +44,7 @@ FBO *fbo = nullptr;
 SSBO *raytraceOutput = nullptr;
 #define TAA_HISTORY_LENGTH 16
 #define RAY_TERMINATION_BYTES 64
+#define MAX_MIP_LEVELS 7
 SSBO *terminationOutput = nullptr;
 typedef struct Light {
   glm::vec4 position;
@@ -465,14 +467,15 @@ int main(void) {
     static_cast<uint64_t>(voxelSpaceDims.x) *
     static_cast<uint64_t>(voxelSpaceDims.y) *
     static_cast<uint64_t>(voxelSpaceDims.z);
-  SSBO *voxelSpaceSSBO = new SSBO(voxelSpaceBytes);
 
-  SSBO *voxelSpaceSSBOMip1 = new SSBO(voxelSpaceBytes / 8);
-  SSBO *voxelSpaceSSBOMip2 = new SSBO(voxelSpaceBytes / 16);
-  SSBO *voxelSpaceSSBOMip3 = new SSBO(voxelSpaceBytes / 32);
-  SSBO *voxelSpaceSSBOMip4 = new SSBO(voxelSpaceBytes / 64);
-  SSBO *voxelSpaceSSBOMip5 = new SSBO(voxelSpaceBytes / 128);
-  SSBO *voxelSpaceSSBOMip6 = new SSBO(voxelSpaceBytes / 128);
+  uint64_t total_voxel_bytes = 0;
+  for (unsigned int i = 0; i <= MAX_MIP_LEVELS; i++) {
+    uint64_t a = voxelSpaceBytes >> (i * 3);
+    total_voxel_bytes += a;
+  }
+
+
+  SSBO *voxelSpaceSSBO = new SSBO(total_voxel_bytes);
   
   #define MAX_LIGHTS 4
   SSBO *lightBuffer = new SSBO(
@@ -494,18 +497,17 @@ int main(void) {
   Program *raytraceVoxelSpace_Compute = new Program();
   raytraceVoxelSpace_Compute->add(Shaders::get("voxel-space-raytrace.comp"))->link();
   
-
-  Program *skyRays_Compute = new Program();
-  skyRays_Compute->add(Shaders::get("voxel-space-sky-rays.comp"))->link();
+  //Program *skyRays_Compute = new Program();
+  //skyRays_Compute->add(Shaders::get("voxel-space-sky-rays.comp"))->link();
 
   Program *raytraceVoxelSpace_Blur = new Program();
   raytraceVoxelSpace_Blur->add(Shaders::get("voxel-space-blur.comp"))->link();
 
-  Program *gravityVoxelSpace = new Program();
-  gravityVoxelSpace->add(Shaders::get("voxel-space-gravity.comp"))->link();
+  //Program *gravityVoxelSpace = new Program();
+  //gravityVoxelSpace->add(Shaders::get("voxel-space-gravity.comp"))->link();
 
-  Program *lightRays_Compute = new Program();
-  lightRays_Compute->add(Shaders::get("voxel-space-conetrace-lights.comp"))->link();
+  //Program *lightRays_Compute = new Program();
+  //lightRays_Compute->add(Shaders::get("voxel-space-conetrace-lights.comp"))->link();
 
 
   uint64_t outputBytes =
@@ -527,13 +529,9 @@ int main(void) {
       ->use()
       ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
       ->uniform1ui("time", time)
-      ->uniformVec3ui("dims", voxelSpaceDims);
+      ->uniformVec3ui("dims", voxelSpaceDims)
+      ->compute(voxelSpaceDims);
 
-    glDispatchCompute(
-      voxelSpaceDims.x / 100,
-      1,
-      voxelSpaceDims.z / 1
-    );
     gl_error();
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
   }
@@ -799,7 +797,8 @@ int main(void) {
         ->compute(sdfDims);
       
       // Apply gravity to the scene
-      if (time > 1) {
+      /*
+      if (false) {
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
         gravityVoxelSpace
           ->use()
@@ -819,6 +818,7 @@ int main(void) {
            );
         
       }
+      */
       lastCharacterTime = time;
 
       uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
@@ -830,101 +830,28 @@ int main(void) {
     }
     
     // Generate mipmaps
-    if (time) {
-
-
+    if (true) {
       double mipStart = glfwGetTime();
-      // Generate mipmap for SSBO (level 1)
-      glm::uvec3 mipDims = voxelSpaceDims / glm::uvec3(2);
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBO, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip1, 2)
-        ->uniformVec3ui("destDims", mipDims)
-        ->timedCompute("mip 1", mipDims);
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      // Generate mipmap for SSBO
+      for (unsigned int i = 1; i <= MAX_MIP_LEVELS; i++) {
+        glm::uvec3 mipDims = voxelSpaceDims / (glm::uvec3(1<<i));
+        glm::uvec3 lowerMipDims = voxelSpaceDims / (glm::uvec3(1 << (i - 1)));
+        ostringstream mipDebug;
+        mipDebug << "mip " << i << " dims: " << mipDims.x << ","  << mipDims.y << "," << mipDims.z;
 
-
-      // Generate mipmap for SSBO (level 2)
-      mipDims = mipDims / glm::uvec3(2);
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip1, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip2, 2)
-        ->uniformVec3ui("destDims", mipDims)
-        ->timedCompute("mip 2", mipDims);
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
-      
-      // Generate mipmap for SSBO (level 3)
-      mipDims = mipDims / glm::uvec3(2);
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip2, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip3, 2)
-        ->uniformVec3ui("destDims", mipDims)
-        ->timedCompute("mip 3", mipDims);
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
-      
-       
-      // Generate mipmap for SSBO (level 4)
-      mipDims = mipDims / glm::uvec3(2);
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip3, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip4, 2)
-        ->uniformVec3ui("destDims", mipDims)
-        ->timedCompute("mip 4", mipDims);
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-      // Generate mipmap for SSBO (level 5)
-      mipDims = mipDims / glm::uvec3(2);
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip4, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip5, 2)
-        ->uniformVec3ui("destDims", mipDims)
-        ->timedCompute("mip 5", mipDims);
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-      // Generate mipmap for SSBO (level 6)
-      mipDims = mipDims / glm::uvec3(2);
-      mipmapVoxelSpace
-        ->use()
-        ->ssbo("sourceVolumeSlab", voxelSpaceSSBOMip5, 1)
-        ->ssbo("destVolumeSlab", voxelSpaceSSBOMip6, 2)
-        ->uniformVec3ui("destDims", mipDims)
-        ->timedCompute("mip 6", mipDims);
-      gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        mipmapVoxelSpace
+          ->use()
+          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+          ->uniformVec3("dims", voxelSpaceDims)
+          ->uniformVec3ui("mipDims", mipDims)
+          ->uniformVec3ui("lowerMipDims", lowerMipDims)
+          ->uniform1ui("mipLevel", i)
+          ->timedCompute(mipDebug.str().c_str(), mipDims);
+        gl_error();
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      }
     }
     
-    // Render the voxel space volume
-    if (false) {
-      raytraceVoxelSpace
-        ->use()
-        ->uniformVec3("eye", currentEye)
-        ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
-        ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
-        ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
-        ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
-        ->uniformFloat("maxDistance", 10000)
-        ->uniformMat4("VP", VP)
-        ->uniform1ui("time", time)
-        ->uniformVec3ui("lightPos", glm::uvec3(
-          10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
-          20,
-          0
-        ))
-        ->uniformVec3("lightColor", glm::vec3(1.0, 1.0, 1.0))
-        ->uniformVec3("dims", glm::vec3(voxelSpaceDims));
-
-      fullscreen_surface->render(raytraceVoxelSpace);
-    }
 
     // Raytrace in compute
     if (true) {
@@ -935,33 +862,16 @@ int main(void) {
           ->use()
 
           ->uniformVec3("eye", currentEye)
-          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
-          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
-          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
-          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
-          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
-          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
-          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip6, 7)
-          ->ssbo("outColorBuffer", raytraceOutput, 8)
-          ->ssbo("outTerminationBuffer", terminationOutput, 9)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
+          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+          ->ssbo("outTerminationBuffer", terminationOutput, 2)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 3)
+          ->ssbo("outColorBuffer", raytraceOutput, 4)
 
-          ->uniformFloat("maxDistance", 10000)
           ->uniformMat4("VP", VP)
-          ->uniform1ui("time", time)
           ->uniformFloat("debug", debug)
-          ->uniformVec3ui("lightPos", glm::uvec3(
-            10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
-            20,
-            0
-          ))
-          ->uniformVec3("lightColor", glm::vec3(1.0, 1.0, 1.0))
-          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
-
-          ->uniformVec3("characterPos", catModel->getPosition())
-
+          ->uniformVec3("dims", voxelSpaceDims)
           ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
+          ->uniform1ui("terminationBufferIdx", 0)
           ->timedCompute(
             "primary rays",
             glm::uvec3(
@@ -973,7 +883,8 @@ int main(void) {
       }
      
       // Trace sky rays
-      {
+      /*
+      if (false) {
         skyRays_Compute
           ->use()
           ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
@@ -995,9 +906,11 @@ int main(void) {
             glm::uvec3(res, 1)
           );
       }
+      */
 
       // Conetrace lights
-      if (true) {
+      /*
+      if (false) {
         Light *lights = (Light *)lightBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
         Light light;
 
@@ -1044,21 +957,16 @@ int main(void) {
           );
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
-      
+      */
       
       // Blur the results
-      {
+      if (false) {
         raytraceVoxelSpace_Blur
           ->use()
           ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]))
-          ->uniform1ui("time", time)
-          ->uniformVec3("eye", currentEye)
-          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
-          ->uniformFloat("debug", debug)
           ->ssbo("outColorBuffer", raytraceOutput, 1)
           ->ssbo("inTerminationBuffer", terminationOutput, 2)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
           ->timedCompute(
             "taa",
             glm::uvec3(
@@ -1070,15 +978,13 @@ int main(void) {
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
       // Debug rendering
-      {
+      if (true) {
         glDisable(GL_DEPTH_TEST);
         debugBindless
           ->use()
           ->ssbo("inColorBuffer", raytraceOutput, 1)
           ->ssbo("inTerminationBuffer", terminationOutput, 2)
           ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]));
-
-          
 
         fullscreen_surface->render(debugBindless);
       }

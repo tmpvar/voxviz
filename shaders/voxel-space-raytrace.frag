@@ -238,12 +238,12 @@ void main() {
     float intensity = 0.0;//0.67;
     vec3 reflectColor = vec3(0.0);
     for (int i=0; i<ITERATIONS; i++) {
-      if (voxel_get(cursor.mapPos, palette_idx)) {
+      if (voxel_mip_get(cursor.mapPos, 0, palette_idx)) {
         // intensity += trace_light(cursor) * 0.55;
         //intensity += trace_sky(cursor) * 0.75;
         if (cursor.mapPos.y < 10) {
           vec3 rpos = trace_reflection(cursor);
-          if (rpos.x >= 0.0 && voxel_get(rpos, palette_idx)) {
+          if (rpos.x >= 0.0 && voxel_mip_get(rpos, 0, palette_idx)) {
             reflectColor = palette_color(palette_idx);// / 2.0;
           }
         } else {

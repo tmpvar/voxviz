@@ -35,24 +35,10 @@ bool read(ivec2 pos, out RayTermination termination) {
     return false;
   }
 
-  uint idx = (pos.x + pos.y * resolution.x) + terminationBufferIdx;
+  uint idx = (pos.x + pos.y * resolution.x);
   termination = in_termination[idx];
 
   return true;
-}
-
-vec4 readT(ivec2 pos) {
-  vec4 color = vec4(0.0);
-  if (pos.x < 0 || pos.y < 0 || pos.x >= resolution.x || pos.y >= resolution.y) {
-    return color;
-  }
-
-  for (uint i=1; i<=TAA_SAMPLES; i++) {
-    uint idx = (pos.x + pos.y * resolution.x) + (resolution.x * resolution.y * ((time + i) % TAA_SAMPLES));
-    color += in_termination[idx].color;// * (1.0 * float(i) / 16.0);//((1 + float(i % 64)) / 64.0);
- }
-
-  return color / TAA_SAMPLES;
 }
 
 
@@ -69,25 +55,4 @@ void main() {
   //out_color[idx] = vec4(in_termination[idx].position.xyz / vec3(dims), 1.0);
   uint idx = pos.x + pos.y * resolution.x;
   out_color[idx] = in_termination[idx].color;
-}
-
-void main1() {
-
-  ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-  uint idx = pos.x + pos.y * resolution.x;
-  if (any(greaterThanEqual(pos, resolution))) {
-
-    return;
-  }
-
-  RayTermination o;
-  read(pos, o);
-
-  out_color[idx] = mix(
-    o.color,
-    readT(pos),
-    0.0//float(pos.x) > float(resolution.x) / 2.0 ? 1.0 : 0.0
-  );
-
-  //out_color[idx] = o.color;
 }

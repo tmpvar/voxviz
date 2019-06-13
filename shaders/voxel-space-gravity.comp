@@ -11,80 +11,80 @@ uniform uint time;
 // uses bindings 1-7 and requires `dims`
 #include "voxel-space-mips.glsl"
 
-
 layout (std430, binding=8) buffer blueNoiseBuffer {
   vec2 blueNoise[];
 };
 
-
-bool move(uvec3 src, ivec3 dest_offset, bool moved) {
-  if (moved) {
-    return true;
-  }
-  uvec3 d = uvec3(dims);
-  uint max_index = (d.x * d.y * d.z);
-  uint src_idx = (src.x + src.y * d.x + src.z * d.x * d.y);// % max_index;
-  uvec3 dest = src + dest_offset;
-  uint dest_idx = (dest.x + dest.y * d.x + dest.z * d.x * d.y);// % max_index;
-
-  uint8_t src_value = volumeMip0[src_idx];
-
-  if (src_value != uint8_t(0)) {
-    if (volumeMip0[dest_idx] == uint8_t(0)) {
-      volumeMip0[dest_idx] = src_value;
-      volumeMip0[src_idx] = uint8_t(0);
-      return true;
-    }
-  }
-  return false;
-}
-
-uint8_t get(uvec3 pos) {
-  uvec3 d = uvec3(dims);
-  uint idx = (pos.x + pos.y * d.x + pos.z * d.x * d.y);// % max_index;
-
-  return volumeMip0[idx];
-}
-
-void main() {
-
-  uvec3 last_pos = uvec3(gl_GlobalInvocationID.x, 0, gl_GlobalInvocationID.z);
-
-  if (any(greaterThanEqual(last_pos, dims))) {
-    return;
-  }
-
-  const uint8_t zero = uint8_t(0);
-  bool moved = false;
-  uint y = 1;
-  for (y; y<dims.y; y++) {
-    uvec3 current_pos = uvec3(last_pos.x, y, last_pos.z);
-    bool lmoved = move(current_pos, ivec3(0, -1, 0), false);
-
-    if (get(current_pos) <= uint8_t(16)) {
-      lmoved = move(current_pos, ivec3( 0, -1,  1), lmoved);
-      lmoved = move(current_pos, ivec3( 0, -1, -1), lmoved);
-      lmoved = move(current_pos, ivec3( 1, -1,  0), lmoved);
-      lmoved = move(current_pos, ivec3(-1, -1,  0), lmoved);
-      lmoved = move(current_pos, ivec3( 1, -1,  1), lmoved);
-      lmoved = move(current_pos, ivec3( 1, -1, -1), lmoved);
-      lmoved = move(current_pos, ivec3( 1, -1,  1), lmoved);
-      lmoved = move(current_pos, ivec3(-1, -1,  1), lmoved);
-    }
-
-    moved = moved || lmoved;
-  }
-
-  if (!moved) {
-    uvec3 d = uvec3(dims);
-    uint dest_idx = (last_pos.x + (d.y - 1) * d.x + last_pos.z * d.x * d.y);
-
-    vec2 uv = last_pos.xz / d.xz;
-    vec2 bn = 2.0 * blueNoise[time + (last_pos.z * last_pos.x % 4096) * (time % 64)].xy - 0.5;
-
-    volumeMip0[dest_idx] = uint8_t(
-       //dest_idx % 200 + 2
-      length(bn) < 0.2515  ? uint8_t(16) : volumeMip0[dest_idx]
-    );
-  }
-}
+//
+// bool move(uvec3 src, ivec3 dest_offset, bool moved) {
+//   if (moved) {
+//     return true;
+//   }
+//   uvec3 d = uvec3(dims);
+//   uint max_index = (d.x * d.y * d.z);
+//   uint src_idx = (src.x + src.y * d.x + src.z * d.x * d.y);// % max_index;
+//   uvec3 dest = src + dest_offset;
+//   uint dest_idx = (dest.x + dest.y * d.x + dest.z * d.x * d.y);// % max_index;
+//
+//   uint8_t src_value = volumeMip0[src_idx];
+//
+//   if (src_value != uint8_t(0)) {
+//     if (volumeMip0[dest_idx] == uint8_t(0)) {
+//       volumeMip0[dest_idx] = src_value;
+//       volumeMip0[src_idx] = uint8_t(0);
+//       return true;
+//     }
+//   }
+//   return false;
+// }
+//
+// uint8_t get(uvec3 pos) {
+//   uvec3 d = uvec3(dims);
+//   uint idx = (pos.x + pos.y * d.x + pos.z * d.x * d.y);// % max_index;
+//
+//   return volumeMip0[idx];
+// }
+//
+// void main() {
+//
+//   uvec3 last_pos = uvec3(gl_GlobalInvocationID.x, 0, gl_GlobalInvocationID.z);
+//
+//   if (any(greaterThanEqual(last_pos, dims))) {
+//     return;
+//   }
+//
+//   const uint8_t zero = uint8_t(0);
+//   bool moved = false;
+//   uint y = 1;
+//   for (y; y<dims.y; y++) {
+//     uvec3 current_pos = uvec3(last_pos.x, y, last_pos.z);
+//     bool lmoved = move(current_pos, ivec3(0, -1, 0), false);
+//
+//     if (get(current_pos) <= uint8_t(16)) {
+//       lmoved = move(current_pos, ivec3( 0, -1,  1), lmoved);
+//       lmoved = move(current_pos, ivec3( 0, -1, -1), lmoved);
+//       lmoved = move(current_pos, ivec3( 1, -1,  0), lmoved);
+//       lmoved = move(current_pos, ivec3(-1, -1,  0), lmoved);
+//       lmoved = move(current_pos, ivec3( 1, -1,  1), lmoved);
+//       lmoved = move(current_pos, ivec3( 1, -1, -1), lmoved);
+//       lmoved = move(current_pos, ivec3( 1, -1,  1), lmoved);
+//       lmoved = move(current_pos, ivec3(-1, -1,  1), lmoved);
+//     }
+//
+//     moved = moved || lmoved;
+//   }
+//
+//   if (!moved) {
+//     uvec3 d = uvec3(dims);
+//     uint dest_idx = (last_pos.x + (d.y - 1) * d.x + last_pos.z * d.x * d.y);
+//
+//     vec2 uv = last_pos.xz / d.xz;
+//     vec2 bn = 2.0 * blueNoise[time + (last_pos.z * last_pos.x % 4096) * (time % 64)].xy - 0.5;
+//
+//     volumeMip0[dest_idx] = uint8_t(
+//        //dest_idx % 200 + 2
+//       length(bn) < 0.2515  ? uint8_t(16) : volumeMip0[dest_idx]
+//     );
+//   }
+// }
+void main() {}

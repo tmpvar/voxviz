@@ -239,6 +239,22 @@ public:
     GLint ret;
     if (this->uniforms.find(name) == this->uniforms.end()) {
       ret = glGetUniformLocation(this->handle, name.c_str());
+
+      if (ret == GL_INVALID_VALUE) {
+        std::cout << "uniformLocation returned invalid enum for: " << name << " on " << this->compositeName << std::endl;
+        return ret;
+      }
+
+      if (ret == GL_INVALID_OPERATION) {
+        std::cout << "uniformLocation returned invalid operation for: " << name << " on " << this->compositeName << std::endl;
+        return ret;
+      }
+
+      if (ret == -1) {
+        std::cout << "uniformLocation broke for: " << name << " on " << this->compositeName << std::endl;
+        return ret;
+      }
+
       this->uniforms[name] = ret;
       gl_error();
     }
@@ -251,9 +267,20 @@ public:
   GLint resourceIndex(string name, GLenum type) {
     GLint ret;
     if (this->resource_indices.find(name) == this->resource_indices.end()) {
-      glGetProgramResourceIndex(this->handle, type, name.c_str());
+      ret = glGetProgramResourceIndex(this->handle, type, name.c_str());
+      if (ret == GL_INVALID_ENUM) {
+        std::cout << "resourceIndex returned invalid enum for: " << name << std::endl;
+        return ret;
+      }
+      
+      if (ret == GL_INVALID_INDEX) {
+        std::cout << "resourceIndex returned invalid index for: " << name << std::endl;
+        return ret;
+      }
+
       this->resource_indices[name] = ret;
-      gl_error();
+
+      //gl_error();
     }
     else {
       ret = this->resource_indices[name];
