@@ -145,7 +145,7 @@ void main() {
   float t = found_distance;
   float opacityDiv = 1.0 / 8.0;
 
-  int minMip = 2;
+  int minMip = 0;
   int maxMip = 7;
   mip = maxMip;
   float mipSize = (float(1<<(mip)));
