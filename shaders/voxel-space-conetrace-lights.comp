@@ -25,11 +25,11 @@ uniform uint lightCount;
 // uses bindings 1-7 and requires `dims`
 #include "voxel-space-mips.glsl"
 
-layout (std430, binding=9) buffer outTerminationBuffer {
+layout (std430) buffer outTerminationBuffer {
   RayTermination out_termination[];
 };
 
-layout (std430, binding=10) buffer blueNoiseBuffer {
+layout (std430) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
@@ -38,7 +38,7 @@ struct Light {
   vec4 color;
 };
 
-layout (std430, binding=11) buffer lightBuffer {
+layout (std430) buffer lightBuffer {
   Light lights[];
 };
 

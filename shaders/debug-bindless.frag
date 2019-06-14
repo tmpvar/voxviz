@@ -4,10 +4,10 @@
 
 #include "voxel-space.glsl"
 
-layout (std430, binding=1) buffer inColorBuffer {
+layout (std430) buffer inColorBuffer {
   vec4 in_color[];
 };
-layout (std430, binding=2) buffer inTerminationBuffer {
+layout (std430) buffer inTerminationBuffer {
   RayTermination in_termination[];
 };
 uniform uvec2 resolution;

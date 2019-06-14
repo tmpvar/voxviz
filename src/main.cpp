@@ -527,7 +527,7 @@ int main(void) {
   {
     fillVoxelSpace
       ->use()
-      ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+      ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
       ->uniform1ui("time", time)
       ->uniformVec3ui("dims", voxelSpaceDims)
       ->compute(voxelSpaceDims);
@@ -779,7 +779,7 @@ int main(void) {
 
       clearVoxelSpaceSDF
         ->use()
-        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
         ->uniform1ui("time", lastCharacterTime)
         ->uniformVec3("offset", lastCharacterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
@@ -789,7 +789,7 @@ int main(void) {
       // Fill the voxel space volume
       fillVoxelSpaceSDF
         ->use()
-        ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
         ->uniform1ui("time", time)
         ->uniformVec3("offset", characterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
@@ -841,7 +841,7 @@ int main(void) {
 
         mipmapVoxelSpace
           ->use()
-          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
+          ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
           ->uniformVec3("dims", voxelSpaceDims)
           ->uniformVec3ui("mipDims", mipDims)
           ->uniformVec3ui("lowerMipDims", lowerMipDims)
@@ -862,10 +862,10 @@ int main(void) {
           ->use()
 
           ->uniformVec3("eye", currentEye)
-          ->ssbo("volumeSlab", voxelSpaceSSBO, 1)
-          ->ssbo("outTerminationBuffer", terminationOutput, 2)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 3)
-          ->ssbo("outColorBuffer", raytraceOutput, 4)
+          ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+          ->ssbo("outTerminationBuffer", terminationOutput)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+          ->ssbo("outColorBuffer", raytraceOutput)
 
           ->uniformMat4("VP", VP)
           ->uniformFloat("debug", debug)
@@ -964,9 +964,9 @@ int main(void) {
         raytraceVoxelSpace_Blur
           ->use()
           ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]))
-          ->ssbo("outColorBuffer", raytraceOutput, 1)
-          ->ssbo("inTerminationBuffer", terminationOutput, 2)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 7)
+          ->ssbo("outColorBuffer", raytraceOutput)
+          ->ssbo("inTerminationBuffer", terminationOutput)
+          ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
           ->timedCompute(
             "taa",
             glm::uvec3(
@@ -982,8 +982,8 @@ int main(void) {
         glDisable(GL_DEPTH_TEST);
         debugBindless
           ->use()
-          ->ssbo("inColorBuffer", raytraceOutput, 1)
-          ->ssbo("inTerminationBuffer", terminationOutput, 2)
+          ->ssbo("inColorBuffer", raytraceOutput)
+          ->ssbo("inTerminationBuffer", terminationOutput)
           ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]));
 
         fullscreen_surface->render(debugBindless);

@@ -11,7 +11,7 @@ uniform uint time;
 // uses bindings 1-7 and requires `dims`
 #include "voxel-space-mips.glsl"
 
-layout (std430, binding=8) buffer blueNoiseBuffer {
+layout (std430) buffer blueNoiseBuffer {
   vec2 blueNoise[];
 };
 

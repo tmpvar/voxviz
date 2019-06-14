@@ -27,15 +27,15 @@ uniform vec3 characterPos;
 // uses bindings 1-7 and requires `dims`
 #include "voxel-space-mips.glsl"
 
-layout (std430, binding=2) buffer outTerminationBuffer {
+layout (std430) buffer outTerminationBuffer {
   RayTermination out_termination[];
 };
 
-layout (std430, binding=3) buffer blueNoiseBuffer {
+layout (std430) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
-layout (std430, binding=4) buffer outColorBuffer {
+layout (std430) buffer outColorBuffer {
   vec4 out_color[];
 };
 

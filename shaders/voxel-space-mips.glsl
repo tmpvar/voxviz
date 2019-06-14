@@ -1,4 +1,4 @@
-layout (std430, binding=1) buffer volumeSlabBuffer {
+layout (std430) buffer volumeSlabBuffer {
   uint8_t volumeSlab[];
 };
 

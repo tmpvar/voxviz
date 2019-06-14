@@ -215,11 +215,15 @@ public:
   }
 };
 
+struct SSBOBinding {
+  GLint block_index;
+};
 
 class Program {
   map<string, GLint> uniforms;
   map<string, GLint> attributes;
   map<string, GLint> resource_indices;
+  map<string, GLint> ssbos;
   map<Shader *, size_t> shader_versions;
   map<string, GLuint> outputs;
   GLuint texture_index;
@@ -310,6 +314,7 @@ public:
     this->attributes.clear();
     this->outputs.clear();
     this->uniforms.clear();
+    this->ssbos.clear();
     
     this->handle = glCreateProgram();
     this->compositeName = "";
@@ -475,20 +480,33 @@ public:
     return this;
   }
 
-  Program *ssbo(string name, SSBO *ssbo, GLuint binding) {
-    // TODO: cache this result
-    //GLuint idx = glGetProgramResourceIndex(this->handle, GL_SHADER_STORAGE_BLOCK, name.c_str());
-    //gl_error();
-    //glShaderStorageBlockBinding(this->handle, idx, 0);
+  Program *ssbo(string name, SSBO *ssbo) {
+    GLint ri = this->resourceIndex(name, GL_SHADER_STORAGE_BLOCK);
 
-    //if (idx == GL_INVALID_INDEX) {
-    //  printf("SSBO binding failed, could not find '%s'\n", name.c_str());
-    //  return this;
-    //}
+    if (ri == GL_INVALID_ENUM) {
+      printf("SSBO binding failed, invalid enum '%s'\n", name.c_str());
+      return this;
+    }
 
+    if (ri == GL_INVALID_INDEX) {
+      printf("SSBO binding failed, could not find '%s'\n", name.c_str());
+      return this;
+    }
+
+    GLint idx;
+    if (this->ssbos.find(name) == this->ssbos.end()) {
+      idx = this->ssbos.size();
+      this->ssbos[name] = idx;
+      // Rebind the buffer index to the order in which it was seen in.
+      glShaderStorageBlockBinding(this->handle, ri, idx);
+    }
+    else {
+      idx = this->ssbos[name];
+    }
+  
     GLuint ssbo_handle = ssbo->bind();
     if (ssbo_handle != 0) {
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo_handle); gl_error();
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, idx, ssbo_handle); gl_error();
     }
     ssbo->unbind();
     return this;
