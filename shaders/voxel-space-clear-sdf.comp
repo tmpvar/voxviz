@@ -9,7 +9,8 @@ layout (std430) buffer volumeSlabBuffer {
   uint8_t volume[];
 };
 
-uniform uvec3 dims;
+uniform uvec3 volumeSlabDims;
+
 uniform uint time;
 uniform vec3 offset;
 uniform uvec3 sdfDims;
@@ -98,8 +99,12 @@ void main() {
   uvec3 pos = rp + uvec3(offset);
   vec3 hd = vec3(sdfDims) / 2.0;
 
-  //uint origin = (offset.x + offset.y * dims.x + offset.z * dims.x * dims.y);
-  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
+  uint idx = (
+    pos.x +
+    pos.y * volumeSlabDims.x +
+    pos.z * volumeSlabDims.x * volumeSlabDims.y
+  );
+
   uint rpi = rp.x + rp.y * sdfDims.x + rp.z * sdfDims.x * sdfDims.y;
   float d = doModel((vec3(rp) - hd + 0.5) / 20.0);
   uint material = (rpi % 10) + 1;

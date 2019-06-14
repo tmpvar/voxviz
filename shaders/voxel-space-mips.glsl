@@ -2,6 +2,8 @@ layout (std430) buffer volumeSlabBuffer {
   uint8_t volumeSlab[];
 };
 
+uniform vec3 volumeSlabDims;
+
 const vec2 lod_defs[8] = vec2[8](
     vec2(0, 1),
     vec2(1, 0.12499999999),
@@ -21,33 +23,22 @@ bool voxel_mip_get(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
   );
 
   uvec3 d = uvec3(
-    uint(dims.x) >> mip,
-    uint(dims.y) >> mip,
-    uint(dims.z) >> mip
+    uint(volumeSlabDims.x) >> mip,
+    uint(volumeSlabDims.y) >> mip,
+    uint(volumeSlabDims.z) >> mip
   );
 
   if (any(greaterThanEqual(p, d))) {
     return false;
   }
 
-  float slots = dims.x * dims.y * dims.z;
+  float slots = volumeSlabDims.x * volumeSlabDims.y * volumeSlabDims.z;
   vec2 lod = lod_defs[mip];
   uint offset = uint(floor(slots * lod.x));
 
-  //uvec3 upos = uvec3(pos)
-  // vec3 d = dims * lod.y;
-  // vec3 p = pos * lod.y;
   uint idx = offset + uint(
     p.x + p.y * d.x + p.z * d.x * d.y
   );
-
-  // uint idx = offset + uint(
-  //   (
-  //     pos.x +
-  //     pos.y * dims.x +
-  //     pos.z * dims.x * dims.y
-  //   ) * lod.y
-  // );
 
   palette_idx = volumeSlab[idx];
 

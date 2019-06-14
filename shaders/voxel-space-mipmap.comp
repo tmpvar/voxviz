@@ -8,8 +8,8 @@ layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 layout (std430) buffer volumeSlabBuffer {
   uint8_t volumeSlab[];
 };
+uniform vec3 volumeSlabDims;
 
-uniform vec3 dims;
 uniform uvec3 mipDims;
 uniform uvec3 lowerMipDims;
 uniform uint mipLevel;
@@ -38,7 +38,7 @@ uint read(uvec3 pos) {
     return 0;
   }
 
-  float slots = dims.x * dims.y * dims.z;
+  float slots = volumeSlabDims.x * volumeSlabDims.y * volumeSlabDims.z;
   vec2 lod = lod_defs[mipLevel-1];
   uint offset = uint(slots * lod.x);
 
@@ -57,7 +57,7 @@ void write(uvec3 p, uint val) {
   }
 
   vec2 lod = lod_defs[mipLevel];
-  float slots = dims.x * dims.y * dims.z;
+  float slots = volumeSlabDims.x * volumeSlabDims.y * volumeSlabDims.z;
   uint offset = uint(slots * lod.x);
 
   uint idx = offset + uint(

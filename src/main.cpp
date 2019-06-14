@@ -308,8 +308,9 @@ int main(void) {
     fillVoxelSpace
       ->use()
       ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+      ->uniformVec3ui("volumeSlabDims", voxelSpaceDims)
+
       ->uniform1ui("time", time)
-      ->uniformVec3ui("dims", voxelSpaceDims)
       ->compute(voxelSpaceDims);
 
     gl_error();
@@ -560,20 +561,22 @@ int main(void) {
       clearVoxelSpaceSDF
         ->use()
         ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+        ->uniformVec3ui("volumeSlabDims", voxelSpaceDims)
+
         ->uniform1ui("time", lastCharacterTime)
         ->uniformVec3("offset", lastCharacterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
-        ->uniformVec3ui("dims", voxelSpaceDims)
         ->compute(sdfDims);
 
       // Fill the voxel space volume
       fillVoxelSpaceSDF
         ->use()
         ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+        ->uniformVec3ui("volumeSlabDims", voxelSpaceDims)
+
         ->uniform1ui("time", time)
         ->uniformVec3("offset", characterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
-        ->uniformVec3ui("dims", voxelSpaceDims)
         ->compute(sdfDims);
 
       lastCharacterTime = time;
@@ -599,7 +602,8 @@ int main(void) {
         mipmapVoxelSpace
           ->use()
           ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
-          ->uniformVec3("dims", voxelSpaceDims)
+          ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+
           ->uniformVec3ui("mipDims", mipDims)
           ->uniformVec3ui("lowerMipDims", lowerMipDims)
           ->uniform1ui("mipLevel", i)
@@ -619,13 +623,15 @@ int main(void) {
 
           ->uniformVec3("eye", currentEye)
           ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+          ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+
           ->ssbo("outTerminationBuffer", terminationOutput)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
           ->ssbo("outColorBuffer", raytraceOutput)
 
           ->uniformMat4("VP", VP)
           ->uniformFloat("debug", debug)
-          ->uniformVec3("dims", voxelSpaceDims)
+          
           ->uniformVec2ui("resolution", res)
           ->uniform1ui("terminationBufferIdx", 0)
           ->timedCompute(
