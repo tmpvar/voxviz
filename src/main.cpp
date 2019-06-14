@@ -111,88 +111,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   }
 }
 
-/* LIBUV JUNK*/
-typedef struct {
-  uv_buf_t buffer;
-  uv_write_t request;
-} write_req_t;
-
-uv_loop_t *loop;
-uv_pipe_t stdin_pipe;
-
-static void alloc_buffer(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-  buf->base = (char *)malloc(suggested_size);
-  memset(buf->base, 0, suggested_size);
-  buf->len = suggested_size;
-}
-
-
-#define MAX_LINE_LENGTH 512
-char current_line[MAX_LINE_LENGTH];
-unsigned int current_line_loc = 0;
-const char *line_splitter = " ";
-const char *line_prefix = "MACHINE_COORD ";
-queue<glm::vec3> tool_position_queue;
-
-void read_stdin(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buffer) {
-  if (nread > 0) {
-    cout << "read " << nread << " bytes" << endl;
-  }
-
-  if (buffer->base) {
-    char *base = buffer->base;
-    for (ssize_t i = 0; i < nread; i++) {
-
-      if (current_line_loc >= MAX_LINE_LENGTH) {
-        current_line_loc = MAX_LINE_LENGTH - 1;
-      }
-      if (base[i] == '\n') {
-        current_line[current_line_loc] = 0;
-        char *parse_pos = strstr(current_line, line_prefix);
-
-        if (parse_pos != NULL) {
-          char *pch = strtok(parse_pos + strlen(line_prefix), line_splitter);
-          glm::vec3 tool_pos;
-          tool_pos[0] = 0.0f;
-          int axis_loc = 0;
-          while (pch != NULL) {
-            tool_pos[axis_loc] = atof(pch);
-            pch = strtok(NULL, line_splitter);
-            axis_loc++;
-            if (axis_loc > 3) {
-            tool_pos[axis_loc] = atof(pch);
-              break;
-            }
-          }
-
-          cout << "moving tool to (" << tool_pos.x << ", " << tool_pos.y << ", " << tool_pos.z << ")" << endl;
-
-          tool_position_queue.push(tool_pos);
-        }
-
-        memset(current_line, 0, MAX_LINE_LENGTH);
-        current_line_loc = 0;
-        continue;
-      }
-      else {
-        current_line[current_line_loc] = base[i];
-        current_line_loc++;
-      }
-
-    }
-    free(buffer->base);
-  }
-}
-/* LIBUV JUNK*/
-
 int main(void) {
-  VolumeManager *volumeManager = new VolumeManager();
-  float dt = 1.0f / 60.0f;
-  q3Scene *physicsScene = new q3Scene(dt);
-  // 32, 5, 16
-  q3BodyDef bodyDef;
-  q3BoxDef boxDef;
-
   memset(keys, 0, sizeof(keys));
 
   int d = BRICK_DIAMETER;
@@ -200,12 +119,6 @@ int main(void) {
   int dims[3] = { d, d, d };
   float dsquare = (float)d*(float)d;
   float camera_z = sqrtf(dsquare * 3.0f) * 1.5f;
-
-  // libuv junk
-  uv_pipe_init(uv_default_loop(), &stdin_pipe, 0);
-  uv_pipe_open(&stdin_pipe, 0);
-  uv_read_start((uv_stream_t*)&stdin_pipe, alloc_buffer, read_stdin);
-  // libuv junk
 
   GLFWwindow* window;
 
@@ -261,29 +174,6 @@ int main(void) {
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
 
-  Program *fillSphereProgram = new Program();
-  fillSphereProgram
-    ->add(Shaders::get("fill-sphere.comp"))
-    ->link();
- 
-
-  Program *fillAllProgram = new Program();
-  fillAllProgram
-    ->add(Shaders::get("fill-all.comp"))
-    ->link();
-
-
-  Program *brickCutProgram = new Program();
-  brickCutProgram
-    ->add(Shaders::get("brick-cut.comp"))
-    ->link();
-
-  Program *brickAddProgram = new Program();
-  brickAddProgram
-    ->add(Shaders::get("brick-add.comp"))
-    ->link();
-
-
   Raytracer *raytracer = new Raytracer(dims);
   float max_distance = 10000.0f;
 
@@ -294,25 +184,6 @@ int main(void) {
   );
 
   unsigned int time = 0;
-
-#if RENDER_STATIC == 1
-  //update_volumes(raytracer, compute, time);
-#endif
-
-  //Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
-  //tool->fillConst(1.0);
-  /*compute->lock(compute->job.command_queues[0], tool->computeBuffer);
-  compute->fill(
-    "fillAll",
-    compute->job.command_queues[0],
-    tool,
-    0
-  );
-  compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
-  */
-  //tool->position(0.0, 512, 0.0);
-
-  //clFinish(compute->job.command_queues[0]);
 
   Program *fullscreen_program = new Program();
   fullscreen_program
@@ -346,99 +217,10 @@ int main(void) {
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     printf("max computer shader invocations %i\n", work_grp_inv);
   }
-  
-  // TODO: if we want to enable multiple space overlapping volumes,
-  //       we will need to group them together as far as physics is
-  //       concerned.
-  //       big volumes also cause this to halt the program.
-  // bodyDef.bodyType = eDynamicBody;
-
-  /*VZDParser::parse(
-    "D:\\work\\voxviz\\include\\parser\\vzd\\out.vzd",
-    volumeManager,
-    physicsScene,
-    bodyDef
-  );*/
-
-  /*
-  VOXParser::parse(
-    "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
-    volumeManager,
-    physicsScene,
-    bodyDef
-  );
-
-  Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
-  Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
-  toolBrick->createGPUMemory();
-  toolBrick->fill(fillSphereProgram);
-  
-  
-
-  Brick *toolBrick2 = tool->AddBrick(glm::ivec3(2, 0, 0), &boxDef);
-  toolBrick2->createGPUMemory();
-  toolBrick2->fillConst(0xFFFFFFFF);
-  
-  
-  volumeManager->addVolume(tool);
-  */
-  q3Transform tx;
-  q3Identity(tx);
-  boxDef.SetRestitution(0.5);
-  bodyDef.bodyType = eStaticBody;
-
-  boxDef.Set(tx, q3Vec3(
-    BRICK_DIAMETER,
-    BRICK_DIAMETER,
-    BRICK_DIAMETER
-  ));
-
-  Volume *floor = new Volume(glm::vec3(0.0));
-  floor->material = glm::vec4(0.67, 0.71, 0.78, 1.0);
-  //Brick *floorBrick = floor->AddBrick(glm::ivec3(1, 0, 0));
-  //floorBrick->createGPUMemory();
-  //floorBrick->fillConst(1.0);
-  //floor->cut(tool);
-  //return 1;
-  
- // tool->scale.x = 1.0;
- // tool->scale.y = 1.0;
- // tool->scale.z = 1.0;
- // tool->rotation.z = M_PI / 4.0;
-  //floor->rotation.z = M_PI / 2.0;
-
-  volumeManager->addVolume(floor);
-
-  //for (int x = 0; x < 32; x++) {
-  //  for (int y = 0; y < 32; y++) {
-  //    for (int z = 0; z < 32; z++) {
-  //      floor->AddBrick(glm::ivec3(x, y, z));
-  //    }
-  //  }
-  //}
-
-  floor->AddBrick(glm::ivec3(0));
-
-  //fillAllProgram->use()->uniform1ui("val", 0xFFFFFFFF);
-  size_t i = 0;
-  for (auto& it : floor->bricks) {
-    i++;
-    Brick *brick = it.second;
-    brick->createGPUMemory();
-    brick->fill(fillSphereProgram);
-    //brick->fill(fillSphereProgram);
-   // brick->fill(fillAllProgram);
-  }
-
-
-  bodyDef.bodyType = eDynamicBody;
-
-  glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
+    
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   fbo = new FBO(windowDimensions[0], windowDimensions[1]);
   
-  uint32_t total_affected = 0;
 
   // Setup Dear ImGui binding
   IMGUI_CHECKVERSION();
@@ -457,10 +239,8 @@ int main(void) {
   ImGui::CreateContext();
   const float movementSpeed = 0.01f;
   GLFWgamepadstate state;
-
-
+  
   // Voxel space
-  //const glm::uvec3 voxelSpaceDims = glm::uvec3(2000, 400, 3000);
   const glm::uvec3 voxelSpaceDims = glm::uvec3(512, 128, 512);
    
   uint64_t voxelSpaceBytes =
@@ -795,30 +575,7 @@ int main(void) {
         ->uniformVec3ui("sdfDims", sdfDims)
         ->uniformVec3ui("dims", voxelSpaceDims)
         ->compute(sdfDims);
-      
-      // Apply gravity to the scene
-      /*
-      if (false) {
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-        gravityVoxelSpace
-          ->use()
-          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
-          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
-          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
-          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
-          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
-          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
-          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip5, 7)
-          ->ssbo("blueNoise", blue_noise->ssbo, 8)
-          ->uniform1ui("time", time)
-          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
-          ->timedCompute(
-            "gravity",
-            glm::uvec3(voxelSpaceDims.x, 1, voxelSpaceDims.z) / glm::uvec3(4)
-           );
-        
-      }
-      */
+
       lastCharacterTime = time;
 
       uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
@@ -852,7 +609,6 @@ int main(void) {
       }
     }
     
-
     // Raytrace in compute
     if (true) {
       // Raytrace into `raytraceOutput`
@@ -881,84 +637,7 @@ int main(void) {
             )
           );
       }
-     
-      // Trace sky rays
-      /*
-      if (false) {
-        skyRays_Compute
-          ->use()
-          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
-          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
-          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
-          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
-          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
-          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
-          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip6, 7)
-          ->ssbo("outTerminationBuffer", terminationOutput, 9)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
-          ->uniform1ui("time", time)
-          ->uniformFloat("debug", debug)
-          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
-          ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
-          ->timedCompute(
-            "sky rays",
-            glm::uvec3(res, 1)
-          );
-      }
-      */
 
-      // Conetrace lights
-      /*
-      if (false) {
-        Light *lights = (Light *)lightBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
-        Light light;
-
-        light.position = glm::vec4(
-          1.0,
-          60.0, //30.0 + sin(time / 100.0) * 30.0,
-          1.0,
-          1.0
-        );
-        light.color = glm::vec4(1.0, 1.0, 1.0, 1.0);
-
-        memcpy(&lights[0], &light, sizeof(light));
-
-
-        light.position = glm::vec4(catModel->getPosition() + glm::vec3(0.0, 20, 0.0), 0.0);
-        light.color = glm::vec4(1.0, 0.0, 0.0, 1.0);
-
-        memcpy(&lights[1], &light, sizeof(light));
-
-        lightBuffer->endMap();
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
-        lightRays_Compute
-          ->use()
-          ->ssbo("volumeSlabMip0", voxelSpaceSSBO, 1)
-          ->ssbo("volumeSlabMip1", voxelSpaceSSBOMip1, 2)
-          ->ssbo("volumeSlabMip2", voxelSpaceSSBOMip2, 3)
-          ->ssbo("volumeSlabMip3", voxelSpaceSSBOMip3, 4)
-          ->ssbo("volumeSlabMip4", voxelSpaceSSBOMip4, 5)
-          ->ssbo("volumeSlabMip5", voxelSpaceSSBOMip5, 6)
-          ->ssbo("volumeSlabMip6", voxelSpaceSSBOMip6, 7)
-          ->ssbo("outTerminationBuffer", terminationOutput, 9)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo, 10)
-          ->ssbo("lightBuffer", lightBuffer, 11)
-          ->uniform1ui("time", time)
-          ->uniformFloat("debug", debug)
-          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
-          ->uniformVec2ui("resolution", res)
-          ->uniform1ui("terminationBufferIdx", res.x * res.y * (time%TAA_HISTORY_LENGTH))
-          ->uniform1ui("lightCount", 2) // TODO: only send the actual count
-          ->timedCompute(
-            "lights",
-            glm::uvec3(res, 1)
-          );
-      }
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
-      */
-      
       // Blur the results
       if (false) {
         raytraceVoxelSpace_Blur
@@ -1013,7 +692,6 @@ int main(void) {
   delete fullscreen_surface;
   delete raytracer;
   Shaders::destroy();
-  uv_read_stop((uv_stream_t*)&stdin_pipe);
   uv_stop(uv_default_loop());
   uv_loop_close(uv_default_loop());
   glfwTerminate();
