@@ -8,9 +8,8 @@ layout( local_size_x = 1, local_size_y = 1, local_size_z = 1 ) in;
 #define TAU 6.283185307179586
 #define PI 3.141592653589793
 
-//uniform vec3 lightPos;
-//uniform vec3 lightColor;
-uniform vec3 dims;
+uniform vec3 lightPos;
+uniform vec3 lightColor;
 uniform uint time;
 
 // uses bindings 1-7 and requires `dims`
@@ -20,9 +19,10 @@ layout (std430, binding=8) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
-layout (std430, binding=9) buffer lightSlab {
-  vec4 light[];
+layout (std430, binding=9) buffer lightSlabBuffer {
+  vec4 lightSlab[];
 };
+uniform vec3 lightSlabDims;
 
 vec3 randomSpherePoint(uint seed) {
   //vec2 bn =  blueNoise[(time + seed + 10) % (4096 * 64)].xy / 2.0;
@@ -85,7 +85,7 @@ vec3 cdir(in uint seed, in vec3 normal) {
 bool outOfBounds(vec3 p) {
   if (
     any(lessThan(p, vec3(0.0))) ||
-    any(greaterThanEqual(p, vec3(dims)))
+    any(greaterThanEqual(p, vec3(lightSlabDims)))
   ) {
     return true;
   }
@@ -93,17 +93,14 @@ bool outOfBounds(vec3 p) {
 }
 
 void write(vec3 p, vec3 color) {
-  if (
-    any(lessThan(p, vec3(0.0))) ||
-    any(greaterThanEqual(p, vec3(dims)))
-  ) {
+  if (outOfBounds(p)) {
     return;
   }
 
   uvec3 up = uvec3(p);
-  uvec3 d = uvec3(dims);
+  uvec3 d = uvec3(lightSlabDims);
   uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
-  light[idx] = vec4(color, 1.0);
+  lightSlab[idx] = vec4(color, 1.0);
 }
 
 void fillDirection(vec3 origin, vec3 dir) {
@@ -111,7 +108,7 @@ void fillDirection(vec3 origin, vec3 dir) {
   uint steps = 128;
   float ratio = 1 / float(steps);
   float t = 0.0;
-  uvec3 d = uvec3(dims);
+  uvec3 d = uvec3(lightSlabDims);
   for (uint i=0; i<steps; i++) {
 
     vec3 p = origin + dir * t;
@@ -122,11 +119,11 @@ void fillDirection(vec3 origin, vec3 dir) {
 
     uvec3 up = uvec3(p);
     uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
-    vec4 v = light[idx];
-    if (voxel_mip(up, 0, noop)) {
+    vec4 v = lightSlab[idx];
+    if (voxel_mip_get(up, 0, noop)) {
       break;
     }
-    light[idx] = min(vec4(1.0), (vec4(1.0, 1.0, 1.0, 1.0 - t * ratio)  + v * 0.95));
+    lightSlab[idx] = min(vec4(1.0), (vec4(1.0, 1.0, 1.0, 1.0 - t * ratio)  + v * 0.95));
 
 
 
@@ -139,7 +136,7 @@ void main() {
   // uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
   // float dir_p = float(dir_idx) / float(total_dirs);
 
-  uvec3 d = uvec3(dims);
+  uvec3 d = uvec3(lightSlabDims);
   vec3 lightPos = vec3(
       230,// + sin(float(time) / 10.0) * 15.0,
       40,// + cos(float(time) / 10.0) * 16.0,// + sin(float(time) / 100.0) * 32,
@@ -188,7 +185,7 @@ void main() {
   //     break;
   //   }
   //
-  //   light[idx] = vec4(1.0, 1.0, 1.0, 1.0 - t * ratio);
+  //   lightSlab[idx] = vec4(1.0, 1.0, 1.0, 1.0 - t * ratio);
   //
   //   t+= max(0.1, t*0.5);// 16.0;// ratio * float(i) * 64;
   // }
@@ -200,7 +197,7 @@ void main1() {
   // uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
   // float dir_p = float(dir_idx) / float(total_dirs);
 
-  uvec3 d = uvec3(dims);
+  uvec3 d = uvec3(lightSlabDims);
   vec3 lightPos = vec3(
       200,// + sin(float(time) / 1000.0) * 150.0,
       40,// + cos(float(time) / 100.0) * 16.0,// + sin(float(time) / 100.0) * 32,
@@ -232,7 +229,7 @@ void main3() {
   // uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
   // float dir_p = float(dir_idx) / float(total_dirs);
 
-  uvec3 d = uvec3(dims);
+  uvec3 d = uvec3(lightSlabDims);
   vec3 lightPos = vec3(
       200 + sin(float(time) / 1000.0) * 150.0,
       40 + cos(float(time) / 100.0) * 16.0,// + sin(float(time) / 100.0) * 32,
@@ -261,18 +258,15 @@ void main3() {
     uvec3 up = uvec3(p);
     uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
 
-    if (
-      any(lessThan(p, vec3(0.0))) ||
-      any(greaterThanEqual(p, vec3(dims)))
-    ) {
+    if (outOfBounds(p)) {
       break;
     }
 
-    if (voxel_mip(up, 0, noop)) {
+    if (voxel_mip_get(up, 0, noop)) {
       break;
     }
 
-    light[idx] = vec4(1.0, 1.0, 1.0, 1.0 - float(t)/float(steps));
+    lightSlab[idx] = vec4(1.0, 1.0, 1.0, 1.0 - float(t)/float(steps));
 
     t+=1;// ratio * float(i) * 16;
   }
@@ -283,7 +277,7 @@ void main2() {
   uint total_dirs = gl_NumWorkGroups.x * gl_WorkGroupSize.x;
   float dir_p = float(dir_idx) / float(total_dirs);
 
-  uvec3 d = uvec3(dims);
+  uvec3 d = uvec3(lightSlabDims);
   vec3 lightPos = vec3(
       200,// + sin(float(time) / 100.0) * 8.0,
       50,// + sin(float(time) / 100.0) * 16.0,// + sin(float(time) / 100.0) * 32,
@@ -306,10 +300,7 @@ void main2() {
   float t = 0;
   for (uint i=0; i<steps; i+=2) {
     vec3 p = lightPos + dir * t;
-    if (
-      any(lessThan(p, vec3(0.0))) ||
-      any(greaterThanEqual(p, vec3(dims)))
-    ) {
+    if (outOfBounds(p)) {
       break;
     }
 
@@ -322,13 +313,13 @@ void main2() {
 
           uvec3 up = uvec3(p + vec3(x, y, z));
           uint idx = (up.x + up.y * d.x + up.z * d.x * d.y);
-          if (voxel_mip(up, 0, noop)) {
-            //light[idx] = vec4(0.0, 1.0, 0.0, 1.0);
+          if (voxel_mip_get(up, 0, noop)) {
+            //lightSlab[idx] = vec4(0.0, 1.0, 0.0, 1.0);
             found++;
             continue;
           }
 
-          light[idx] = vec4(lightColor, 1.0);
+          lightSlab[idx] = vec4(lightColor, 1.0);
         }
       }
     }

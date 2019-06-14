@@ -5,20 +5,22 @@
 
 layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
 
-layout (std430, binding=1) buffer lightSlab {
-  vec4 light[];
+layout (std430) buffer lightSlabBuffer {
+  vec4 lightSlab[];
 };
 
-uniform uint time;
-uniform uvec3 dims;
+uniform vec3 lightSlabDims;
 
 void main() {
-  uvec3 pos = gl_GlobalInvocationID.xyz;
-  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
+  uvec3 p = gl_GlobalInvocationID.xyz;
+  uvec3 d = uvec3(lightSlabDims);
+  uint idx = (p.x + p.y * d.x + p.z * d.x * d.y);
+
   // reset to 0 which is effectively off
-  vec4 v = light[idx];
-  light[idx] = vec4(
+  // TODO: write to the mip levels as well.
+  vec4 v = lightSlab[idx];
+  lightSlab[idx] = vec4(
     v.rgb,
-    max(0.0, v.a * 0.75)
+    0//max(0.0, v.a * 0.75)
   );
 }

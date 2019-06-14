@@ -254,11 +254,6 @@ public:
         return ret;
       }
 
-      if (ret == -1) {
-        std::cout << "uniformLocation broke for: " << name << " on " << this->compositeName << std::endl;
-        return ret;
-      }
-
       this->uniforms[name] = ret;
       gl_error();
     }
@@ -516,11 +511,18 @@ public:
   Program *compute(glm::uvec3 dims) {
     GLint local_layout[3];
     glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &local_layout[0]);
-    glDispatchCompute(
-      max((dims.x / local_layout[0]), 1),
-      max((dims.y / local_layout[1]), 1),
-      max((dims.z / local_layout[2]), 1)
+
+    glm::uvec3 d(
+      glm::ceil(glm::vec3(dims) / glm::vec3(local_layout[0], local_layout[1], local_layout[2]))
     );
+
+
+    glDispatchCompute(
+      max(d.x, 1),
+      max(d.y, 1),
+      max(d.z, 1)
+    );
+
     gl_error();
     return this;
   }

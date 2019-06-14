@@ -40,9 +40,10 @@ layout (std430) buffer outColorBuffer {
 };
 
 // TODO: move this into separate include
-layout (std430, binding) buffer lightSlabBuffer {
+layout (std430) buffer lightSlabBuffer {
   vec4 lightSlab[];
 };
+uniform vec3 lightSlabDims;
 
 #define ITERATIONS 512
 
@@ -164,16 +165,9 @@ void main() {
 
     // test light space
     uvec3 up = uvec3(p);
-    uvec3 ud = uvec3(dims);
+    uvec3 ud = uvec3(lightSlabDims);
     uint idx = (up.x + up.y * ud.x + up.z * ud.x * ud.y);
-    vec4 lightValue = lightBuffer[idx];
-    // if (lightValue.a > 0.0) {
-    //   c = lightValue.rgb;
-    //   found_normal = -sign(d) *
-    //                   step(prevP.xyz, prevP.yzx) *
-    //                   step(prevP.xyz, prevP.zxy);
-    //   break;
-    // }
+
 
     if (voxel_mip_get(p, mip, palette_idx)) {
       if (mip == minMip) {
@@ -198,7 +192,7 @@ void main() {
       invMipSize = 1.0 / mipSize;
       continue;
     }
-    else if (mip < maxMip && !voxel_mip(p, min(mip + 1, maxMip), palette_idx)) {
+    else if (mip < maxMip && !voxel_mip_get(p, min(mip + 1, maxMip), palette_idx)) {
       mip = min(maxMip, mip+1);
       mipSize = (float(1<<(mip)));
       invMipSize = 1.0 / mipSize;

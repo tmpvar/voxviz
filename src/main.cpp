@@ -614,13 +614,7 @@ int main(void) {
         ->uniformVec3("lightSlabDims", voxelSpaceDims)
 
         ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
-        ->uniformVec3ui("lightPos", glm::uvec3(
-          20,
-          10 + static_cast<uint32_t>(abs(sin(nowTime / 10.0) * 200)),
-          16
-        ))
         ->uniform1ui("time", time)
-        ->uniformVec3("lightColor", glm::vec3(1.0, 0.0, 0.0))
         ->timedCompute("lightspace: fill", glm::uvec3(4096, 0, 0));
     }
 
@@ -696,29 +690,22 @@ int main(void) {
           ->ssbo("lightSlabBuffer", lightSpaceSSBO)
           ->uniformVec3("lightSlabDims", voxelSpaceDims)
 
+
           ->uniform1ui("time", time)
-          ->uniformFloat("debug", debug)
-          ->uniformVec3("dims", glm::vec3(voxelSpaceDims))
           ->uniformVec2ui("resolution", res)
           ->timedCompute("lightspace: conetrace", glm::uvec3(res, 1));
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
       }
 
       // Blur the results
-      if (false) {
+      if (true) {
         raytraceVoxelSpace_Blur
           ->use()
-          ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]))
+          ->uniformVec2ui("resolution", res)
           ->ssbo("outColorBuffer", raytraceOutput)
           ->ssbo("inTerminationBuffer", terminationOutput)
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
-          ->timedCompute(
-            "taa",
-            glm::uvec3(
-              windowDimensions[0],
-              windowDimensions[1],
-              1
-            )
-          );
+          ->timedCompute("taa", glm::uvec3(res, 1));
       }
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
       // Debug rendering
@@ -728,7 +715,7 @@ int main(void) {
           ->use()
           ->ssbo("inColorBuffer", raytraceOutput)
           ->ssbo("inTerminationBuffer", terminationOutput)
-          ->uniformVec2ui("resolution", glm::uvec2(windowDimensions[0], windowDimensions[1]));
+          ->uniformVec2ui("resolution", res);
 
         fullscreen_surface->render(debugBindless);
       }
