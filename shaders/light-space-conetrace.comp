@@ -101,8 +101,8 @@ void main() {
   for (uint i=0; i<MAX_MIPS; i++) {
     if (light_mip_get(o.position.xyz, i, tmp)) {
       acc += tmp;// * (1.0 - float(i) / float(4));
-      //acc += vec4(hsl(vec3((float(i)/float(MAX_MIPS)), 0.9, 0.5)), 1.0);
-      // break;
+      //acc = vec4(hsl(vec3((float(i)/float(MAX_MIPS)), 0.9, 0.5)), 1.0 - float(i)/float(MAX_MIPS+1));
+      break;
     }
   }
 

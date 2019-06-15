@@ -14,6 +14,7 @@ uniform uint time;
 uniform vec3 characterPos;
 uniform float samples;
 
+#include "voxel-space.glsl"
 #include "voxel-space-mips.glsl"
 #include "light-space-mips.glsl"
 
@@ -57,6 +58,63 @@ void fillDirection(vec3 origin, vec3 dir) {
   }
 }
 
+void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
+  uint8_t occlusion;
+  uint steps = 256;
+  float ratio = 1 / float(steps);
+  float t = 0.0;
+  uvec3 d = uvec3(lightSlabDims);
+  float intensity = 1.0;
+
+  uint mip = 0;
+  uint minMip = 0;
+  uint maxMip = MAX_MIPS;
+
+  float dt = 1.0 / length(volumeSlabDims);
+  float mipSize = (float(1<<(mip)));
+  float invMipSize = 1.0 / mipSize;
+
+  vec3 invDir = 1.0 / dir;
+
+  for (uint i=0; i<steps; i++) {
+    vec3 p = origin + dir * t;
+
+    if (outOfBounds(p)) {
+      return;
+    }
+
+    if (voxel_mip_get(p, mip, occlusion)) {
+      vec4 pcolor = vec4(0.0);
+      light_mip_get(p, mip, pcolor);
+      light_mip_set(p, mip, (vec4(lightColor, intensity) + pcolor) / 2.0);
+
+      if (mip == minMip) {
+
+        return;
+      }
+
+      mip = max(mip - 1, minMip);
+      t -= dt * 0.00125;
+
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      continue;
+    }
+    else if (mip < maxMip && !voxel_mip_get(p, min(mip + 1, maxMip), occlusion)) {
+      mip = min(maxMip, mip+1);
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      t += dt * 0.125;
+    }
+
+    vec3 deltas = (step(0.0, dir) - fract(p * invMipSize)) * invDir;
+    dt = max(mincomp(deltas), 0.0001) * mipSize;
+    t += max(1.0,t * 0.001);
+    t += dt;
+
+  }
+}
+
 void main() {
   float h = samples * 0.5;
   float a = 0.495;
@@ -74,7 +132,7 @@ void main() {
       case 4: dir = vec3(o.x, o.y,  a); break;
       case 5: dir = vec3(o.x, o.y, -a); break;
     }
-    fillDirection(lightPos, normalize(dir));
+    fillDirectionEmptySpaceSkip(lightPos, normalize(dir));
   } else {
 
     fillDirection(lightPos, normalize(vec3( a, o.x, o.y)));

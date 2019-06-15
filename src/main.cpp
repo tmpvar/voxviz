@@ -606,33 +606,6 @@ int main(void) {
       glMemoryBarrier(GL_ALL_BARRIER_BITS);
     }
     
-    // Light space
-    {
-      // this appears to be .1ms faster on my 1080ti
-      lightSpaceClear_Compute
-        ->use()
-        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
-        ->uniformVec3("lightSlabDims", voxelSpaceDims)
-        ->timedCompute("lightspace: clear", glm::uvec3(total_light_slab_slots, 1, 1));
-
-      float samples = 96;
-      lightSpaceFill_Compute
-        ->use()
-        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
-        ->uniformVec3("volumeSlabDims", voxelSpaceDims)
-
-        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
-        ->uniformVec3("lightSlabDims", voxelSpaceDims)
-
-        ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
-        ->uniform1ui("time", time)
-        ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(10.0))
-        ->uniformVec3("lightColor", glm::vec3(1.0))
-        ->uniformFloat("samples", samples)
-        ->timedCompute("lightspace: fill", glm::uvec3(samples, samples, 6));
-    }
-
-
     // Generate mipmaps
     if (true) {
       double mipStart = glfwGetTime();
@@ -653,9 +626,36 @@ int main(void) {
           ->uniform1ui("mipLevel", i)
           ->timedCompute(mipDebug.str().c_str(), mipDims);
         gl_error();
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
       }
     }
+
+    // Light space
+    {
+      // this appears to be .1ms faster on my 1080ti
+      lightSpaceClear_Compute
+        ->use()
+        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+        ->uniformVec3("lightSlabDims", voxelSpaceDims)
+        ->timedCompute("lightspace: clear", glm::uvec3(total_light_slab_slots, 1, 1));
+
+      float samples = 128;
+      lightSpaceFill_Compute
+        ->use()
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+        ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+
+        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+        ->uniformVec3("lightSlabDims", voxelSpaceDims)
+
+        ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+        ->uniform1ui("time", time)
+        ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(10.0))
+        ->uniformVec3("lightColor", glm::vec3(1.0))
+        ->uniformFloat("samples", samples)
+        ->timedCompute("lightspace: fill", glm::uvec3(samples, samples, 6));
+    }
+
     
     // Raytrace in compute
     if (true) {
