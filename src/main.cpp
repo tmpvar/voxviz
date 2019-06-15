@@ -241,7 +241,7 @@ int main(void) {
   GLFWgamepadstate state;
   
   // Voxel space
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(512, 128, 512);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 512, 128);
    
   uint64_t voxelSpaceBytes =
     static_cast<uint64_t>(voxelSpaceDims.x) *
@@ -296,6 +296,10 @@ int main(void) {
 
   Program *lightSpaceFill_Compute = new Program();
   lightSpaceFill_Compute->add(Shaders::get("light-space-fill.comp"))->link();
+
+  Program *mipmapLightSpace = new Program();
+  mipmapLightSpace->add(Shaders::get("light-space-mipmap.comp"))->link();
+
 
   Program *lightSpaceConeTrace_Compute = new Program();
   lightSpaceConeTrace_Compute->add(Shaders::get("light-space-conetrace.comp"))->link();
@@ -521,6 +525,8 @@ int main(void) {
           fabs(z) > 0.1 ? -z * 100 * deltaTime : 0.0
         );
         catModel->move(move);
+        catModel->clampPosition(glm::vec3(8.0, 16, 0.0), glm::vec3(voxelSpaceDims) - glm::vec3(8.0, 0.0, 16.0));
+        
 
         if (fabs(x) > 0.1 || fabs(z) > 0.1) {
           float dir = atan2(-move.x, -move.z);
@@ -539,6 +545,7 @@ int main(void) {
           fabs(z) > 0.1 ? -z * 100 * deltaTime : 0
         );
         */
+        
       }
     }
 
@@ -601,12 +608,14 @@ int main(void) {
     
     // Light space
     {
+      // this appears to be .1ms faster on my 1080ti
       lightSpaceClear_Compute
         ->use()
         ->ssbo("lightSlabBuffer", lightSpaceSSBO)
         ->uniformVec3("lightSlabDims", voxelSpaceDims)
         ->timedCompute("lightspace: clear", glm::uvec3(total_light_slab_slots, 1, 1));
 
+      float samples = 96;
       lightSpaceFill_Compute
         ->use()
         ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
@@ -617,7 +626,10 @@ int main(void) {
 
         ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
         ->uniform1ui("time", time)
-        ->timedCompute("lightspace: fill", glm::uvec3(4096, 0, 0));
+        ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(10.0))
+        ->uniformVec3("lightColor", glm::vec3(1.0))
+        ->uniformFloat("samples", samples)
+        ->timedCompute("lightspace: fill", glm::uvec3(samples, samples, 6));
     }
 
 
@@ -728,6 +740,7 @@ int main(void) {
       static int counter = 0;
       ImGui::Text("%.1fFPS (%.3f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
       ImGui::Text("camera(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
+      ImGui::Text("cat(%.3f, %.3f, %.3f)", catModel->getPosition().x, catModel->getPosition().y, catModel->getPosition().z);
     }
 
     ImGui::Render();

@@ -56,6 +56,16 @@ class OBB {
       return this;
     }
 
+    OBB *clampPosition(glm::vec3 lower, glm::vec3 upper) {
+      
+      this->position.x = glm::clamp(position.x, lower.x, upper.x);
+      this->position.y = glm::clamp(position.y, lower.y, upper.y);
+      this->position.z = glm::clamp(position.z, lower.z, upper.z);
+      
+      this->dirty = true;
+      return this;
+    }
+
     OBB *rotate(glm::vec3 rotation) {
       this->rotation += rotation;
       this->dirty = true;

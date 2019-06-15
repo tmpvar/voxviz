@@ -41,6 +41,10 @@ class Entity {
       this->obb->setRotation(rotation);
     }
 
+    void clampPosition(glm::vec3 lower, glm::vec3 upper) {
+      this->obb->clampPosition(lower, upper);
+    }
+
     glm::vec3 getPosition() {
       return this->obb->getPosition();
     }

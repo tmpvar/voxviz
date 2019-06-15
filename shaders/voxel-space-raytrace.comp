@@ -6,6 +6,7 @@
 layout( local_size_x = 32 , local_size_y = 16, local_size_z = 1 ) in;
 
 #include "voxel-space-mips.glsl"
+#include "light-space-mips.glsl"
 
 #include "ray-aabb.glsl"
 #include "palette.glsl"
@@ -38,12 +39,6 @@ layout (std430) buffer blueNoiseBuffer {
 layout (std430) buffer outColorBuffer {
   vec4 out_color[];
 };
-
-// TODO: move this into separate include
-layout (std430) buffer lightSlabBuffer {
-  vec4 lightSlab[];
-};
-uniform vec3 lightSlabDims;
 
 #define ITERATIONS 512
 
@@ -142,14 +137,14 @@ void main() {
   vec3 d = in_ray_dir;
   vec3 id = 1.0 / d;
   vec3 p = eye + d * found_distance;
-  vec3 prevP = eye - d * 2.0;
+  vec3 prevP = eye;// - d * 2.0;
 
   float dt = 1.0 / length(volumeSlabDims);
   float t = found_distance;
   float opacityDiv = 1.0 / 8.0;
 
   int minMip = 0;
-  int maxMip = 7;
+  int maxMip = MAX_MIPS;
   mip = maxMip;
   float mipSize = (float(1<<(mip)));
   float invMipSize = 1.0 / mipSize;
@@ -163,11 +158,26 @@ void main() {
       break;
     }
 
-    // test light space
-    uvec3 up = uvec3(p);
-    uvec3 ud = uvec3(lightSlabDims);
-    uint idx = (up.x + up.y * ud.x + up.z * ud.x * ud.y);
-
+    // // test light space
+    // vec4 lightAtPos = vec4(0.0);
+    // vec4 acc = vec4(0.0);
+    // bool inLight = false;
+    // for (uint i=0; i<MAX_MIPS; i++) {
+    //   if (light_mip_get(p, mip, lightAtPos)) {
+    //     inLight = true;
+    //     acc += lightAtPos;
+    //     break;
+    //   }
+    // }
+    //
+    // if (inLight) {
+    //   c = lightAtPos.rgb * lightAtPos.a;
+    //   found_normal = -sign(d) *
+    //                  step(prevP.xyz, prevP.yzx) *
+    //                  step(prevP.xyz, prevP.zxy);
+    //   miss = false;
+    //   break;
+    // }
 
     if (voxel_mip_get(p, mip, palette_idx)) {
       if (mip == minMip) {
