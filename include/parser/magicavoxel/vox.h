@@ -20,7 +20,7 @@ static bool cmp(const char *a, const char *b) {
 
 class VOXModel {
   public:
-  uint8_t palette[256];
+  glm::uvec4 palette[256];
   glm::uvec3 dims;
   size_t bytes = 0;
   uint8_t *buffer = nullptr;
@@ -83,7 +83,25 @@ public:
         memset(vox->buffer, 0, bytes);
       }
       else if (cmp(chunk_id, "RGBA")) {
-        ifs.read((char *)&vox->palette, 256);
+        uint32_t palette_entry;
+        for (int i = 0; i <= 254; i++) {
+          ifs.read((char *)&palette_entry, 4);
+
+          // read the alpha channel
+          vox->palette[i + 1].a = palette_entry && 0xFF;
+
+          // read the blue channel
+          palette_entry = palette_entry >> 8;
+          vox->palette[i + 1].b = palette_entry && 0xFF;
+
+          // read the green channel
+          palette_entry = palette_entry >> 8;
+          vox->palette[i + 1].g = palette_entry && 0xFF;
+
+          // read the red channel
+          palette_entry = palette_entry >> 8;
+          vox->palette[i + 1].r = palette_entry && 0xFF;
+        }
       }
       else if (cmp(chunk_id, "MATT")) {
         // skip id, type, weight

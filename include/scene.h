@@ -121,6 +121,9 @@ class VoxEntity : public Entity {
               continue;
             }
 
+            // TODO: the vox palette is now fully populated and we should be
+            // writing the full color information into the grid.
+            //  vox->palette[vox->buffer[src_idx]];
             buf[dest_idx] = vox->buffer[src_idx];
           }
         }
