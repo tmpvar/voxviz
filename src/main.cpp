@@ -51,6 +51,7 @@ typedef struct Light {
   glm::vec4 color;
 };
 
+
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -241,7 +242,7 @@ int main(void) {
   GLFWgamepadstate state;
   
   // Voxel space
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 512, 128);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 256, 128);
    
   uint64_t voxelSpaceBytes =
     static_cast<uint64_t>(voxelSpaceDims.x) *
@@ -328,7 +329,6 @@ int main(void) {
       ->compute(voxelSpaceDims);
 
     gl_error();
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
   }
 
   Program *raytraceVoxelSpace = new Program();
@@ -584,6 +584,7 @@ int main(void) {
         ->uniformVec3("offset", lastCharacterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
         ->compute(sdfDims);
+      // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
       // Fill the voxel space volume
       fillVoxelSpaceSDF
@@ -601,9 +602,10 @@ int main(void) {
       uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
       catModel->paintInto(buf, voxelSpaceDims);
       voxelSpaceSSBO->endMap();
+      
 
       gl_error();
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
     
     // Generate mipmaps
@@ -626,7 +628,7 @@ int main(void) {
           ->uniform1ui("mipLevel", i)
           ->timedCompute(mipDebug.str().c_str(), mipDims);
         gl_error();
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
       }
     }
 
@@ -639,7 +641,7 @@ int main(void) {
         ->uniformVec3("lightSlabDims", voxelSpaceDims)
         ->timedCompute("lightspace: clear", glm::uvec3(total_light_slab_slots, 1, 1));
 
-      float samples = 128;
+      float samples = 256;
       lightSpaceFill_Compute
         ->use()
         ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
@@ -654,6 +656,8 @@ int main(void) {
         ->uniformVec3("lightColor", glm::vec3(1.0))
         ->uniformFloat("samples", samples)
         ->timedCompute("lightspace: fill", glm::uvec3(samples, samples, 6));
+
+      // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
     
@@ -689,6 +693,7 @@ int main(void) {
               1
             )
           );
+        // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
       }
 
       // Conetrace light buffer
@@ -708,7 +713,7 @@ int main(void) {
           ->uniform1ui("time", time)
           ->uniformVec2ui("resolution", res)
           ->timedCompute("lightspace: conetrace", glm::uvec3(res, 1));
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
       }
 
       // Blur the results
@@ -721,7 +726,7 @@ int main(void) {
           ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
           ->timedCompute("taa", glm::uvec3(res, 1));
       }
-      glMemoryBarrier(GL_ALL_BARRIER_BITS);
+      // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
       // Debug rendering
       if (true) {
         glDisable(GL_DEPTH_TEST);

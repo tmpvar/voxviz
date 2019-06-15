@@ -1,6 +1,10 @@
 #ifndef __CORE_H
 #define __CORE_H
 
+//#define DISABLE_DEBUG_GL_TIMED_COMPUTE
+//#define DISABLE_GL_ERROR
+
+
 #define BRICK_DIAMETER 128
 #define BRICK_RADIUS BRICK_DIAMETER / 2
 #define INV_BRICK_DIAMETER 1.0 / float(BRICK_DIAMETER)

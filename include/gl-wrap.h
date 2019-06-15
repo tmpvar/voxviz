@@ -28,7 +28,13 @@
 
 using namespace std;
 
-#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
+#ifndef DISABLE_GL_ERROR
+  #define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
+#else
+  #define gl_error() do {} while(0)
+#endif
+
+
 
 GLint gl_ok(GLint error);
 GLint GL_ERROR();
@@ -228,6 +234,8 @@ class Program {
   map<string, GLuint> outputs;
   GLuint texture_index;
   string compositeName;
+  GLint local_layout[3];
+  bool isCompute = false;
 public:
   GLuint handle;
 
@@ -288,6 +296,10 @@ public:
   }
 
   Program *add(Shader *shader) {
+    if (shader->type == GL_COMPUTE_SHADER) {
+      this->isCompute = true;
+    }
+
     this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
     this->compositeName += " " + shader->name;
     glAttachShader(this->handle, shader->handle);
@@ -300,6 +312,11 @@ public:
     glLinkProgram(this->handle);
     gl_program_log(this->handle);
     gl_error();
+
+    if (this->isCompute) {
+      glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &this->local_layout[0]);
+      gl_error();
+    }
     return this;
   }
 
@@ -509,11 +526,14 @@ public:
 
 
   Program *compute(glm::uvec3 dims) {
-    GLint local_layout[3];
-    glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &local_layout[0]);
+    glm::vec3 local(
+      this->local_layout[0],
+      this->local_layout[1],
+      this->local_layout[2]
+    );
 
     glm::uvec3 d(
-      glm::ceil(glm::vec3(dims) / glm::vec3(local_layout[0], local_layout[1], local_layout[2]))
+      glm::ceil(glm::vec3(dims) / local)
     );
 
 
@@ -528,24 +548,28 @@ public:
   }
 
   Program *timedCompute(const char *str, glm::uvec3 dims) {
-    GLuint query;
-    GLuint64 elapsed_time;
-    GLint done = 0;
-    glGenQueries(1, &query);
-    glBeginQuery(GL_TIME_ELAPSED, query);
+    #ifdef DISABLE_DEBUG_GL_TIMED_COMPUTE
+      return this->compute(dims);
+    #else
+      GLuint query;
+      GLuint64 elapsed_time;
+      GLint done = 0;
+      glGenQueries(1, &query);
+      glBeginQuery(GL_TIME_ELAPSED, query);
 
-    this->compute(dims);
+      this->compute(dims);
 
-    glEndQuery(GL_TIME_ELAPSED);
-    while (!done) {
-      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
-    }
+      glEndQuery(GL_TIME_ELAPSED);
+      while (!done) {
+        glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+      }
 
-    // get the query result
-    glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
-    ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
-    glDeleteQueries(1, &query);
-    return this;
+      // get the query result
+      glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+      ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+      glDeleteQueries(1, &query);
+      return this;
+    #endif
   }
 };
 

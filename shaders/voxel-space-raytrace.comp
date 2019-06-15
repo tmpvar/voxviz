@@ -158,12 +158,12 @@ void main() {
       break;
     }
 
-    // // test light space
+    // test light space
     // vec4 lightAtPos = vec4(0.0);
     // vec4 acc = vec4(0.0);
     // bool inLight = false;
     // for (uint i=0; i<MAX_MIPS; i++) {
-    //   if (light_mip_get(p, mip, lightAtPos)) {
+    //   if (light_mip_get(p, i, lightAtPos)) {
     //     inLight = true;
     //     acc += lightAtPos;
     //     break;

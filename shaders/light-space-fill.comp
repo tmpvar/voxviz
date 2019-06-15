@@ -85,8 +85,12 @@ void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
 
     if (voxel_mip_get(p, mip, occlusion)) {
       vec4 pcolor = vec4(0.0);
-      light_mip_get(p, mip, pcolor);
-      light_mip_set(p, mip, (vec4(lightColor, intensity) + pcolor) / 2.0);
+
+      for (uint j=mip; j<MAX_MIPS; j++) {
+        pcolor = vec4(0.0);
+        light_mip_get(p, mip, pcolor);
+        light_mip_set(p, mip, (vec4(lightColor, intensity) + pcolor) / 2.0);
+      }
 
       if (mip == minMip) {
 
