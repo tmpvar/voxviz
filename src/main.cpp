@@ -248,14 +248,16 @@ int main(void) {
     static_cast<uint64_t>(voxelSpaceDims.y) *
     static_cast<uint64_t>(voxelSpaceDims.z);
 
-  uint64_t total_voxel_bytes = 0;
+  uint64_t total_voxel_slab_slots = 0;
   for (unsigned int i = 0; i <= MAX_MIP_LEVELS; i++) {
     uint64_t a = voxelSpaceBytes >> (i * 3);
-    total_voxel_bytes += a;
+    total_voxel_slab_slots += a;
   }
 
-  SSBO *voxelSpaceSSBO = new SSBO(total_voxel_bytes);
-  SSBO *lightSpaceSSBO = new SSBO(voxelSpaceBytes * uint64_t(16));
+  SSBO *voxelSpaceSSBO = new SSBO(total_voxel_slab_slots /* 1 byte per voxel.. for now */);
+
+  uint64_t total_light_slab_slots = total_voxel_slab_slots;
+  SSBO *lightSpaceSSBO = new SSBO(total_light_slab_slots * uint64_t(16));
   
   #define MAX_LIGHTS 4
   SSBO *lightBuffer = new SSBO(
@@ -603,7 +605,7 @@ int main(void) {
         ->use()
         ->ssbo("lightSlabBuffer", lightSpaceSSBO)
         ->uniformVec3("lightSlabDims", voxelSpaceDims)
-        ->timedCompute("lightspace: clear", voxelSpaceDims);
+        ->timedCompute("lightspace: clear", glm::uvec3(total_light_slab_slots, 1, 1));
 
       lightSpaceFill_Compute
         ->use()

@@ -19,8 +19,5 @@ void main() {
   // reset to 0 which is effectively off
   // TODO: write to the mip levels as well.
   vec4 v = lightSlab[idx];
-  lightSlab[idx] = vec4(
-    v.rgb,
-    0//max(0.0, v.a * 0.75)
-  );
+  lightSlab[idx] = vec4(0);
 }
