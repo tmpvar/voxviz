@@ -34,7 +34,7 @@ using namespace std;
   #define gl_error() do {} while(0)
 #endif
 
-
+static map<string, string> shaderLogs;
 
 GLint gl_ok(GLint error);
 GLint GL_ERROR();
@@ -75,34 +75,28 @@ static const char *shader_type(GLuint type) {
 }
 
 class Shader {
+  bool valid = false;
 public:
   GLuint handle;
   GLuint type;
   string name;
   string filename;
   size_t version;
+
   Shader(const char *src, const char *filename, const char *name, const GLuint type) {
     this->version = 1;
     this->filename = filename;
-    // this->src = src;
     this->type = type;
-    this->handle = glCreateShader(type);
-    gl_error();
     this->name = name;
-    glShaderSource(this->handle, 1, &src, NULL);
-    gl_error();
-    std::cout << "Compile "
-      << shader_type(type)
-      << " Shader: "
-      << name
-      << std::endl;
+    this->reload();
+  }
 
-    glCompileShader(this->handle);
-    gl_error();
-    gl_shader_log(this->handle);
+  bool isValid() {
+    return this->valid;
   }
 
   bool reload() {
+    this->valid = true;
     std::cout << "reloading shader: " << this->name << std::endl;
     std::ifstream t(this->filename);
     std::string str;
@@ -112,11 +106,13 @@ public:
     t.seekg(0, std::ios::beg);
 
     str.assign((std::istreambuf_iterator<char>(t)),
+
       std::istreambuf_iterator<char>());
     const GLchar *source = (const GLchar *)str.c_str();
     GLuint new_handle = glCreateShader(this->type);
     glShaderSource(new_handle, 1, &source, NULL);
-    std::cout << "Compile "
+    std::cout
+      << "Compile "
       << shader_type(type)
       << " Shader: "
       << name
@@ -129,11 +125,25 @@ public:
     glGetShaderiv(new_handle, GL_COMPILE_STATUS, &isCompiled);
     
     if (!isCompiled) {
+      GLint l, m;
+      glGetShaderiv(new_handle, GL_INFO_LOG_LENGTH, &m);
+      char *s = (char *)malloc(m * sizeof(char));
+      glGetShaderInfoLog(new_handle, m, &l, s);
+      cout << this->name << "failed to compile" << endl
+           << s << endl;
+      shaderLogs[this->name] = string(s);
+      free(s);
       gl_shader_log(new_handle);
-      return false;
+      this->valid = false;
+    }
+    else {
+      shaderLogs.erase(this->name);
     }
 
-    glDeleteShader(this->handle);
+    if (glIsShader(this->handle)) {
+      glDeleteShader(this->handle);
+    }
+
     this->handle = new_handle;
     this->version++;
     return true;
@@ -225,6 +235,7 @@ struct SSBOBinding {
   GLint block_index;
 };
 
+
 class Program {
   map<string, GLint> uniforms;
   map<string, GLint> attributes;
@@ -236,15 +247,19 @@ class Program {
   string compositeName;
   GLint local_layout[3];
   bool isCompute = false;
+  bool valid = false;
 public:
   GLuint handle;
 
   Program() {
     this->handle = glCreateProgram();
+    this->valid = true;
   }
 
   ~Program() {
-    glDeleteProgram(this->handle);
+    if (glIsProgram(this->handle)) {
+      glDeleteProgram(this->handle);
+    }
   }
 
   GLint uniformLocation(string name) {
@@ -296,18 +311,28 @@ public:
   }
 
   Program *add(Shader *shader) {
+    this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
+    this->compositeName += shader->name + " ";
+
     if (shader->type == GL_COMPUTE_SHADER) {
       this->isCompute = true;
     }
 
-    this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
-    this->compositeName += " " + shader->name;
+    if (!shader->isValid() || !this->valid) {
+      this->valid = false;
+      return this;
+    }
+
     glAttachShader(this->handle, shader->handle);
     gl_error();
     return this;
   }
 
   Program *link() {
+    if (!this->valid) {
+      return this;
+    }
+
     std::cout << "linking" << this->compositeName << std::endl;
     glLinkProgram(this->handle);
     gl_program_log(this->handle);
@@ -321,7 +346,10 @@ public:
   }
 
   void rebuild() {
-    glDeleteProgram(this->handle);
+    if (glIsProgram(this->handle)) {
+      glDeleteProgram(this->handle);
+    }
+
     this->resource_indices.clear();
     this->attributes.clear();
     this->outputs.clear();
@@ -330,6 +358,8 @@ public:
     
     this->handle = glCreateProgram();
     this->compositeName = "";
+    this->valid = true;
+
     for (auto const& v : this->shader_versions) {
       Shader *shader = v.first;
       this->add(shader);
@@ -363,6 +393,10 @@ public:
     }
     #endif
 
+    if (!this->valid) {
+      return this;
+    }
+
     static int used = 0;
     glUseProgram(this->handle);
     this->texture_index = 0;
@@ -372,6 +406,10 @@ public:
   }
 
   Program *output(string name, const GLuint location = 0) {
+    if (!this->valid) {
+      return this;
+    }
+
     if (this->outputs.find(name) == this->outputs.end()) {
       this->outputs.emplace(name, location);
     }
@@ -380,6 +418,10 @@ public:
   }
 
   Program *attribute(string name) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint posAttrib;
     if (attributes.find(name) == this->attributes.end()) {
       posAttrib = glGetAttribLocation(this->handle, name.c_str());
@@ -393,24 +435,40 @@ public:
   }
 
   Program *uniformFloat(string name, float v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform1f(loc, v);
     return this;
   }
 
   Program *uniformVec2(string name, glm::vec2 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform2f(loc, v[0], v[1]);
     return this;
   }
 
   Program *uniformVec2ui(string name, glm::uvec2 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform2ui(loc, v[0], v[1]);
     return this;
   }
 
   Program *uniformVec3(string name, glm::vec3 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
 
     glUniform3f(loc, v[0], v[1], v[2]);
@@ -418,6 +476,9 @@ public:
   }
 
   Program *uniformVec3fArray(string name, glm::vec3 *v, size_t count) {
+    if (!this->valid) {
+      return this;
+    }
 
     GLint loc = this->uniformLocation(name);
     GLfloat *buf = (GLfloat *)malloc(sizeof(GLfloat) * 3 * count);
@@ -435,42 +496,70 @@ public:
   }
 
   Program *uniformVec3i(string name, glm::ivec3 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform3i(loc, v[0], v[1], v[2]);
     return this;
   }
 
   Program *uniformVec3ui(string name, glm::uvec3 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform3ui(loc, v[0], v[1], v[2]);
     return this;
   }
 
   Program *uniformVec4(string name, glm::vec4 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform4f(loc, v[0], v[1], v[2], v[3]);
     return this;
   }
 
   Program *uniformMat4(string name, glm::mat4 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniformMatrix4fv(loc, 1, GL_FALSE, &v[0][0]);
     return this;
   }
 
   Program *uniform1i(string name, int i) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform1i(loc, i);
     return this;
   }
 
   Program *uniform1ui(string name, uint32_t ui) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform1ui(loc, ui);
     return this;
   }
 
   Program *texture2d(string name, GLuint  texture_id) {
+    if (!this->valid) {
+      return this;
+    }
+
     glActiveTexture(GL_TEXTURE0 + this->texture_index);
     glBindTexture(GL_TEXTURE_2D, texture_id);
     this->uniform1i(name, texture_index);
@@ -479,6 +568,10 @@ public:
   }
 
   Program *texture3d(string name, GLuint  texture_id) {
+    if (!this->valid) {
+      return this;
+    }
+
     glActiveTexture(GL_TEXTURE0 + this->texture_index);
     glBindTexture(GL_TEXTURE_3D, texture_id);
     this->uniform1i(name, texture_index);
@@ -487,12 +580,20 @@ public:
   }
 
   Program *bufferAddress(string name, GLuint64 val) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glProgramUniformui64NV(this->handle, loc, val);
     return this;
   }
 
   Program *ssbo(string name, SSBO *ssbo) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint ri = this->resourceIndex(name, GL_SHADER_STORAGE_BLOCK);
 
     if (ri == GL_INVALID_ENUM) {
@@ -526,6 +627,10 @@ public:
 
 
   Program *compute(glm::uvec3 dims) {
+    if (!this->valid) {
+      return this;
+    }
+
     glm::vec3 local(
       this->local_layout[0],
       this->local_layout[1],
@@ -548,6 +653,10 @@ public:
   }
 
   Program *timedCompute(const char *str, glm::uvec3 dims) {
+    if (!this->valid) {
+      return this;
+    }
+
     #ifdef DISABLE_DEBUG_GL_TIMED_COMPUTE
       return this->compute(dims);
     #else

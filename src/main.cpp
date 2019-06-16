@@ -30,14 +30,15 @@
 #include <sstream>
 #include <string.h>
 #include <queue>
+#include <map>
 
 bool keys[1024];
 bool prevKeys[1024];
 double mouse[2];
 bool fullscreen = 0;
+bool yes = true;
 // int windowDimensions[2] = { 1024, 768 };
 int windowDimensions[2] = { 1440, 900 };
-
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 FBO *fbo = nullptr;
 
@@ -433,7 +434,16 @@ int main(void) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
     glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
+
+    if (!shaderLogs.empty()) {
+      ImGui::SetNextWindowPos(ImVec2(20, windowDimensions[1] / 2 + 20));
+    }
+    else {
+      ImGui::SetNextWindowPos(ImVec2(20, 20));
+    }
+    ImGui::Begin("stats");
 
     double nowTime = glfwGetTime();
     deltaTime = nowTime - lastTime;
@@ -746,6 +756,25 @@ int main(void) {
       ImGui::Text("%.1fFPS (%.3f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
       ImGui::Text("camera(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
       ImGui::Text("cat(%.3f, %.3f, %.3f)", catModel->getPosition().x, catModel->getPosition().y, catModel->getPosition().z);
+      ImGui::End();
+
+      if (!shaderLogs.empty()) {
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(windowDimensions[0], windowDimensions[1] / 2));
+        ImGui::Begin(
+          "Shader Errors",
+          &yes,
+          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoTitleBar
+          );
+        for (auto const& log : shaderLogs) {
+          unsigned int lines = std::count(log.second.begin(), log.second.end(), '\n');
+          ImGui::BeginChild(log.first.c_str(), ImVec2(0, 20 + 20*lines), true);
+          ImGui::Text(log.first.c_str());
+          ImGui::TextColored(ImVec4(1.0, 0.0, 0.0, 1.0), log.second.c_str());
+          ImGui::EndChild();
+        }
+        ImGui::End();
+      }
     }
 
     ImGui::Render();
