@@ -89,6 +89,7 @@ add_executable(
 )
 
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT voxviz)
 
 source_group("shaders" FILES ${SHADER_FILES})
 
