@@ -593,7 +593,7 @@ int main(void) {
         ->uniform1ui("time", lastCharacterTime)
         ->uniformVec3("offset", lastCharacterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
-        ->compute(sdfDims);
+        ->timedCompute("sdf: clear", sdfDims);
       // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
       // Fill the voxel space volume
@@ -605,7 +605,7 @@ int main(void) {
         ->uniform1ui("time", time)
         ->uniformVec3("offset", characterPos)
         ->uniformVec3ui("sdfDims", sdfDims)
-        ->compute(sdfDims);
+        ->timedCompute("sdf: fill", sdfDims);
 
       lastCharacterTime = time;
 
