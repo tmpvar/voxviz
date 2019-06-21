@@ -98,6 +98,7 @@ static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
   );
 }
 
+#define MAX_BRICKS 2000000
 
 class Volume {
 protected:
@@ -115,6 +116,13 @@ public:
   Mesh *mesh;
    
   q3Body* physicsBody;
+
+
+  size_t total_position_mem = 0;
+  size_t total_brick_pointer_mem = 0;
+  float *positions;
+  GLuint64 *pointers;
+
   Volume(glm::vec3 pos, q3Scene *scene = nullptr, q3BodyDef *bodyDef = nullptr) {
     this->position = pos;
     this->rotation = glm::vec3(0.0);
@@ -172,6 +180,16 @@ public:
       bodyDef->position.Set(pos.x, pos.y, pos.z);
       this->physicsBody = scene->CreateBody(*bodyDef);
     }
+
+
+    // prealloc a large slab of memory for VAO
+    this->total_position_mem = MAX_BRICKS * 3 * sizeof(float);
+    this->total_brick_pointer_mem = MAX_BRICKS * sizeof(GLuint64);
+    this->positions = (float *)malloc(total_position_mem);
+    this->pointers = (GLuint64 *)malloc(total_brick_pointer_mem);
+
+    glGenBuffers(1, &this->instanceVBO); gl_error();
+    glGenBuffers(1, &this->pointerVBO); gl_error();
   }
 
   ~Volume() {
@@ -265,9 +283,19 @@ public:
     return true;
   }
 
+  GLuint instanceVBO = 0;
+  GLuint pointerVBO = 0;
+
   size_t bind() {
     // Mesh data
-    if (!this->dirty) {
+    size_t brick_len = this->bricks.size();
+    
+    if (brick_len == 0) {
+      this->activeBricks = 0;
+      return activeBricks;
+    }
+
+    if (!this->dirty && this->activeBricks == brick_len) {
       glBindVertexArray(this->mesh->vao);
       glEnableVertexAttribArray(0);
       glEnableVertexAttribArray(1);
@@ -281,57 +309,39 @@ public:
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, this->mesh->vbo);
 
-    size_t total_bricks = this->bricks.size();
-    if (total_bricks == 0) {
-      this->activeBricks = 0;
-      return activeBricks;
-    }
 
-    size_t total_position_mem = total_bricks * 3 * sizeof(float);
-    size_t total_brick_pointer_mem = total_bricks * sizeof(GLuint64);
-    float *positions = (float *)malloc(total_position_mem);
-    GLuint64 *pointers = (GLuint64 *)malloc(total_brick_pointer_mem);
     size_t loc = 0;
     for (auto& it : this->bricks) {
       Brick *brick = it.second;
-      /*if (this->occluded(brick->index)) {
-        continue;
-      }*/
 
-      positions[loc * 3 + 0] = float(brick->index.x);
-      positions[loc * 3 + 1] = float(brick->index.y);
-      positions[loc * 3 + 2] = float(brick->index.z);
+      this->positions[loc * 3 + 0] = float(brick->index.x);
+      this->positions[loc * 3 + 1] = float(brick->index.y);
+      this->positions[loc * 3 + 2] = float(brick->index.z);
 
-      pointers[loc] = brick->bufferAddress;
+      this->pointers[loc] = brick->bufferAddress;
       loc++;
     }
 
     cout << "loc: " << loc << endl;
     // Instance data
-    unsigned int instanceVBO;
-    glGenBuffers(1, &instanceVBO); gl_error();
     glEnableVertexAttribArray(1); gl_error();
-    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO); gl_error();
+    glBindBuffer(GL_ARRAY_BUFFER, this->instanceVBO); gl_error();
     glBufferData(GL_ARRAY_BUFFER, total_position_mem, &positions[0], GL_STATIC_DRAW); gl_error();
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0); gl_error();
     glVertexAttribDivisor(1, 1); gl_error();
 
     // Buffer pointer data
-    unsigned int pointerVBO;
-    glGenBuffers(1, &pointerVBO); gl_error();
     glEnableVertexAttribArray(2); gl_error();
-    glBindBuffer(GL_ARRAY_BUFFER, pointerVBO); gl_error();
+    glBindBuffer(GL_ARRAY_BUFFER, this->pointerVBO); gl_error();
     glBufferData(GL_ARRAY_BUFFER, total_brick_pointer_mem, &pointers[0], GL_STATIC_DRAW); gl_error();
     glVertexAttribLPointer(2, 1, GL_UNSIGNED_INT64_ARB, sizeof(GLuint64), 0); gl_error();
     glVertexAttribDivisor(2, 1); gl_error();
 
-    //free(positions);
-    //free(pointers);
     this->activeBricks = loc;
     return this->activeBricks;
   }
 
-  glm::mat4 getModelMatrix() {
+   glm::mat4 getModelMatrix() {
     //    q3Transform tx = this->physicsBody->GetTransform();
 
     glm::mat4 model = glm::mat4(1.0f);
