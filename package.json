@@ -10,6 +10,6 @@
   },
   "scripts": {
   	"glsl-reload": "node shaders/convert.js -w -o build/shaders",
-    "generate": "rm -rf build && mkdir build && cd build && cmake -DCMAKE_GENERATOR_PLATFORM=x64 .."
+    "generate": "rm -rf build && mkdir build && cd build && cmake -G \"Visual Studio 15 2017\" -A x64 -T host=x64 .."
   }
 }

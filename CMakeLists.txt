@@ -11,7 +11,7 @@ IF(UNIX)
 ENDIF()
 
 IF(WINDOWS)
-	set_target_properties(voxviz PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS /EHsc")
+	set_target_properties(voxviz PROPERTIES COMPILE_FLAGS "-m64" LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS /EHsc -m64")
 ENDIF()
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
