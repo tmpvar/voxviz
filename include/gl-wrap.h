@@ -235,6 +235,77 @@ struct SSBOBinding {
   GLint block_index;
 };
 
+class Timer {
+  GLuint query;
+  double elapsed_time;
+  bool done = false;
+  bool started = 0;
+  string name;
+public:
+
+  Timer() {
+    glGenQueries(1, &this->query);
+  }
+
+  ~Timer() {
+    glDeleteQueries(1, &this->query);
+  }
+
+  Timer *begin(const char *name) {
+    this->done = false;
+    this->name = string(name);
+    glBeginQuery(GL_TIME_ELAPSED, this->query);
+    this->started = true;
+    return this;
+  }
+
+  Timer *end() {
+    glEndQuery(GL_TIME_ELAPSED);
+    return this;
+  }
+
+  bool isComplete() {
+    if (!this->started) {
+      return true;
+    }
+
+    GLint isDone = 0;
+    glGetQueryObjectiv(
+      this->query,
+      GL_QUERY_RESULT_AVAILABLE,
+      &isDone
+    );
+
+    if (isDone == 1) {
+      this->done = true;
+      GLuint64 time;
+      glGetQueryObjectui64v(
+        query,
+        GL_QUERY_RESULT,
+        &time
+      );
+
+      this->elapsed_time = double(time) / 1000000.0;
+    }
+
+    return this->done;
+  }
+
+  Timer *waitUntilComplete() {
+    if (this->started && !this->done) {
+      while (!this->isComplete()) {}
+    }
+    return this;
+  }
+
+  Timer *debug() {
+    if (this->done) {
+      ImGui::Text("%s: %.3f.ms", this->name.c_str(), this->elapsed_time);
+    }
+    return this;
+  }
+};
+
 
 class Program {
   map<string, GLint> uniforms;

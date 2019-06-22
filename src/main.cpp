@@ -580,10 +580,14 @@ int main(void) {
     else {
       ImGui::SetNextWindowPos(ImVec2(20, 20));
     }
+
+    ImGui::SetNextWindowSize(ImVec2(300, windowDimensions[1] / 2 - 20));
     ImGui::Begin("stats");
 
     // render shadow map
     if (true) {
+      Timer shadowMapTimer;
+      shadowMapTimer.begin("shadowmap");
       shadowFBO->bind();
       glDrawBuffer(GL_NONE);
       glEnable(GL_DEPTH_TEST);
@@ -627,62 +631,71 @@ int main(void) {
       }
       shadowmap->end();
       shadowFBO->unbind();
+      shadowMapTimer.end()->waitUntilComplete()->debug();
     }    
     
-    fbo->bind();
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glDepthMask(GL_TRUE);
+    // primary rays + proxy geometry rasterization
+    if (true) {
+      Timer primaryRaysTimer;
+      primaryRaysTimer.begin("primary rays");
+      fbo->bind();
+      glEnable(GL_DEPTH_TEST);
+      glDepthFunc(GL_LESS);
+      glDepthMask(GL_TRUE);
 
-    glCullFace(GL_BACK);
-    glEnable(GL_CULL_FACE);
+      glCullFace(GL_BACK);
+      glEnable(GL_CULL_FACE);
 
-    glClearDepth(1.0);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glClearDepth(1.0);
+      glClearColor(0.0, 0.0, 0.0, 1.0);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
 
-    glm::mat4 VP = perspectiveMatrix * viewMatrix;
+      glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    for (int i = 0; i < 2048; i++) {
-      if (volumeManager->tick()) {
-        break;
-      }
-    }
-
-    for (auto& volume : volumeManager->volumes) {
-      if (volume->bricks.size() == 0) {
-        continue;
+      for (int i = 0; i < 2048; i++) {
+        if (volumeManager->tick()) {
+          break;
+        }
       }
 
-      glm::mat4 volumeModel = volume->getModelMatrix();
-      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
-      raytracer->program->use()
-        ->uniformMat4("MVP", VP * volumeModel)
-        ->uniformVec3("invEye", glm::vec3(
-          invEye.x / invEye.w,
-          invEye.y / invEye.w,
-          invEye.z / invEye.w
-        ))
-        ->uniformMat4("model", volumeModel)
-        ->uniformVec3("eye", currentEye)
-        ->uniformFloat("maxDistance", max_distance)
-        ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformVec4("material", volume->material);
+      for (auto& volume : volumeManager->volumes) {
+        if (volume->bricks.size() == 0) {
+          continue;
+        }
 
-      raytracer->render(volume, raytracer->program);
-    }
+        glm::mat4 volumeModel = volume->getModelMatrix();
+        glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
+        raytracer->program->use()
+          ->uniformMat4("MVP", VP * volumeModel)
+          ->uniformVec3("invEye", glm::vec3(
+            invEye.x / invEye.w,
+            invEye.y / invEye.w,
+            invEye.z / invEye.w
+          ))
+          ->uniformMat4("model", volumeModel)
+          ->uniformVec3("eye", currentEye)
+          ->uniformFloat("maxDistance", max_distance)
+          ->uniform1i("showHeat", raytracer->showHeat)
+          ->uniformVec4("material", volume->material);
 
-    physicsScene->Step();
-    //floor->rotation.z += 0.001;
-    tool->rotation.z += 0.001;
-    tool->rotation.y += 0.002;
-    //tool->rotation.x += 0.005;
+        raytracer->render(volume, raytracer->program);
+      }
+
+      physicsScene->Step();
+      //floor->rotation.z += 0.001;
+      tool->rotation.z += 0.001;
+      tool->rotation.y += 0.002;
+      //tool->rotation.x += 0.005;
     
-    fbo->unbind();
+      fbo->unbind();
+      primaryRaysTimer.end()->waitUntilComplete()->debug();
+    }
     
     // render with shadow buffer
     if (true) {
+      Timer compositeTimer;
+      compositeTimer.begin("composite");
       glBindTexture(GL_TEXTURE_2D, shadowFBO->texture_depth);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_DEPTH_TO_TEXTURE_EXT);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -703,6 +716,7 @@ int main(void) {
       glEnable(GL_DEPTH_TEST);
 
       fullscreen_surface->render(fullscreen_program);
+      compositeTimer.end()->waitUntilComplete()->debug();
   }   
 
     // Tool based boolean operations
