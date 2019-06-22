@@ -26,10 +26,14 @@ Brick::~Brick() {
 }
 
 void Brick::createGPUMemory() {
-  glGenBuffers(1, &bufferId);
+  if (glIsBuffer(this->bufferId)) {
+    return;
+  }
+
+  glGenBuffers(1, &this->bufferId);
   gl_error();
 
-  glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
+  glBindBuffer(GL_TEXTURE_BUFFER, this->bufferId);
   gl_error();
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
@@ -54,7 +58,7 @@ void Brick::createGPUMemory() {
 
 void Brick::upload() {
   // TODO: I believe this is causing an exception to be thrown further down the line..
-  glBindBuffer(GL_TEXTURE_BUFFER, bufferId);
+  glBindBuffer(GL_TEXTURE_BUFFER, this->bufferId);
   gl_error();
   // TODO: consider breaking each voxel into 64 bits (4x4x4)
   glBufferData(
