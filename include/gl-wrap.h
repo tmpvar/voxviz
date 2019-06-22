@@ -17,13 +17,24 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <imgui.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
+
 using namespace std;
 
+#ifndef DISABLE_GL_ERROR
 #define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
+#else
+#define gl_error() do {} while(0)
+#endif
+
+static map<string, string> shaderLogs;
 
 GLint gl_ok(GLint error);
 GLint GL_ERROR();
@@ -64,34 +75,28 @@ static const char *shader_type(GLuint type) {
 }
 
 class Shader {
+  bool valid = false;
 public:
   GLuint handle;
   GLuint type;
   string name;
   string filename;
   size_t version;
+
   Shader(const char *src, const char *filename, const char *name, const GLuint type) {
     this->version = 1;
     this->filename = filename;
-    // this->src = src;
     this->type = type;
-    this->handle = glCreateShader(type);
-    gl_error();
     this->name = name;
-    glShaderSource(this->handle, 1, &src, NULL);
-    gl_error();
-    std::cout << "Compile "
-      << shader_type(type)
-      << " Shader: "
-      << name
-      << std::endl;
+    this->reload();
+  }
 
-    glCompileShader(this->handle);
-    gl_error();
-    gl_shader_log(this->handle);
+  bool isValid() {
+    return this->valid;
   }
 
   bool reload() {
+    this->valid = true;
     std::cout << "reloading shader: " << this->name << std::endl;
     std::ifstream t(this->filename);
     std::string str;
@@ -101,11 +106,13 @@ public:
     t.seekg(0, std::ios::beg);
 
     str.assign((std::istreambuf_iterator<char>(t)),
+
       std::istreambuf_iterator<char>());
     const GLchar *source = (const GLchar *)str.c_str();
     GLuint new_handle = glCreateShader(this->type);
     glShaderSource(new_handle, 1, &source, NULL);
-    std::cout << "Compile "
+    std::cout
+      << "Compile "
       << shader_type(type)
       << " Shader: "
       << name
@@ -116,13 +123,27 @@ public:
 
     GLint isCompiled = 0;
     glGetShaderiv(new_handle, GL_COMPILE_STATUS, &isCompiled);
-    
+
     if (!isCompiled) {
+      GLint l, m;
+      glGetShaderiv(new_handle, GL_INFO_LOG_LENGTH, &m);
+      char *s = (char *)malloc(m * sizeof(char));
+      glGetShaderInfoLog(new_handle, m, &l, s);
+      cout << this->name << "failed to compile" << endl
+        << s << endl;
+      shaderLogs[this->name] = string(s);
+      free(s);
       gl_shader_log(new_handle);
-      return false;
+      this->valid = false;
+    }
+    else {
+      shaderLogs.erase(this->name);
     }
 
-    glDeleteShader(this->handle);
+    if (glIsShader(this->handle)) {
+      glDeleteShader(this->handle);
+    }
+
     this->handle = new_handle;
     this->version++;
     return true;
@@ -135,7 +156,7 @@ public:
 
 // TODO: consider renaming this to MappableSlab or something less gl specific
 class SSBO {
-  size_t total_bytes = 0;
+  GLsizeiptr total_bytes = 0;
   GLuint handle = 0;
   bool mapped = false;
 public:
@@ -146,11 +167,13 @@ public:
     MAP_WRITE_ONLY = GL_WRITE_ONLY,
   };
 
-  SSBO(size_t bytes) {
+  SSBO(uint64_t bytes) {
     this->resize(bytes);
   }
 
-  SSBO *resize(size_t bytes) {
+  SSBO *resize(uint64_t bytes) {
+    std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+
     if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
     }
@@ -159,9 +182,11 @@ public:
       return this;
     }
 
+
+
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_COPY); gl_error();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_DRAW); gl_error();
     this->unbind();
 
     this->total_bytes = bytes;
@@ -206,30 +231,56 @@ public:
   }
 };
 
+struct SSBOBinding {
+  GLint block_index;
+};
+
 
 class Program {
   map<string, GLint> uniforms;
   map<string, GLint> attributes;
   map<string, GLint> resource_indices;
+  map<string, GLint> ssbos;
   map<Shader *, size_t> shader_versions;
   map<string, GLuint> outputs;
   GLuint texture_index;
   string compositeName;
+  GLint local_layout[3];
+  bool isCompute = false;
+  bool valid = false;
 public:
   GLuint handle;
 
   Program() {
     this->handle = glCreateProgram();
+    this->valid = true;
   }
 
   ~Program() {
-    glDeleteProgram(this->handle);
+    if (glIsProgram(this->handle)) {
+      glDeleteProgram(this->handle);
+    }
+  }
+
+  bool isValid() {
+    return this->valid;
   }
 
   GLint uniformLocation(string name) {
     GLint ret;
     if (this->uniforms.find(name) == this->uniforms.end()) {
       ret = glGetUniformLocation(this->handle, name.c_str());
+
+      if (ret == GL_INVALID_VALUE) {
+        std::cout << "uniformLocation returned invalid enum for: " << name << " on " << this->compositeName << std::endl;
+        return ret;
+      }
+
+      if (ret == GL_INVALID_OPERATION) {
+        std::cout << "uniformLocation returned invalid operation for: " << name << " on " << this->compositeName << std::endl;
+        return ret;
+      }
+
       this->uniforms[name] = ret;
       gl_error();
     }
@@ -242,9 +293,20 @@ public:
   GLint resourceIndex(string name, GLenum type) {
     GLint ret;
     if (this->resource_indices.find(name) == this->resource_indices.end()) {
-      glGetProgramResourceIndex(this->handle, type, name.c_str());
+      ret = glGetProgramResourceIndex(this->handle, type, name.c_str());
+      if (ret == GL_INVALID_ENUM) {
+        std::cout << "resourceIndex returned invalid enum for: " << name << std::endl;
+        return ret;
+      }
+
+      if (ret == GL_INVALID_INDEX) {
+        std::cout << "resourceIndex returned invalid index for: " << name << std::endl;
+        return ret;
+      }
+
       this->resource_indices[name] = ret;
-      gl_error();
+
+      //gl_error();
     }
     else {
       ret = this->resource_indices[name];
@@ -254,29 +316,54 @@ public:
 
   Program *add(Shader *shader) {
     this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
-    this->compositeName += " " + shader->name;
+    this->compositeName += shader->name + " ";
+
+    if (shader->type == GL_COMPUTE_SHADER) {
+      this->isCompute = true;
+    }
+
+    if (!shader->isValid() || !this->valid) {
+      this->valid = false;
+      return this;
+    }
+
     glAttachShader(this->handle, shader->handle);
     gl_error();
     return this;
   }
 
   Program *link() {
+    if (!this->valid) {
+      return this;
+    }
+
     std::cout << "linking" << this->compositeName << std::endl;
     glLinkProgram(this->handle);
     gl_program_log(this->handle);
     gl_error();
+
+    if (this->isCompute) {
+      glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &this->local_layout[0]);
+      gl_error();
+    }
     return this;
   }
 
   void rebuild() {
-    glDeleteProgram(this->handle);
+    if (glIsProgram(this->handle)) {
+      glDeleteProgram(this->handle);
+    }
+
     this->resource_indices.clear();
     this->attributes.clear();
     this->outputs.clear();
     this->uniforms.clear();
-    
+    this->ssbos.clear();
+
     this->handle = glCreateProgram();
     this->compositeName = "";
+    this->valid = true;
+
     for (auto const& v : this->shader_versions) {
       Shader *shader = v.first;
       this->add(shader);
@@ -297,10 +384,14 @@ public:
   }
 
   Program *use() {
-    #ifdef SHADER_HOTRELOAD
+#ifdef SHADER_HOTRELOAD
     for (auto& it : this->shader_versions) {
       Shader *shader = it.first;
       size_t version = it.second;
+      if (!shader->isValid()) {
+        this->valid = false;
+        break;
+      }
       if (version != shader->version) {
         std::cout << "rebuild program before use: " << this->compositeName << std::endl;
         this->rebuild();
@@ -308,7 +399,11 @@ public:
         break;
       }
     }
-    #endif
+#endif
+
+    if (!this->valid) {
+      return this;
+    }
 
     static int used = 0;
     glUseProgram(this->handle);
@@ -319,6 +414,10 @@ public:
   }
 
   Program *output(string name, const GLuint location = 0) {
+    if (!this->valid) {
+      return this;
+    }
+
     if (this->outputs.find(name) == this->outputs.end()) {
       this->outputs.emplace(name, location);
     }
@@ -327,6 +426,10 @@ public:
   }
 
   Program *attribute(string name) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint posAttrib;
     if (attributes.find(name) == this->attributes.end()) {
       posAttrib = glGetAttribLocation(this->handle, name.c_str());
@@ -340,18 +443,40 @@ public:
   }
 
   Program *uniformFloat(string name, float v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform1f(loc, v);
     return this;
   }
 
   Program *uniformVec2(string name, glm::vec2 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform2f(loc, v[0], v[1]);
     return this;
   }
 
+  Program *uniformVec2ui(string name, glm::uvec2 v) {
+    if (!this->valid) {
+      return this;
+    }
+
+    GLint loc = this->uniformLocation(name);
+    glUniform2ui(loc, v[0], v[1]);
+    return this;
+  }
+
   Program *uniformVec3(string name, glm::vec3 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
 
     glUniform3f(loc, v[0], v[1], v[2]);
@@ -359,6 +484,9 @@ public:
   }
 
   Program *uniformVec3fArray(string name, glm::vec3 *v, size_t count) {
+    if (!this->valid) {
+      return this;
+    }
 
     GLint loc = this->uniformLocation(name);
     GLfloat *buf = (GLfloat *)malloc(sizeof(GLfloat) * 3 * count);
@@ -376,42 +504,70 @@ public:
   }
 
   Program *uniformVec3i(string name, glm::ivec3 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform3i(loc, v[0], v[1], v[2]);
     return this;
   }
 
   Program *uniformVec3ui(string name, glm::uvec3 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform3ui(loc, v[0], v[1], v[2]);
     return this;
   }
 
   Program *uniformVec4(string name, glm::vec4 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform4f(loc, v[0], v[1], v[2], v[3]);
     return this;
   }
 
   Program *uniformMat4(string name, glm::mat4 v) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniformMatrix4fv(loc, 1, GL_FALSE, &v[0][0]);
     return this;
   }
 
   Program *uniform1i(string name, int i) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform1i(loc, i);
     return this;
   }
 
   Program *uniform1ui(string name, uint32_t ui) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glUniform1ui(loc, ui);
     return this;
   }
 
   Program *texture2d(string name, GLuint  texture_id) {
+    if (!this->valid) {
+      return this;
+    }
+
     glActiveTexture(GL_TEXTURE0 + this->texture_index);
     glBindTexture(GL_TEXTURE_2D, texture_id);
     this->uniform1i(name, texture_index);
@@ -420,6 +576,10 @@ public:
   }
 
   Program *texture3d(string name, GLuint  texture_id) {
+    if (!this->valid) {
+      return this;
+    }
+
     glActiveTexture(GL_TEXTURE0 + this->texture_index);
     glBindTexture(GL_TEXTURE_3D, texture_id);
     this->uniform1i(name, texture_index);
@@ -428,28 +588,105 @@ public:
   }
 
   Program *bufferAddress(string name, GLuint64 val) {
+    if (!this->valid) {
+      return this;
+    }
+
     GLint loc = this->uniformLocation(name);
     glProgramUniformui64NV(this->handle, loc, val);
     return this;
   }
 
-  Program *ssbo(string name, SSBO *ssbo, GLuint binding) {
-    // TODO: cache this result
-    //GLuint idx = glGetProgramResourceIndex(this->handle, GL_SHADER_STORAGE_BLOCK, name.c_str());
-    //gl_error();
-    //glShaderStorageBlockBinding(this->handle, idx, 0);
+  Program *ssbo(string name, SSBO *ssbo) {
+    if (!this->valid) {
+      return this;
+    }
 
-    //if (idx == GL_INVALID_INDEX) {
-    //  printf("SSBO binding failed, could not find '%s'\n", name.c_str());
-    //  return this;
-    //}
+    GLint ri = this->resourceIndex(name, GL_SHADER_STORAGE_BLOCK);
+
+    if (ri == GL_INVALID_ENUM) {
+      printf("SSBO binding failed, invalid enum '%s'\n", name.c_str());
+      return this;
+    }
+
+    if (ri == GL_INVALID_INDEX) {
+      printf("SSBO binding failed, could not find '%s'\n", name.c_str());
+      return this;
+    }
+
+    GLint idx;
+    if (this->ssbos.find(name) == this->ssbos.end()) {
+      idx = this->ssbos.size();
+      this->ssbos[name] = idx;
+      // Rebind the buffer index to the order in which it was seen in.
+      glShaderStorageBlockBinding(this->handle, ri, idx);
+    }
+    else {
+      idx = this->ssbos[name];
+    }
 
     GLuint ssbo_handle = ssbo->bind();
     if (ssbo_handle != 0) {
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo_handle); gl_error();
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, idx, ssbo_handle); gl_error();
     }
     ssbo->unbind();
     return this;
+  }
+
+
+  Program *compute(glm::uvec3 dims) {
+    if (!this->valid) {
+      return this;
+    }
+
+    glm::vec3 local(
+      this->local_layout[0],
+      this->local_layout[1],
+      this->local_layout[2]
+    );
+
+    glm::uvec3 d(
+      glm::ceil(glm::vec3(dims) / local)
+    );
+
+
+    glDispatchCompute(
+      max(d.x, 1),
+      max(d.y, 1),
+      max(d.z, 1)
+    );
+
+    gl_error();
+    return this;
+  }
+
+  Program *timedCompute(const char *str, glm::uvec3 dims) {
+    if (!this->valid) {
+      return this;
+    }
+
+#ifdef DISABLE_DEBUG_GL_TIMED_COMPUTE
+    return this->compute(dims);
+#else
+    GLuint query;
+    GLuint64 elapsed_time;
+    GLint done = 0;
+    glGenQueries(1, &query);
+    glBeginQuery(GL_TIME_ELAPSED, query);
+
+    this->compute(dims);
+
+    glEndQuery(GL_TIME_ELAPSED);
+    while (!done) {
+      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+    }
+
+    // get the query result
+    glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+    ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+    glDeleteQueries(1, &query);
+    return this;
+#endif
   }
 };
 
@@ -462,6 +699,7 @@ class GPUSlab {
 public:
 
   GPUSlab(uint32_t bytes) {
+    cout << "create GPUSlab of " << bytes << " bytes" << endl;
     this->resize(bytes);
   }
 
@@ -640,6 +878,9 @@ public:
   }
 
   void render(Program *program, const char* attribute) {
+    if (!program->isValid()) {
+      return;
+    }
     program->attribute(attribute);
     gl_error();
     glEnableVertexAttribArray(0);
@@ -818,8 +1059,21 @@ public:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    
 
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_depth, 0/*mipmap level*/);
+    /*glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, this->width, this->height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    */
+
+    glFramebufferTexture(
+      GL_FRAMEBUFFER,
+      GL_DEPTH_ATTACHMENT,
+      this->texture_depth,
+      0/*mipmap level*/
+    );
 
     this->status();
     return this;
