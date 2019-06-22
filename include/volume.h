@@ -486,7 +486,7 @@ public:
     if (size > 0) {
       VolumeOperation *op = this->operation_queue.front();
       this->operation_queue.pop();
-      if (op->equal(this->operation_queue.front())) {
+      if (this->operation_queue.size() > 0 && op->equal(this->operation_queue.front())) {
         return false;
       }
       this->performOperation(op);
