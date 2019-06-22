@@ -14,6 +14,7 @@ public:
   glm::mat4 depthMVP;
   glm::mat4 depthBiasMVP;
   glm::vec3 eye;
+  glm::vec3 invEye;
   glm::vec3 target;
   Program *program;
   FreeCamera *camera;
@@ -25,6 +26,7 @@ public:
       ->add(Shaders::get("raytrace.vert"))
       ->add(Shaders::get("raytrace-light.frag"))
       ->output("outColor")
+      ->output("outPosition")
       ->link();
 
     this->program->use();
@@ -34,7 +36,6 @@ public:
   }
 
   void begin() {
-    glm::vec3 target = glm::vec3(0,0,0);
     this->depthViewMatrix = glm::lookAt(this->eye, this->target, glm::vec3(0.0, 1.0, 0.0));
     this->depthMVP = depthProjectionMatrix * depthViewMatrix;
 

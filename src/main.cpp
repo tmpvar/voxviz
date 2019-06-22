@@ -243,8 +243,8 @@ int main(void) {
   }
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+  //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifndef FULLSCREEN
@@ -286,7 +286,7 @@ int main(void) {
 
   Shaders::init();
   shadowmap = new Shadowmap();
-  shadowmap->orient(glm::vec3(-200, 300, 260), glm::vec3(350, 60, 260));
+  shadowmap->orient(glm::vec3(-50, 50, 50), glm::vec3(25, 10, 30));
 
 
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
@@ -325,25 +325,6 @@ int main(void) {
   );
 
   int time = 0;
-
-#if RENDER_STATIC == 1
-  //update_volumes(raytracer, compute, time);
-#endif
-
-  //Volume *tool = raytracer->addVolumeAtIndex(5, 5, 5, 128, 512, 128);
-  //tool->fillConst(1.0);
-  /*compute->lock(compute->job.command_queues[0], tool->computeBuffer);
-  compute->fill(
-    "fillAll",
-    compute->job.command_queues[0],
-    tool,
-    0
-  );
-  compute->unlock(compute->job.command_queues[0], tool->computeBuffer);
-  */
-  //tool->position(0.0, 512, 0.0);
-
-  //clFinish(compute->job.command_queues[0]);
 
   Program *fullscreen_program = new Program();
   fullscreen_program
@@ -399,6 +380,7 @@ int main(void) {
   );
 
   Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
+  
   Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
@@ -411,6 +393,7 @@ int main(void) {
   
   
   volumeManager->addVolume(tool);
+
 
   q3Transform tx;
   q3Identity(tx);
@@ -431,17 +414,17 @@ int main(void) {
   //floor->cut(tool);
   //return 1;
   
-  tool->scale.x = 1.0;
-  tool->scale.y = 1.0;
-  tool->scale.z = 1.0;
+  tool->scale.x = 2.0;
+  tool->scale.y = 2.0;
+  tool->scale.z = 2.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
 
-  for (int x = 0; x < 32; x++) {
-    for (int y = 0; y < 32; y++) {
-      for (int z = 0; z < 32; z++) {
+  for (int x = 0; x < 64; x++) {
+    for (int y = 0; y < 8; y++) {
+      for (int z = 0; z < 64; z++) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
@@ -484,88 +467,91 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.01f;
+  const float movementSpeed = 0.1f;
   GLFWgamepadstate state;
   while (!glfwWindowShouldClose(window)) {
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    
+    // input
+    {
+      float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
+      if (keys[GLFW_KEY_W]) {
+        camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
+        //camera->translate(0.0f, 0.0f, 10.0f);
+      }
 
-    float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
-    if (keys[GLFW_KEY_W]) {
-      camera->ProcessKeyboard(Camera_Movement::FORWARD, speed);
-      //camera->translate(0.0f, 0.0f, 10.0f);
-    }
+      if (keys[GLFW_KEY_S]) {
+        camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed);
+      }
 
-    if (keys[GLFW_KEY_S]) {
-      camera->ProcessKeyboard(Camera_Movement::BACKWARD, speed);
-    }
+      if (keys[GLFW_KEY_A]) {
+        camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
+      }
 
-    if (keys[GLFW_KEY_A]) {
-      camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
-    }
+      if (keys[GLFW_KEY_D]) {
+        camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
+      }
 
-    if (keys[GLFW_KEY_D]) {
-      camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
-    }
-
-    if (keys[GLFW_KEY_H]) {
-      raytracer->showHeat = 1;
-    }
-    else {
-      raytracer->showHeat = 0;
-    }
-
-    float debug = keys[GLFW_KEY_1] ? 1.0f : 0.0f;
-
-    if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
-      if (!fullscreen) {
-        const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-        glfwSetWindowSize(window, mode->width, mode->height);
-        glfwSetWindowPos(window, 0, 0);
-        glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
-        glViewport(0, 0, mode->width, mode->height);
-        fullscreen = true;
+      if (keys[GLFW_KEY_H]) {
+        raytracer->showHeat = 1;
       }
       else {
-        glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
-        glfwSetWindowPos(window, 100, 100);
-        glfwSetWindowMonitor(window, NULL, 100, 100, windowDimensions[0], windowDimensions[1], GLFW_DONT_CARE);
-        glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
-        fullscreen = false;
+        raytracer->showHeat = 0;
       }
-      prevKeys[GLFW_KEY_ENTER] = false;
 
-      delete fbo;
-      delete shadowFBO;
-      glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
-      fbo = new FBO(windowDimensions[0], windowDimensions[1]);
-      shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
+      float debug = keys[GLFW_KEY_1] ? 1.0f : 0.0f;
 
-    }
+      if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
+        if (!fullscreen) {
+          const GLFWvidmode *mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+          glfwSetWindowSize(window, mode->width, mode->height);
+          glfwSetWindowPos(window, 0, 0);
+          glfwSetWindowMonitor(window, glfwGetPrimaryMonitor(), 0, 0, mode->width, mode->height, GLFW_DONT_CARE);
+          glViewport(0, 0, mode->width, mode->height);
+          fullscreen = true;
+        }
+        else {
+          glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
+          glfwSetWindowPos(window, 100, 100);
+          glfwSetWindowMonitor(window, NULL, 100, 100, windowDimensions[0], windowDimensions[1], GLFW_DONT_CARE);
+          glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
+          fullscreen = false;
+        }
+        prevKeys[GLFW_KEY_ENTER] = false;
 
-    // mouse look like free-fly/fps
-    double xpos, ypos, delta[2];
-    glfwGetCursorPos(window, &xpos, &ypos);
-    delta[0] = xpos - mouse[0];
-    delta[1] = ypos - mouse[1];
-    mouse[0] = xpos;
-    mouse[1] = ypos;
+        delete fbo;
+        delete shadowFBO;
+        glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
+        fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+        shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
 
-    camera->ProcessMouseMovement((float)delta[0], (float)-delta[1]);
+      }
+
+      // mouse look like free-fly/fps
+      double xpos, ypos, delta[2];
+      glfwGetCursorPos(window, &xpos, &ypos);
+      delta[0] = xpos - mouse[0];
+      delta[1] = ypos - mouse[1];
+      mouse[0] = xpos;
+      mouse[1] = ypos;
+
+      camera->ProcessMouseMovement((float)delta[0], (float)-delta[1]);
     
-    if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
-      int axis_count;
-      const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
-      const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
-      const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
-      const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
-      tool->move(
-        fabs(x) > 0.1 ? x * movementSpeed : 0,
-        fabs(y) > 0.1 ? -y * movementSpeed : 0,
-        fabs(z) > 0.1 ? z * movementSpeed : 0
-      );
+      if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
+        int axis_count;
+        const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
+        const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+        const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+        const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
+        tool->move(
+          fabs(x) > 0.1 ? x * movementSpeed : 0,
+          fabs(y) > 0.1 ? -y * movementSpeed : 0,
+          fabs(z) > 0.1 ? z * movementSpeed : 0
+        );
+      }
     }
 
     if (tool_position_queue.size() > 0) {
@@ -588,31 +574,62 @@ int main(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
 
-    /*
-    shadowFBO->bind();
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glCullFace(GL_BACK);
-    glEnable(GL_CULL_FACE);
-    glClearDepth(1.0);
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    gl_error();
+    if (!shaderLogs.empty()) {
+      ImGui::SetNextWindowPos(ImVec2(20, windowDimensions[1] / 2 + 20));
+    }
+    else {
+      ImGui::SetNextWindowPos(ImVec2(20, 20));
+    }
+    ImGui::Begin("stats");
 
-    shadowmap->begin();
-    shadowmap->program
-      ->use()
-      ->uniformMat4("MVP", shadowmap->depthMVP)
-      ->uniformVec3("eye", shadowmap->eye)
-      ->uniform1i("showHeat", raytracer->showHeat)
-      ->uniformFloat("maxDistance", max_distance);
+    // render shadow map
+    if (true) {
+      shadowFBO->bind();
+      glDrawBuffer(GL_NONE);
+      glEnable(GL_DEPTH_TEST);
+      glDepthFunc(GL_LESS);
+      glCullFace(GL_BACK);
+      glEnable(GL_CULL_FACE);
+      glClearDepth(1.0);
+      glClearColor(0.0, 0.0, 0.0, 1.0);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      gl_error();
 
-      raytracer->render(shadowmap->program);
-    shadowmap->end();
-    shadowFBO->unbind();
-    */
+      shadowmap->orient(
+        tool->position,
+        tool->position + glm::vec3(50, 0, 0)
+      );
+
+      shadowmap->begin();
+      for (auto& volume : volumeManager->volumes) {
+        if (volume->bricks.size() == 0) {
+          continue;
+        }
+
+        glm::mat4 volumeModel = volume->getModelMatrix();
+        glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(shadowmap->eye, 1.0);
+
+        shadowmap->program
+          ->use()
+          ->uniformMat4("MVP", shadowmap->depthMVP)
+          ->uniformVec3("invEye", glm::vec3(
+            invEye.x / invEye.w,
+            invEye.y / invEye.w,
+            invEye.z / invEye.w
+          ))
+          ->uniformMat4("model", volumeModel)
+          ->uniformVec3("eye", shadowmap->eye)
+          ->uniformFloat("maxDistance", max_distance)
+          ->uniform1i("showHeat", raytracer->showHeat)
+          ->uniformVec4("material", volume->material);
+
+        raytracer->render(volume, shadowmap->program);
+      }
+      shadowmap->end();
+      shadowFBO->unbind();
+    }    
     
-    //fbo->bind();
+    fbo->bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -627,7 +644,7 @@ int main(void) {
 
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < 2048; i++) {
       if (volumeManager->tick()) {
         break;
       }
@@ -653,77 +670,40 @@ int main(void) {
         ->uniform1i("showHeat", raytracer->showHeat)
         ->uniformVec4("material", volume->material);
 
-      /*raytracer->program->uniformFloat(
-        "debug",
-        volume != tool && tool->overlaps(volume) ? 1.0 : 0.0
-      );*/
-
-      gl_error();
-      size_t activeBricks = volume->bind();
-      //raytracer->render(volume, raytracer->program);
-
-      glDrawElementsInstanced(
-        GL_TRIANGLES,
-        volume->mesh->faces.size(),
-        GL_UNSIGNED_INT,
-        0,
-        //volume->bricks.size()
-        activeBricks
-      );
-      gl_error();
+      raytracer->render(volume, raytracer->program);
     }
 
-    //volumeManager->volumes[0]->rotation.x += 0.0001;
-    //volumeManager->volumes[1]->scale.z = 1.0 + abs(sin(time / 1000.0)) * 10.0;
-    //volumeManager->volumes[1]->rotation.y += 0.001;
-/*
-    {
-      glm::mat4 volumeModel = floor->getModelMatrix();
-      glm::vec4 invEye = glm::inverse(volumeModel) * glm::vec4(currentEye, 1.0);
-      raytracer->program->use()
-        ->uniformMat4("MVP", VP * volumeModel)
-        ->uniformVec3("invEye", glm::vec3(
-          invEye.x / invEye.w,
-          invEye.y / invEye.w,
-          invEye.z / invEye.w
-        ))
-        ->uniformFloat("maxDistance", max_distance)
-        ->uniform1i("showHeat", raytracer->showHeat)
-        ->uniformFloat("debug", debug)
-        ->uniformVec4("material", floor->material);
-
-      floor->bind();
-      raytracer->render(floor, raytracer->program);
-    }
-*/
-    
     physicsScene->Step();
     //floor->rotation.z += 0.001;
     tool->rotation.z += 0.001;
     tool->rotation.y += 0.002;
     //tool->rotation.x += 0.005;
     
-    /*fbo->unbind();
+    fbo->unbind();
     
-    glBindTexture(GL_TEXTURE_2D, shadowFBO->texture_depth);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_DEPTH_TO_TEXTURE_EXT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // render with shadow buffer
+    if (true) {
+      glBindTexture(GL_TEXTURE_2D, shadowFBO->texture_depth);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_DEPTH_TO_TEXTURE_EXT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    fullscreen_program->use()
-      ->uniformFloat("maxDistance", max_distance)
-      ->texture2d("iColor", fbo->texture_color)
-      ->texture2d("iPosition", fbo->texture_position)
-      ->uniformVec3("light", shadowmap->eye)
-      ->uniformVec3("eye", currentEye)
-      ->texture2d("iShadowMap", shadowFBO->texture_depth)
-      ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP);
+      fullscreen_program->use()
+        ->uniformFloat("maxDistance", max_distance)
+        ->texture2d("iColor", fbo->texture_color)
+        ->texture2d("iPosition", fbo->texture_position)
+        ->uniformVec3("light", shadowmap->eye)
+        ->uniformVec3("eye", currentEye)
+        ->texture2d("iShadowMap", shadowFBO->texture_depth)
+        ->texture2d("iShadowColor", shadowFBO->texture_color)
+        ->texture2d("iShadowPosition", shadowFBO->texture_position)
+        ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP);
     
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glEnable(GL_DEPTH_TEST);
 
-    fullscreen_surface->render(fullscreen_program);
-   */
+      fullscreen_surface->render(fullscreen_program);
+  }   
 
     // Tool based boolean operations
     // opCut
@@ -741,7 +721,7 @@ int main(void) {
       floor->booleanOp(tool, true, brickAddProgram);
     }
 
-
+    // display stats
     {
       static float f = 0.0f;
       static int counter = 0;
@@ -754,6 +734,26 @@ int main(void) {
         tool->position.z
       );
       ImGui::Text("%i floor bricks", floor->bricks.size());
+      ImGui::End();
+
+      if (!shaderLogs.empty()) {
+        bool yes = 1;
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(windowDimensions[0], windowDimensions[1] / 2));
+        ImGui::Begin(
+          "Shader Errors",
+          &yes,
+          ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoTitleBar
+        );
+        for (auto const& log : shaderLogs) {
+          unsigned int lines = std::count(log.second.begin(), log.second.end(), '\n');
+          ImGui::BeginChild(log.first.c_str(), ImVec2(0, 20 + 20 * lines), true);
+          ImGui::Text(log.first.c_str());
+          ImGui::TextColored(ImVec4(1.0, 0.0, 0.0, 1.0), log.second.c_str());
+          ImGui::EndChild();
+        }
+        ImGui::End();
+      }
     }
 
     ImGui::Render();

@@ -2,71 +2,80 @@
 #extension GL_NV_gpu_shader5: require
 #extension GL_ARB_bindless_texture : require
 
+#include "voxel.glsl"
+
 in vec3 rayOrigin;
 in vec3 center;
-flat in float *volumePointer;
+in vec3 brickSurfacePos;
+flat in vec3 brickTranslation;
+
+flat in uint32_t *volumePointer;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outPosition;
+//layout(location = 2) out float outDepth;
 
 uniform sampler3D volume;
 uniform uvec3 dims;
 uniform vec3 eye;
+uniform vec3 invEye;
 uniform float maxDistance;
+uniform mat4 model;
+uniform vec4 material;
+uniform float debug;
 
-#define ITERATIONS 60
-
-float voxel(vec3 worldPos) {
-  vec3 fdims = vec3(dims);
-  vec3 hfdims = fdims * 0.5;
-
-  uvec3 pos = uvec3(round((hfdims + worldPos - center)));
-  uint idx = (pos.x + pos.y * dims.x + pos.z * dims.x * dims.y);
-  bool oob = any(lessThan(pos, vec3(0.0))) || any(greaterThanEqual(pos, dims));
-  return oob ? -1.0 : float(volumePointer[idx]);
+vec3 tx(mat4 m, vec3 v) {
+  vec4 tmp = m * vec4(v, 1.0);
+  return tmp.xyz / tmp.w;
 }
 
-float march(in vec3 pos, in vec3 dir, out float hit) {
-  dir = normalize(dir);
-  // grid space
-  vec3 origin = pos;
-  vec3 grid = floor(pos);
-  vec3 grid_step = sign( dir );
-  vec3 corner = max( grid_step, vec3( 0.0 ) );
-  bvec3 mask;
+#define ITERATIONS BRICK_DIAMETER*2 + BRICK_RADIUS
 
-  // ray space
-  vec3 inv = vec3( 1.0 ) / dir;
-  vec3 ratio = ( grid + corner - pos ) * inv;
-  vec3 ratio_step = grid_step * inv;
+float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out float iterations) {
+  pos -= rayDir * 4.0;
+  vec3 mapPos = vec3(floor(pos));
+  vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
+  vec3 rayStep = sign(rayDir);
+  vec3 sideDist = (sign(rayDir) * (mapPos - pos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+  vec3 mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
 
-  // dda
-  hit = -1.0;
-
-  for (float i = 0.0; i < ITERATIONS; i++ ) {
-    if (hit > 0.0 || voxel( grid ) > 0.0) {
+  float hit = 0.0;
+  vec3 prevPos = pos;
+  for (int iterations = 0; iterations < ITERATIONS; iterations++) {
+    if (hit > 0.0 || voxel_get(volumePointer, ivec3(mapPos))) {
       hit = 1.0;
-      continue;
+      break;
     }
 
-    mask = lessThanEqual(ratio.xyz, min(ratio.yzx, ratio.zxy));
-    grid += ivec3(grid_step) * ivec3(mask);
-	pos += grid_step * ivec3(mask);
-    ratio += ratio_step * vec3(mask);
+    mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
+    sideDist += mask * deltaDist;
+    mapPos += mask * rayStep;
   }
 
-  return distance(eye, pos);
+  pos = floor(mapPos) + 0.5;
+  normal = mask;
+  return hit;
 }
 
 void main() {
-  vec3 pos = gl_FrontFacing ? rayOrigin : eye;
-  vec3 eyeToPlane = gl_FrontFacing ? rayOrigin - eye : eye - rayOrigin;
+  // TODO: handle the case where the camera is inside of a brick
+  vec3 eyeToPlane = (brickSurfacePos + brickTranslation) - invEye;
   vec3 dir = normalize(eyeToPlane);
-
   vec3 normal;
   vec3 voxelCenter;
-  float hit;
+  float iterations;
+  vec3 found_normal;
+  float found_iterations;
+  vec3 found_center;
 
-  float depth = march(pos, dir, hit);
-  gl_FragDepth = hit < 0.0 ? 1.0 : depth / maxDistance;
-  outColor = vec4(normal, 1.0);
+  // move the location to positive space to better align with the underlying grid
+  vec3 pos = brickSurfacePos * BRICK_DIAMETER;
+
+
+  float hit = march(pos, dir, found_center, found_normal, found_iterations);
+  vec3 tpos = tx(model, brickTranslation + brickSurfacePos);
+  gl_FragDepth = distance(pos, eye) / maxDistance;
+  gl_FragDepth = distance(tpos, eye) / maxDistance;
+  outColor = vec4(normalize(pos), 1.0);
+  outPosition = vec4(tpos, 1.0);
 }

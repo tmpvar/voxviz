@@ -29,6 +29,7 @@
           ->add(Shaders::get("raytrace.vert"))
           ->add(Shaders::get("raytrace.frag"))
           ->output("outColor")
+          ->output("outPosition")
           ->link();
 
       this->program->use();
@@ -43,12 +44,19 @@
         return;
       }
 
+      if (!p->isValid()) {
+        return;
+      }
+
+      size_t activeBricks = volume->bind();
+      
+
       glDrawElementsInstanced(
         GL_TRIANGLES,
         volume->mesh->faces.size(),
         GL_UNSIGNED_INT,
         0,
-        volume->bricks.size()
+        activeBricks
       );
        gl_error();
     }

@@ -115,18 +115,19 @@ void main() {
   float hit = march(pos, dir, voxelCenter, normal, iterations);
   //float hit = march_groundtruth(pos, dir, voxelCenter, normal, iterations);
   if (hit < 0.0) {
-	discard;
+	   discard;
   }
   pos = pos / BRICK_DIAMETER;
   //gl_FragDepth = hit < 0.0 ? 1.0 : distance(rayOrigin + (pos - brickOrigin) / BRICK_DIAMETER, invEye) / maxDistance;
   outColor = mix(material, vec4(1.0, 0.0, 0.0, 1.0), debug); //vec4(brickOrigin / float(BRICK_DIAMETER), 1.0), hit < 0.0);
   //outPosition = rayOrigin / maxDistance;
-
+  vec3 tpos = tx(model, brickTranslation + pos);
+  outPosition = tpos / maxDistance;
 
   gl_FragDepth = mix(
-	1.0,
-	distance(tx(model, brickTranslation + pos), eye) / maxDistance,
-	hit
+  	1.0,
+  	distance(tpos, eye) / maxDistance,
+  	hit
   );
 
   //outColor = vec4(pos, 1.0);
