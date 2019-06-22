@@ -29,6 +29,23 @@ public:
     this->stockToTool = stockToTool;
     memcpy(this->toolVerts, toolVerts, sizeof(glm::vec3) * 8);
   }
+
+  bool equal(VolumeOperation *next) {
+    if (next == nullptr) {
+      return false;
+    }
+
+    bool out = true;
+    out = out && this->toolBrick == next->toolBrick;
+    out = out && this->stockBrick == next->stockBrick;
+    out = out && glm::all(glm::equal(this->stockToTool, next->stockToTool));
+    for (int i = 0; i < 8 && out == true; i++) {
+      out = out && glm::all(glm::equal(this->toolVerts[i], next->toolVerts[i]));
+    }
+
+    out = out && this->program == next->program;
+    return out;
+  }
 };
 
 
@@ -469,6 +486,9 @@ public:
     if (size > 0) {
       VolumeOperation *op = this->operation_queue.front();
       this->operation_queue.pop();
+      if (op->equal(this->operation_queue.front())) {
+        return false;
+      }
       this->performOperation(op);
       return size == 1;
     }
@@ -494,9 +514,7 @@ public:
       ->uniformVec3("toolBrickIndex", glm::vec3(op->toolBrick->index))
       ->uniformVec3("stockBrickIndex", glm::vec3(op->stockBrick->index))
       ->uniformVec3fArray("toolBrickVerts", op->toolVerts, 8)
-      ->uniformMat4("stockToTool", op->stockToTool);
-
-    glDispatchCompute(BRICK_VOXEL_WORDS, 1, 1);
-    gl_error();
+      ->uniformMat4("stockToTool", op->stockToTool)
+      ->compute(glm::uvec3(BRICK_VOXEL_WORDS, 1, 1));
   }
 };
