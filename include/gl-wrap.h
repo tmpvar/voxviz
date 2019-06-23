@@ -101,6 +101,12 @@ public:
     std::ifstream t(this->filename);
     std::string str;
 
+    if (!t.is_open()) {
+      shaderLogs[this->name] = "file could not be opened\npath: " + string(this->filename) + "\n";
+      this->valid = false;
+      return true;
+    }
+
     t.seekg(0, std::ios::end);
     str.reserve(t.tellg());
     t.seekg(0, std::ios::beg);

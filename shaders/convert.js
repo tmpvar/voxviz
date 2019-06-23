@@ -121,7 +121,28 @@ class Shaders {
 
     static Shader *get(const std::string file) {
       if (Shaders::instances.find(file) == Shaders::instances.end()) {
-        return nullptr;
+        // build a placeholder in the case of missing shaders. this allows
+        // the hot reload to work properly.
+
+        string fullPath = string("${spath(outBase)}\\\\") + file;
+
+        GLuint type;
+        if (file.find(".vert") != string::npos) {
+          type = GL_VERTEX_SHADER;
+        } else if (file.find(".frag") != string::npos) {
+          type = GL_FRAGMENT_SHADER;
+        } else if (file.find(".comp")) {
+          type = GL_COMPUTE_SHADER;
+        }
+
+        Shader *noop = new Shader(
+          "",
+          fullPath.c_str(),
+          file.c_str(),
+          type
+        );
+        Shaders::instances[file.c_str()] = noop;
+        return noop;
       }
       return Shaders::instances.at(file);
     }
