@@ -20,6 +20,10 @@ const dependencyMap = {
   // file: [dep, dep]
 }
 
+const ignore = {
+  'built.h': true
+}
+
 
 if (argv.w) {
   chokidar.watch(
@@ -31,8 +35,15 @@ if (argv.w) {
       return
     }
 
+    if (ignore[p]) {
+      return;
+    }
+
+
     p = path.normalize(p)
     console.log('CHANGE', p)
+
+
     // is this a leaf?
     if (dependencyMap[p]) {
       console.log('REBUILD', p)
