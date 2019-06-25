@@ -29,7 +29,7 @@
 using namespace std;
 
 #ifndef DISABLE_GL_ERROR
-#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
+#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); DebugBreak(); exit(1);}
 #else
 #define gl_error() do {} while(0)
 #endif
@@ -682,12 +682,12 @@ public:
     GLint ri = this->resourceIndex(name, GL_SHADER_STORAGE_BLOCK);
 
     if (ri == GL_INVALID_ENUM) {
-      printf("SSBO binding failed, invalid enum '%s'\n", name.c_str());
+      shaderLogs[this->compositeName] = "SSBO binding failed, invalid enum " + name + "\n";
       return this;
     }
 
     if (ri == GL_INVALID_INDEX) {
-      printf("SSBO binding failed, could not find '%s'\n", name.c_str());
+      shaderLogs[this->compositeName] = "SSBO binding failed, could not find " + name + "\n";
       return this;
     }
 
@@ -862,9 +862,9 @@ public:
 
 class Mesh {
 public:
-  GLuint vao;
-  GLuint vbo;
-  GLuint ebo;
+  GLuint vao = 0xFFFFFFFF;
+  GLuint vbo = 0xFFFFFFFF;
+  GLuint ebo = 0xFFFFFFFF;
   std::vector<GLfloat> verts;
   std::vector<GLuint> faces;
 

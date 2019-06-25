@@ -4,37 +4,43 @@
 
 #include "voxel.glsl"
 
-uniform uint *stockBuffer;
-uniform uint *toolBuffer;
+uniform uint32_t brick_index_stock;
+uniform uint32_t brick_index_tool;
+
 uniform vec3 toolBrickIndex;
 uniform vec3 stockBrickIndex;
 uniform mat4 stockToTool;
-uniform vec3 toolBrickVerts[8];
 
 // TODO: how do we cut transformed bricks?
 // TODO: how do we cut using transformed bricks?
 
 // TODO: use variable group size so we can better control the
 //       slice size
-layout( local_size_x = 1, local_size_y = 1, local_size_z = 1 ) in;
+layout( local_size_x = 16, local_size_y = 1, local_size_z = 1 ) in;
 
 vec3 tx(mat4 m, vec3 v) {
   vec4 tmp = m * vec4(v, 1.0);
   return tmp.xyz / tmp.w;
 }
 
+bool oob(vec3 pos) {
+  return any(lessThan(pos, vec3(0))) || any(greaterThanEqual(pos, vec3(BRICK_DIAMETER)));
+}
+
 void main() {
 	uint idx = gl_GlobalInvocationID.x;
+  if (idx > BRICK_VOXEL_WORDS) {
+    return;
+  }
+
 	uint lower = idx * VOXEL_WORD_BITS;
-	uint upper = lower + VOXEL_WORD_BITS;
-	uint bits = 0;
 
-	if (stockBuffer[idx] == 0) {
-		return;
-	}
+  uint val = 0;
+  BrickData tool = bricks[brick_index_tool];
+	for (uint i = 0; i < VOXEL_WORD_BITS; i++) {
+    uint p = lower + i;
+		uint set_mask = 1 << i;
 
-	for (uint p = lower; p < upper; p++) {
-		uint mask = 1 << (p - lower);
 		vec3 stockVoxel = vec3(
 			p % BRICK_DIAMETER,
 			(p / BRICK_DIAMETER) % BRICK_DIAMETER,
@@ -44,11 +50,13 @@ void main() {
 		vec3 localPos = stockBrickIndex + (vec3(stockVoxel) + 0.5) * INV_BRICK_DIAMETER;
 		// transform the point back into tool space
 		vec3 v2 = tx(stockToTool, localPos);
-		ivec3 toolVoxel = ivec3(floor((v2 - toolBrickIndex) * BRICK_DIAMETER));
-		if (voxel_get(toolBuffer, toolVoxel)) {
-			bits |= mask;
-		}
-	}
-	stockBuffer[idx] &= ~bits;
-}
+		vec3 toolVoxel = (v2 - toolBrickIndex) * BRICK_DIAMETER;
 
+    if (oob(toolVoxel)) {
+      continue;
+    }
+
+	  val |= voxel_get(brick_index_tool, vec3(toolVoxel)) ? set_mask : 0;
+	}
+  bricks[brick_index_stock].data[idx] &= ~val;
+}

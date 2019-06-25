@@ -4,16 +4,14 @@
 
 #include "voxel.glsl"
 
-in vec3 rayOrigin;
-in vec3 center;
 in vec3 brickSurfacePos;
 flat in vec3 brickTranslation;
 
-flat in uint32_t *volumePointer;
+flat in uint32_t brick_index;
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outPosition;
-//layout(location = 2) out float outDepth;
+
 
 uniform sampler3D volume;
 uniform uvec3 dims;
@@ -42,7 +40,7 @@ float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out 
   float hit = 0.0;
   vec3 prevPos = pos;
   for (int iterations = 0; iterations < ITERATIONS; iterations++) {
-    if (hit > 0.0 || voxel_get(volumePointer, ivec3(mapPos))) {
+    if (hit > 0.0 || voxel_get(brick_index, ivec3(mapPos))) {
       hit = 1.0;
       break;
     }
@@ -71,10 +69,8 @@ void main() {
   // move the location to positive space to better align with the underlying grid
   vec3 pos = brickSurfacePos * BRICK_DIAMETER;
 
-
   float hit = march(pos, dir, found_center, found_normal, found_iterations);
   vec3 tpos = tx(model, brickTranslation + brickSurfacePos);
-  gl_FragDepth = distance(pos, eye) / maxDistance;
   gl_FragDepth = distance(tpos, eye) / maxDistance;
   outColor = vec4(normalize(pos), 1.0);
   outPosition = vec4(tpos, 1.0);

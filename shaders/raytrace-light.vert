@@ -1,23 +1,23 @@
 #version 430 core
 #extension GL_NV_gpu_shader5: require
-#extension GL_ARB_bindless_texture : require
+
+#include "../include/core.h"
 
 layout (location = 0) in vec3 position;
-layout (location = 1) in vec3 iCenter;
-layout (location = 2) in float *iBufferPointer;
+layout (location = 1) in vec3 translation;
+layout (location = 2) in uint32_t in_brick_index;
 
 uniform mat4 MVP;
-uniform uvec3 dims;
 
-out vec3 rayOrigin;
-out vec3 center;
+out vec3 brickSurfacePos;
+flat out vec3 brickTranslation;
+
 // flat means "do not interpolate"
-flat out float *volumePointer;
+flat out uint32_t brick_index;
 
 void main() {
-  vec3 pos = position * (vec3(dims) / 2.0);
-  rayOrigin = pos + iCenter;
-  center = iCenter;
-  volumePointer = iBufferPointer;	
-  gl_Position = MVP * vec4(rayOrigin, 1.0);
+  brickTranslation = translation;
+  brickSurfacePos = position;
+  brick_index = in_brick_index;
+  gl_Position = MVP * vec4(position + translation, 1.0);
 }

@@ -1,14 +1,11 @@
 #version 450 core
 #extension GL_NV_gpu_shader5: require
-#extension GL_ARB_bindless_texture : require
-//#extension GL_EXT_shader_image_load_store : require
 
 #include "voxel.glsl"
 
 in vec3 brickSurfacePos;
 flat in vec3 brickTranslation;
-flat in uint32_t *volumePointer;
-//flat in layout(bindless_sampler) sampler3D volumeSampler;
+flat in uint32_t brick_index;
 
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec3 outPosition;
@@ -27,19 +24,26 @@ uniform vec3 eye;
 #define ITERATIONS BRICK_DIAMETER*2 + BRICK_RADIUS
 
 float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out float iterations) {
-  pos -= rayDir * 4.0;
+  vec3 del = fract(pos) - rayDir;
+  pos -= rayDir * 0.1;//step(del.xyz, del.yzx) * step(del.xyz, del.zxy) * 0.1;
   vec3 mapPos = vec3(floor(pos));
   vec3 deltaDist = abs(vec3(length(rayDir)) / rayDir);
   vec3 rayStep = sign(rayDir);
+
   vec3 sideDist = (sign(rayDir) * (mapPos - pos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+
   vec3 mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
 
   float hit = 0.0;
   vec3 prevPos = pos;
-  for (int iterations = 0; iterations < ITERATIONS; iterations++) {
-    if (hit > 0.0 || voxel_get(volumePointer, ivec3(mapPos))) {
-      hit = 1.0;
-      break;
+  for (int iterations = 0; iterations < ITERATIONS && hit == 0.0; iterations++) {
+    // TODO: this used to work in the function call but now if we bail we'll stop iterating
+    //       which is a bad thing.
+    if (all(greaterThanEqual(mapPos, vec3(0))) && all(lessThan(mapPos, vec3(BRICK_DIAMETER)))) {
+      if (voxel_get(brick_index, mapPos)) {
+        hit = 1.0;
+        break;
+      }
     }
 
     mask = step(sideDist.xyz, sideDist.yzx) * step(sideDist.xyz, sideDist.zxy);
@@ -48,51 +52,9 @@ float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out 
   }
 
   pos = floor(mapPos) + 0.5;
+
   normal = mask;
   return hit;
-}
-
-
-float march_groundtruth(in out vec3 pos, vec3 dir, out vec3 center, out vec3 normal, out float iterations) {
-	vec3 invDir = 1.0 / dir;
-	float hit = 0.0;
-  pos -= dir;
-  vec3 prevPos = pos;
-
-
-
-	for (iterations = 0; iterations < ITERATIONS*10; iterations++) {
-		if (voxel_get(volumePointer, ivec3(floor(pos)))) {
-			hit = 1.0;
-			break;
-		}
-    prevPos = pos;
-		pos += dir / 10;
-	}
-
-	// center = floor(pos) + vec3( 0.5 );
-	// vec3 d = sign(fract(pos));
-
-	// normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
-
-
-  vec3 d =  min(abs(fract(pos)), abs((1.0 - fract(pos))));
-  //normal = vec3(lessThanEqual(d.xyz, min(d.yzx, d.zxy)));
-  // normal = vec3(0.0);
-  if (d.x > d.y && d.x > d.z) {
-    normal = vec3(1.0, 0.0, 0.0);
-  }
-  // else if (d.y < d.x && d.y < d.z) {
-  //   normal = vec3(0.0, 1.0, 0.0);
-  // }
-  // // else if (d.z < d.x && d.z < d.y) {
-  // //   normal = vec3(0.0, 0.0, 1.0);
-  // // }
-  else {
-    normal = vec3(distance(pos, invEye) / 50);
-  }
-
-	return hit;
 }
 
 vec3 tx(mat4 m, vec3 v) {
@@ -101,7 +63,6 @@ vec3 tx(mat4 m, vec3 v) {
 }
 
 void main() {
-
   // TODO: handle the case where the camera is inside of a brick
   vec3 eyeToPlane = (brickSurfacePos + brickTranslation) - invEye;
   vec3 dir = normalize(eyeToPlane);

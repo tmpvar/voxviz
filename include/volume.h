@@ -115,8 +115,6 @@ static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
   );
 }
 
-#define MAX_BRICKS 2000000
-
 class Volume {
 protected:
   bool dirty;
@@ -138,7 +136,7 @@ public:
   size_t total_position_mem = 0;
   size_t total_brick_pointer_mem = 0;
   float *positions;
-  GLuint64 *pointers;
+  uint32_t *pointers;
 
   Volume(glm::vec3 pos, q3Scene *scene = nullptr, q3BodyDef *bodyDef = nullptr) {
     this->position = pos;
@@ -201,9 +199,9 @@ public:
 
     // prealloc a large slab of memory for VAO
     this->total_position_mem = MAX_BRICKS * 3 * sizeof(float);
-    this->total_brick_pointer_mem = MAX_BRICKS * sizeof(GLuint64);
+    this->total_brick_pointer_mem = MAX_BRICKS * sizeof(uint32_t);
     this->positions = (float *)malloc(total_position_mem);
-    this->pointers = (GLuint64 *)malloc(total_brick_pointer_mem);
+    this->pointers = (uint32_t *)malloc(total_brick_pointer_mem);
 
     glGenBuffers(1, &this->instanceVBO); gl_error();
     glGenBuffers(1, &this->pointerVBO); gl_error();
@@ -335,7 +333,7 @@ public:
       this->positions[loc * 3 + 1] = float(brick->index.y);
       this->positions[loc * 3 + 2] = float(brick->index.z);
 
-      this->pointers[loc] = brick->bufferAddress;
+      this->pointers[loc] = brick->memory_index;
       loc++;
     }
 
@@ -351,7 +349,7 @@ public:
     glEnableVertexAttribArray(2); gl_error();
     glBindBuffer(GL_ARRAY_BUFFER, this->pointerVBO); gl_error();
     glBufferData(GL_ARRAY_BUFFER, total_brick_pointer_mem, &pointers[0], GL_STATIC_DRAW); gl_error();
-    glVertexAttribLPointer(2, 1, GL_UNSIGNED_INT64_ARB, sizeof(GLuint64), 0); gl_error();
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(uint32_t), 0); gl_error();
     glVertexAttribDivisor(2, 1); gl_error();
 
     this->activeBricks = loc;
@@ -508,13 +506,15 @@ public:
       return;
     }
 
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
     op->program->use()
-      ->bufferAddress("stockBuffer", op->stockBrick->bufferAddress)
-      ->bufferAddress("toolBuffer", op->toolBrick->bufferAddress)
       ->uniformVec3("toolBrickIndex", glm::vec3(op->toolBrick->index))
       ->uniformVec3("stockBrickIndex", glm::vec3(op->stockBrick->index))
-      ->uniformVec3fArray("toolBrickVerts", op->toolVerts, 8)
       ->uniformMat4("stockToTool", op->stockToTool)
+      ->uniform1ui("brick_index_tool", op->toolBrick->memory_index)
+      ->uniform1ui("brick_index_stock", op->stockBrick->memory_index)
+      ->ssbo("brickBuffer", BrickMemory::instance()->ssbo)
       ->compute(glm::uvec3(BRICK_VOXEL_WORDS, 1, 1));
   }
 };
