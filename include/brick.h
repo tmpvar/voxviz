@@ -28,9 +28,9 @@
   class Brick {
   public:
     glm::ivec3 index;
-    uint32_t memory_index;
+    uint32_t memory_index = 0xFFFFFFFF;
     float debug;
-    float *data;
+    uint32_t *data = nullptr;
     aabb_t *aabb;
     Volume *volume;
     bool full;
@@ -41,7 +41,25 @@
     void bind(Program * program);
     bool isect(Brick *other, aabb_t *out);
 
-    void setVoxel(glm::uvec3 pos, float val);
+    void setVoxel(glm::uvec3 pos);
     void fillConst(uint32_t val);
+    void upload();
+
+    void createHostMemory() {
+      if (this->data != nullptr) {
+        return;
+      }
+      this->data = (uint32_t *)malloc(BRICK_VOXEL_BYTES);
+      memset(this->data, 0, BRICK_VOXEL_BYTES);
+    }
+
+    void freeHostMemory() {
+      if (this->data != nullptr) {
+        free(this->data);
+        this->data = nullptr;
+      }
+
+    }
+
   };
 #endif

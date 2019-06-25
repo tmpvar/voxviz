@@ -65,6 +65,7 @@ add_executable(
 
   include/parser/vzd/vzd.h
   include/parser/magicavoxel/vox.h
+  include/parser/raw/raw.h
 
   include/collision/aabb-obb.h
 

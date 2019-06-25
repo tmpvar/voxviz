@@ -254,7 +254,6 @@ public:
     if (found == nullptr && createIfNotFound) {
       found = this->AddBrick(index);
       found->createGPUMemory();
-      found->fillConst(0);
     }
 
     return found;

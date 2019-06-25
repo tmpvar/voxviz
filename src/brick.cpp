@@ -22,8 +22,6 @@ BrickMemory *BrickMemory::instance() {
   return BrickMemory::_instance;
 }
 
-
-
 Brick::Brick(glm::ivec3 index) {
   this->index = index;
   this->debug = 0.0f;
@@ -32,7 +30,11 @@ Brick::Brick(glm::ivec3 index) {
   this->aabb->upper = glm::vec3(index) + glm::vec3(1.0);
 }
 
-Brick::~Brick() {}
+Brick::~Brick() {
+  if (this->data != nullptr) {
+    free(this->data);
+  }
+}
 
 void Brick::createGPUMemory() {
   this->memory_index = BrickMemory::instance()->alloc();
@@ -54,7 +56,7 @@ bool Brick::isect(Brick *other, aabb_t *out) {
   return aabb_isect(this->aabb, other->aabb, out);
 }
 
-void Brick::setVoxel(glm::uvec3 pos, float val) {
+void Brick::setVoxel(glm::uvec3 pos) {
   if (
     pos.x > BRICK_DIAMETER ||
     pos.y > BRICK_DIAMETER ||
@@ -63,13 +65,21 @@ void Brick::setVoxel(glm::uvec3 pos, float val) {
     return;
   }
 
-  uint32_t idx = pos.x;
-  idx += pos.y * BRICK_DIAMETER;
-  idx += pos.z * BRICK_DIAMETER * BRICK_DIAMETER;
+  uint32_t idx = (
+    pos.x + 
+    pos.y * BRICK_DIAMETER +
+    pos.z * BRICK_DIAMETER * BRICK_DIAMETER
+  );
 
-  this->data[idx] = val;
-  // TODO: maybe only upload the single value that was changed?
-  //this->upload();
+  uint32_t word = idx / VOXEL_WORD_BITS;
+  uint32_t bit = idx % VOXEL_WORD_BITS;
+  uint32_t mask = (1 << bit);
+  
+  if (this->data == nullptr) {
+    this->createHostMemory();
+  }
+
+  this->data[word] |= mask;
 }
 
 void Brick::fillConst(uint32_t val) {
@@ -87,6 +97,26 @@ void Brick::fillConst(uint32_t val) {
     GL_RED_INTEGER,
     GL_UNSIGNED_INT,
     &val
+  );
+  gl_error();
+  //this->full = true;
+}
+
+void Brick::upload() {
+  if (memory_index == 0xFFFFFFFF || this->data == nullptr) {
+    return;
+  }
+
+  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+  BrickMemory::instance()->ssbo->bind();
+ 
+  uint32_t size = BRICK_VOXEL_BYTES;
+  uint64_t offset = this->memory_index * size;
+  glBufferSubData(
+    GL_SHADER_STORAGE_BUFFER,
+    offset,
+    size,
+    &this->data
   );
   gl_error();
   //this->full = true;
