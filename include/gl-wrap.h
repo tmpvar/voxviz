@@ -29,7 +29,7 @@
 using namespace std;
 
 #ifndef DISABLE_GL_ERROR
-  #define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); exit(1);}
+  #define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); DebugBreak(); exit(1);}
 #else
   #define gl_error() do {} while(0)
 #endif
@@ -627,6 +627,7 @@ public:
 
 
   Program *compute(glm::uvec3 dims) {
+    this->use();
     if (!this->valid) {
       return this;
     }

@@ -215,7 +215,7 @@ void main() {
     // FIXME: we get ~1ms back if this is enabled, but lose the ability to
     //        compute good face normals. There is likely a better mechanism
     //        for increasing marching speed at further distances (cone marching?)
-    // t += max(0.1,t/1024);
+    //t += max(0.1,t/1024);
     prevP = deltas;
     p = eye + d * t;
   }

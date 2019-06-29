@@ -439,10 +439,14 @@ int main(void) {
 
     if (!shaderLogs.empty()) {
       ImGui::SetNextWindowPos(ImVec2(20, windowDimensions[1] / 2 + 20));
+      ImGui::SetNextWindowSize(ImVec2(300, windowDimensions[1] / 2 + 20));
     }
     else {
       ImGui::SetNextWindowPos(ImVec2(20, 20));
+      ImGui::SetNextWindowSize(ImVec2(300, windowDimensions[1] - 40));
     }
+
+    
     ImGui::Begin("stats");
 
     double nowTime = glfwGetTime();
@@ -643,7 +647,8 @@ int main(void) {
     }
 
     // Light space
-    {
+    { 
+      glm::uvec3 dims = voxelSpaceDims + glm::uvec3(2);
       // this appears to be .1ms faster on my 1080ti
       lightSpaceClear_Compute
         ->use()
@@ -664,8 +669,135 @@ int main(void) {
         ->uniform1ui("time", time)
         ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(10.0))
         ->uniformVec3("lightColor", glm::vec3(1.0))
-        ->uniformFloat("samples", samples)
-        ->timedCompute("lightspace: fill", glm::uvec3(samples, samples, 6));
+        ->uniformFloat("samples", samples);
+
+      // axis is specified as x=0, y=1, z=2
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 0)
+        ->uniform1ui("start", 0)
+        ->timedCompute("lightspace: fill -X", glm::uvec3(
+          dims.y,
+          dims.z,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 0)
+        ->uniform1ui("start", 1)
+        ->timedCompute("lightspace: fill +X", glm::uvec3(
+          dims.y,
+          dims.z,
+          1
+        ));
+      
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 1)
+        ->uniform1ui("start", 0)
+        ->timedCompute("lightspace: fill -Y", glm::uvec3(
+          dims.x,
+          dims.z,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 1)
+        ->uniform1ui("start", 1)
+        ->timedCompute("lightspace: fill +Y", glm::uvec3(
+          dims.x,
+          dims.z,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 2)
+        ->uniform1ui("start", 0)
+        ->timedCompute("lightspace: fill -Z", glm::uvec3(
+          dims.x,
+          dims.y,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 2)
+        ->uniform1ui("start", 1)
+        ->timedCompute("lightspace: fill +Z", glm::uvec3(
+          dims.x,
+          dims.y,
+          1
+        ));
+
+
+
+      lightSpaceFill_Compute
+        ->use()
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+        ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+
+        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+        ->uniformVec3("lightSlabDims", voxelSpaceDims)
+
+        ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+        ->uniform1ui("time", time)
+        ->uniformVec3("lightPos", glm::vec3(10, 50, 30))
+        ->uniformVec3("lightColor", glm::vec3(1.0, 0.0, 0.0))
+        ->uniformFloat("samples", samples);
+
+      // axis is specified as x=0, y=1, z=2
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 0)
+        ->uniform1ui("start", 0)
+        ->timedCompute("lightspace: fill -X", glm::uvec3(
+          dims.y,
+          dims.z,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 0)
+        ->uniform1ui("start", 1)
+        ->timedCompute("lightspace: fill +X", glm::uvec3(
+          dims.y,
+          dims.z,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 1)
+        ->uniform1ui("start", 0)
+        ->timedCompute("lightspace: fill -Y", glm::uvec3(
+          dims.x,
+          dims.z,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 1)
+        ->uniform1ui("start", 1)
+        ->timedCompute("lightspace: fill +Y", glm::uvec3(
+          dims.x,
+          dims.z,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 2)
+        ->uniform1ui("start", 0)
+        ->timedCompute("lightspace: fill -Z", glm::uvec3(
+          dims.x,
+          dims.y,
+          1
+        ));
+
+      lightSpaceFill_Compute
+        ->uniform1ui("axis", 2)
+        ->uniform1ui("start", 1)
+        ->timedCompute("lightspace: fill +Z", glm::uvec3(
+          dims.x,
+          dims.y,
+          1
+        ));
 
       // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
