@@ -1,12 +1,12 @@
 layout (std430) buffer volumeSlabBuffer {
-  uint8_t volumeSlab[];
+  uint volumeSlab[];
 };
 
 uniform vec3 volumeSlabDims;
 
 #include "mips.glsl"
 
-bool voxel_mip_get(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
+bool voxel_mip_get(in vec3 pos, const in uint mip, out uint palette_idx) {
   uvec3 p = uvec3(
     uint(pos.x) >> mip,
     uint(pos.y) >> mip,
@@ -33,5 +33,5 @@ bool voxel_mip_get(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
 
   palette_idx = volumeSlab[idx];
 
-  return palette_idx > uint8_t(0);
+  return palette_idx > 0;
 }

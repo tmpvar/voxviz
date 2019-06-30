@@ -1,6 +1,4 @@
 #version 430 core
-#extension GL_NV_gpu_shader5: enable
-#extension GL_ARB_bindless_texture : require
 
 #include "voxel-space.glsl"
 

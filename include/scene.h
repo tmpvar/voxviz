@@ -74,7 +74,7 @@ class VoxEntity : public Entity {
       }
     }
 
-    void paintInto(uint8_t *buf, glm::uvec3 bufDims) {
+    void paintInto(uint32_t *buf, glm::uvec3 bufDims) {
       glm::vec3 radius = this->obb->getRadius();
       glm::vec3 center = this->obb->getPosition();
       glm::uvec3 dims(radius * glm::vec3(2.0));

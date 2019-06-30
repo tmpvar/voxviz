@@ -17,7 +17,7 @@ uint default_palette[256] = {
 	0xff880000, 0xff770000, 0xff550000, 0xff440000, 0xff220000, 0xff110000, 0xffeeeeee, 0xffdddddd, 0xffbbbbbb, 0xffaaaaaa, 0xff888888, 0xff777777, 0xff555555, 0xff444444, 0xff222222, 0xff111111
 };
 
-vec3 palette_color(uint8_t idx) {
+vec3 palette_color(uint idx) {
   uint v = default_palette[idx];
   return vec3(
     float((v & 0xFF0000) >> 16) / 255.0,

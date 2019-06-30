@@ -18,20 +18,10 @@
 
   class Raytracer {
     public:
-    Program *program;
     int showHeat;
 
     Raytracer(int *dimensions) {
       this->showHeat = 0;
-     
-      this->program = new Program();
-      this->program
-          ->add(Shaders::get("raytrace.vert"))
-          ->add(Shaders::get("raytrace.frag"))
-          ->output("outColor")
-          ->link();
-
-      this->program->use();
     }
 
     ~Raytracer() {

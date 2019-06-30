@@ -259,7 +259,7 @@ int main(void) {
     total_voxel_slab_slots += a;
   }
 
-  SSBO *voxelSpaceSSBO = new SSBO(total_voxel_slab_slots /* 1 byte per voxel.. for now */);
+  SSBO *voxelSpaceSSBO = new SSBO(total_voxel_slab_slots * uint64_t(4));
 
   uint64_t total_light_slab_slots = total_voxel_slab_slots;
   SSBO *lightSpaceSSBO = new SSBO(total_light_slab_slots * uint64_t(16));
@@ -417,7 +417,7 @@ int main(void) {
       glm::uvec3(50, 64, 100)
     );
 
-    uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
+    uint32_t *buf = (uint32_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
 
     catModel->paintInto(buf, voxelSpaceDims);
     voxMonu1->paintInto(buf, voxelSpaceDims);
@@ -623,7 +623,7 @@ int main(void) {
 
       lastCharacterTime = time;
 
-      uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
+      uint32_t *buf = (uint32_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
       catModel->paintInto(buf, voxelSpaceDims);
       voxelSpaceSSBO->endMap();
       

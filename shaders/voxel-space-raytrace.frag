@@ -1,5 +1,5 @@
 #version 450 core
-#extension GL_NV_gpu_shader5: require
+
 #extension GL_ARB_bindless_texture : require
 
 #include "ray-aabb.glsl"
@@ -79,7 +79,7 @@ float trace_light(in DDACursor cursor) {
     new_ray_dir
   );
 
-  uint8_t noop;
+  uint noop;
   vec3 found_normal;
   for (int i=0; i<128; i++) {
     if (voxel_mip_get(c.mapPos, 1, noop)) {
@@ -116,7 +116,7 @@ float trace_sky(in DDACursor cursor) {
     new_ray_dir
   );
 
-  uint8_t noop;
+  uint noop;
   vec3 found_normal;
   for (int i=0; i<20; i++) {
     if (voxel_mip_get(c.mapPos, 1, noop)) {
@@ -150,7 +150,7 @@ vec3 trace_reflection(in DDACursor cursor) {
     new_ray_dir
   );
 
-  uint8_t noop;
+  uint noop;
   vec3 found_normal;
   for (int i=0; i<64; i++) {
     if (voxel_mip_get(c.mapPos, 1, noop)) {
@@ -168,7 +168,7 @@ vec3 trace_reflection(in DDACursor cursor) {
 // }
 //
 // vec4 voxel_ao(vec3 pos, vec3 d1, vec3 d2) {
-//   uint8_t noop;
+//   uint noop;
 // 	vec4 side = vec4(
 //     float(voxel_get(pos + d1, noop)),
 //     float(voxel_get(pos + d2, noop)),
@@ -219,7 +219,7 @@ void main() {
     );
     float bounced = 0.0;
     vec3 agg;
-    uint8_t palette_idx;
+    uint palette_idx;
 
     bool lighting = false;
     vec3 c = vec3(0.2);

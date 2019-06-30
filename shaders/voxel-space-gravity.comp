@@ -1,7 +1,7 @@
 #version 430 core
-#extension GL_NV_shader_buffer_load: enable
+
 #extension GL_ARB_compute_shader: enable
-#extension GL_NV_gpu_shader5: enable
+
 
 layout( local_size_x = 32, local_size_y = 1, local_size_z = 1 ) in;
 
@@ -26,19 +26,19 @@ layout (std430) buffer blueNoiseBuffer {
 //   uvec3 dest = src + dest_offset;
 //   uint dest_idx = (dest.x + dest.y * d.x + dest.z * d.x * d.y);// % max_index;
 //
-//   uint8_t src_value = volumeMip0[src_idx];
+//   uint src_value = volumeMip0[src_idx];
 //
-//   if (src_value != uint8_t(0)) {
-//     if (volumeMip0[dest_idx] == uint8_t(0)) {
+//   if (src_value != uint(0)) {
+//     if (volumeMip0[dest_idx] == uint(0)) {
 //       volumeMip0[dest_idx] = src_value;
-//       volumeMip0[src_idx] = uint8_t(0);
+//       volumeMip0[src_idx] = uint(0);
 //       return true;
 //     }
 //   }
 //   return false;
 // }
 //
-// uint8_t get(uvec3 pos) {
+// uint get(uvec3 pos) {
 //   uvec3 d = uvec3(dims);
 //   uint idx = (pos.x + pos.y * d.x + pos.z * d.x * d.y);// % max_index;
 //
@@ -53,14 +53,14 @@ layout (std430) buffer blueNoiseBuffer {
 //     return;
 //   }
 //
-//   const uint8_t zero = uint8_t(0);
+//   const uint zero = uint(0);
 //   bool moved = false;
 //   uint y = 1;
 //   for (y; y<dims.y; y++) {
 //     uvec3 current_pos = uvec3(last_pos.x, y, last_pos.z);
 //     bool lmoved = move(current_pos, ivec3(0, -1, 0), false);
 //
-//     if (get(current_pos) <= uint8_t(16)) {
+//     if (get(current_pos) <= uint(16)) {
 //       lmoved = move(current_pos, ivec3( 0, -1,  1), lmoved);
 //       lmoved = move(current_pos, ivec3( 0, -1, -1), lmoved);
 //       lmoved = move(current_pos, ivec3( 1, -1,  0), lmoved);
@@ -81,9 +81,9 @@ layout (std430) buffer blueNoiseBuffer {
 //     vec2 uv = last_pos.xz / d.xz;
 //     vec2 bn = 2.0 * blueNoise[time + (last_pos.z * last_pos.x % 4096) * (time % 64)].xy - 0.5;
 //
-//     volumeMip0[dest_idx] = uint8_t(
+//     volumeMip0[dest_idx] = uint(
 //        //dest_idx % 200 + 2
-//       length(bn) < 0.2515  ? uint8_t(16) : volumeMip0[dest_idx]
+//       length(bn) < 0.2515  ? uint(16) : volumeMip0[dest_idx]
 //     );
 //   }
 // }

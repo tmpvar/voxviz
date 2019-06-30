@@ -1,7 +1,7 @@
 #version 430 core
-#extension GL_NV_shader_buffer_load: enable
+
 #extension GL_ARB_compute_shader: enable
-#extension GL_NV_gpu_shader5: enable
+
 
 layout( local_size_x = 32 , local_size_y = 16, local_size_z = 1 ) in;
 
@@ -129,7 +129,7 @@ void main() {
   }
 
 
-  uint8_t palette_idx;
+  uint palette_idx;
   vec3 c = vec3(0.0);
   int i;
 
