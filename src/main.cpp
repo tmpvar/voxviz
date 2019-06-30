@@ -182,7 +182,10 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera(
-    glm::vec3(10, 40, 30)
+    glm::vec3(100, 100, -200),
+	glm::vec3(0.0, 1.0, 0.0),
+	90.0,
+	0.0
   );
 
   unsigned int time = 0;
@@ -299,6 +302,13 @@ int main(void) {
   Program *lightSpaceFill_Compute = new Program();
   lightSpaceFill_Compute->add(Shaders::get("light-space-fill.comp"))->link();
 
+  Program *lightSpaceBlurUp_Compute = new Program();
+  lightSpaceBlurUp_Compute->add(Shaders::get("light-space-blur-up.comp"))->link();
+
+  Program *lightSpaceBlurDown_Compute = new Program();
+  lightSpaceBlurDown_Compute->add(Shaders::get("light-space-blur-down.comp"))->link();
+
+
   Program *mipmapLightSpace = new Program();
   mipmapLightSpace->add(Shaders::get("light-space-mipmap.comp"))->link();
 
@@ -354,7 +364,7 @@ int main(void) {
   {
     catModel = new VoxEntity(
       "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
-      glm::vec3(10.0, 10.0, 10.0)
+      glm::vec3(200.0, 50.0, 10.0)
     );
 
     VoxEntity *voxMonu1 = new VoxEntity(
@@ -648,158 +658,194 @@ int main(void) {
 
     // Light space
     { 
-      glm::uvec3 dims = voxelSpaceDims + glm::uvec3(2);
-      // this appears to be .1ms faster on my 1080ti
-      lightSpaceClear_Compute
-        ->use()
-        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
-        ->uniformVec3("lightSlabDims", voxelSpaceDims)
-        ->timedCompute("lightspace: clear", glm::uvec3(total_light_slab_slots, 1, 1));
+	  {
+		glm::uvec3 dims = voxelSpaceDims / glm::uvec3(2) + glm::uvec3(2);
+		// this appears to be .1ms faster on my 1080ti
+		lightSpaceClear_Compute
+		  ->use()
+		  ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+		  ->uniformVec3("lightSlabDims", voxelSpaceDims)
+		  ->timedCompute("lightspace: clear", glm::uvec3(total_light_slab_slots, 1, 1));
 
-      float samples = 256;
-      lightSpaceFill_Compute
-        ->use()
-        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
-        ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+		float samples = 256;
+		lightSpaceFill_Compute
+		  ->use()
+		  ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+		  ->uniformVec3("volumeSlabDims", voxelSpaceDims)
 
-        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
-        ->uniformVec3("lightSlabDims", voxelSpaceDims)
+		  ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+		  ->uniformVec3("lightSlabDims", voxelSpaceDims)
 
-        ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
-        ->uniform1ui("time", time)
-        ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(10.0))
-        ->uniformVec3("lightColor", glm::vec3(1.0))
-        ->uniformFloat("samples", samples);
+		  ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+		  ->uniform1ui("time", time)
+		  ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(10.0))
+		  ->uniformVec3("lightColor", glm::vec3(1.0))
+		  ->uniformFloat("samples", samples);
 
-      // axis is specified as x=0, y=1, z=2
+		// axis is specified as x=0, y=1, z=2
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 0)
-        ->uniform1ui("start", 0)
-        ->timedCompute("lightspace: fill -X", glm::uvec3(
-          dims.y,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 0)
+		  ->uniform1ui("start", 0)
+		  ->timedCompute("lightspace: fill -X", glm::uvec3(
+			dims.y,
+			dims.z,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 0)
-        ->uniform1ui("start", 1)
-        ->timedCompute("lightspace: fill +X", glm::uvec3(
-          dims.y,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 0)
+		  ->uniform1ui("start", 1)
+		  ->timedCompute("lightspace: fill +X", glm::uvec3(
+			dims.y,
+			dims.z,
+			1
+		  ));
       
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 1)
-        ->uniform1ui("start", 0)
-        ->timedCompute("lightspace: fill -Y", glm::uvec3(
-          dims.x,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 1)
+		  ->uniform1ui("start", 0)
+		  ->timedCompute("lightspace: fill -Y", glm::uvec3(
+			dims.x,
+			dims.z,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 1)
-        ->uniform1ui("start", 1)
-        ->timedCompute("lightspace: fill +Y", glm::uvec3(
-          dims.x,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 1)
+		  ->uniform1ui("start", 1)
+		  ->timedCompute("lightspace: fill +Y", glm::uvec3(
+			dims.x,
+			dims.z,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 2)
-        ->uniform1ui("start", 0)
-        ->timedCompute("lightspace: fill -Z", glm::uvec3(
-          dims.x,
-          dims.y,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 2)
+		  ->uniform1ui("start", 0)
+		  ->timedCompute("lightspace: fill -Z", glm::uvec3(
+			dims.x,
+			dims.y,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 2)
-        ->uniform1ui("start", 1)
-        ->timedCompute("lightspace: fill +Z", glm::uvec3(
-          dims.x,
-          dims.y,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 2)
+		  ->uniform1ui("start", 1)
+		  ->timedCompute("lightspace: fill +Z", glm::uvec3(
+			dims.x,
+			dims.y,
+			1
+		  ));
 
 
 
-      lightSpaceFill_Compute
-        ->use()
-        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
-        ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+		lightSpaceFill_Compute
+		  ->use()
+		  ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+		  ->uniformVec3("volumeSlabDims", voxelSpaceDims)
 
-        ->ssbo("lightSlabBuffer", lightSpaceSSBO)
-        ->uniformVec3("lightSlabDims", voxelSpaceDims)
+		  ->ssbo("lightSlabBuffer", lightSpaceSSBO)
+		  ->uniformVec3("lightSlabDims", voxelSpaceDims)
 
-        ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
-        ->uniform1ui("time", time)
-        ->uniformVec3("lightPos", glm::vec3(10, 50, 30))
-        ->uniformVec3("lightColor", glm::vec3(1.0, 0.0, 0.0))
-        ->uniformFloat("samples", samples);
+		  ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+		  ->uniform1ui("time", time)
+		  ->uniformVec3("lightPos", glm::vec3(10, 50, 30))
+		  ->uniformVec3("lightColor", glm::vec3(1.0, 0.0, 0.0))
+		  ->uniformFloat("samples", samples);
 
-      // axis is specified as x=0, y=1, z=2
+		// axis is specified as x=0, y=1, z=2
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 0)
-        ->uniform1ui("start", 0)
-        ->timedCompute("lightspace: fill -X", glm::uvec3(
-          dims.y,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 0)
+		  ->uniform1ui("start", 0)
+		  ->timedCompute("lightspace: fill -X", glm::uvec3(
+			dims.y,
+			dims.z,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 0)
-        ->uniform1ui("start", 1)
-        ->timedCompute("lightspace: fill +X", glm::uvec3(
-          dims.y,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 0)
+		  ->uniform1ui("start", 1)
+		  ->timedCompute("lightspace: fill +X", glm::uvec3(
+			dims.y,
+			dims.z,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 1)
-        ->uniform1ui("start", 0)
-        ->timedCompute("lightspace: fill -Y", glm::uvec3(
-          dims.x,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 1)
+		  ->uniform1ui("start", 0)
+		  ->timedCompute("lightspace: fill -Y", glm::uvec3(
+			dims.x,
+			dims.z,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 1)
-        ->uniform1ui("start", 1)
-        ->timedCompute("lightspace: fill +Y", glm::uvec3(
-          dims.x,
-          dims.z,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 1)
+		  ->uniform1ui("start", 1)
+		  ->timedCompute("lightspace: fill +Y", glm::uvec3(
+			dims.x,
+			dims.z,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 2)
-        ->uniform1ui("start", 0)
-        ->timedCompute("lightspace: fill -Z", glm::uvec3(
-          dims.x,
-          dims.y,
-          1
-        ));
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 2)
+		  ->uniform1ui("start", 0)
+		  ->timedCompute("lightspace: fill -Z", glm::uvec3(
+			dims.x,
+			dims.y,
+			1
+		  ));
 
-      lightSpaceFill_Compute
-        ->uniform1ui("axis", 2)
-        ->uniform1ui("start", 1)
-        ->timedCompute("lightspace: fill +Z", glm::uvec3(
-          dims.x,
-          dims.y,
-          1
-        ));
-
+		lightSpaceFill_Compute
+		  ->uniform1ui("axis", 2)
+		  ->uniform1ui("start", 1)
+		  ->timedCompute("lightspace: fill +Z", glm::uvec3(
+			dims.x,
+			dims.y,
+			1
+		  ));
+	  }
       // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+	  lightSpaceBlurUp_Compute
+		->use()
+		->ssbo("lightSlabBuffer", lightSpaceSSBO)
+		->uniformVec3("lightSlabDims", voxelSpaceDims);
+
+	  for (int mip = 1; mip < MAX_MIP_LEVELS; mip++) {
+		ostringstream mipDebug;
+		mipDebug << "lightspace: blur up " << mip;
+
+		glm::uvec3 mipDims = voxelSpaceDims / (glm::uvec3(1 << mip));
+
+		lightSpaceBlurUp_Compute
+		  ->uniform1ui("mipLevel", mip)
+		  ->timedCompute(mipDebug.str().c_str(), mipDims);
+	  }
+
+	  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+	  
+	  lightSpaceBlurDown_Compute
+		->use()
+		->ssbo("lightSlabBuffer", lightSpaceSSBO)
+		->uniformVec3("lightSlabDims", voxelSpaceDims);
+
+	  for (int mip = MAX_MIP_LEVELS - 1; mip >= 1; mip--) {
+		glm::uvec3 mipDims = voxelSpaceDims / (glm::uvec3(1 << mip));
+		ostringstream mipDebug;
+		mipDebug << "lightspace: blur down" << mip;
+
+		lightSpaceBlurDown_Compute
+		  ->uniform1ui("mipLevel", uint32_t(mip))
+		  ->timedCompute(mipDebug.str().c_str(), mipDims);
+	  }
+
+	  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
     

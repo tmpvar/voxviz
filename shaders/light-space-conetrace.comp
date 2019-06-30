@@ -33,7 +33,7 @@ float sum(vec3 v) { return dot(v, vec3(1.0)); }
 
 
 
-void main() {
+void main2() {
   uvec2 screen_pos = gl_GlobalInvocationID.xy;
   uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
   uint out_idx = screen_idx;// + terminationBufferIdx;
@@ -62,21 +62,63 @@ void main() {
     //
     acc /= 3;
   } else {
-    for (uint i=0; i<MAX_MIPS; i++) {
-      if (light_mip_get(p + o.normal.xyz, i, tmp)) {
-        if (tmp.a > 0.0) {
-          acc += tmp;// * (1.0 - float(i) / float(MAX_MIPS));
+    for (uint j = 0; j<2; j++) {
+      vec3 jitter = cdir(j * screen_idx, o.normal.xyz);
+      for (uint i=0; i<7; i++) {
+        if (light_mip_get(p + o.normal.xyz - jitter, i, tmp)) {
+          if (tmp.a > 0.0) {
+            acc += tmp * (1.0 - float(i) / float(MAX_MIPS));
+          }
         }
       }
     }
-    acc /= MAX_MIPS;
+    acc /= (MAX_MIPS);
   }
 
   out_termination[out_idx].color = o.color.rgba * (acc);//vec4(o.color.rgb * (acc.rgb * acc.a), 1.0);
 }
 
+void main3() {
+  uvec2 screen_pos = gl_GlobalInvocationID.xy;
+  uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
+  uint out_idx = screen_idx;// + terminationBufferIdx;
 
-void main2() {
+  RayTermination o = out_termination[out_idx];
+
+  if (all(equal(o.position, vec4(-1.0)))) {
+    return;
+  }
+  vec4 acc = vec4(0.0);
+  vec4 tmp;
+  float t = 0.1;
+  float mip = 0.0;
+  int steps = 5;
+  int rays = 4;
+  vec3 n = o.normal.xyz;
+  uint8_t occlusion;
+
+  for (int r=0; r<rays; r++) {
+    vec3 jitter = cdir(screen_idx * r, n);
+    vec3 jitter2 = cdir(screen_idx * r * 2, n);
+    vec3 p = o.position.xyz + jitter * t;
+    float intensity = 1.0;
+
+    for (uint i=0; i<steps && intensity > 0.0; i++) {
+      if (voxel_mip_get(p, uint(mip), occlusion)) {
+        intensity -= float(occlusion)/255.0;
+      }
+      if (light_mip_get(p, uint(mip), tmp)) {
+        acc += tmp * (1.0 - mip/MAX_MIPS) * intensity;
+      }
+      t = float(i) / float(rays);
+      mip = 2 * float(i)/float(steps);
+    }
+  }
+  acc /= float(rays);
+  out_termination[out_idx].color = o.color.rgba * acc * acc.a;//vec4(o.color.rgb * (acc.rgb * acc.a), 1.0);
+}
+
+void main() {
   uvec2 screen_pos = gl_GlobalInvocationID.xy;
   uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
   uint out_idx = screen_idx;// + terminationBufferIdx;
@@ -91,22 +133,12 @@ void main2() {
   vec4 tmp;
   for (uint i=0; i<MAX_MIPS; i++) {
     if (light_mip_get(o.position.xyz, i, tmp)) {
-      acc += tmp;// * (1.0 - float(i) / float(4));
-      //acc = vec4(hsl(vec3((float(i)/float(MAX_MIPS)), 0.9, 0.5)), 1.0 - float(i)/float(MAX_MIPS+1));
-      break;
-    }
+       acc += tmp * (1.0 - float(i) / MAX_MIPS);
+     }
   }
-
-  // if (light_mip_get(o.position.xyz, 0, tmp)) {
-  //   acc = tmp;// * (1.0 - float(i) / float(MAX_MIPS));
-  //
-  //   //vec3 o = hsl(vec3(0.7 - (float(i)/float(MAX_MIPS) * 0.9), 0.9, 0.5));
-  //
-  //   out_termination[out_idx].color = vec4(o.color.rgb * (vec3(0.0, 1.0, 0.0) * acc.a), 1.0);;
-  //   //break;
-  // } else {
-    out_termination[out_idx].color = o.color.rgba * acc * acc.a;//vec4(o.color.rgb * (acc.rgb * acc.a), 1.0);
-  // }
+  acc /= 8;
+  // light_mip_get(o.position.xyz, 1, acc);
+  out_termination[out_idx].color = o.color.rgba * acc * acc.a;//vec4(o.color.rgb * (acc.rgb * acc.a), 1.0);
 }
 
 void main1() {
@@ -139,7 +171,7 @@ void main1() {
       float(time) * length(o.position)
     ),
     normal
-  );
+  ) * 0.1;
 
   vec3 dir = normalize(normal + cd);
   float i = 0;
@@ -155,11 +187,11 @@ void main1() {
       break;
     }
 
-    for (uint i=0; i<MAX_MIPS; i++) {
-      if (light_mip_get(p, i, tmp)) {
-        acc += tmp * (1.0 - float(i) / float(MAX_MIPS)) * intensity;
-      }
-    }
+    // for (uint i=0; i<MAX_MIPS; i++) {
+    //   if (light_mip_get(p, i, tmp)) {
+    //     acc += tmp * (1.0 - float(i) / float(MAX_MIPS)) * intensity;
+    //   }
+    // }
 
 
     uint mipLevel = max(1, uint(t * 0.15));

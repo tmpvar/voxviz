@@ -1,0 +1,36 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 64, local_size_y = 4, local_size_z = 1 ) in;
+
+uniform uint mipLevel;
+
+#include "light-space-mips.glsl"
+
+void main() {
+  uint upperMip = mipLevel + 1;
+  // lower mip cell size
+  float cellSize = (float(1<<(mipLevel)));
+
+  // get the world space position
+  vec3 pos = gl_GlobalInvocationID.xyz * cellSize;
+
+
+  if (any(greaterThanEqual(pos, lightSlabDims))) {
+    return;
+  }
+
+  vec4 acc = vec4(0.0);
+  vec4 tmp;
+
+  light_mip_get(pos, upperMip, tmp);
+  acc += tmp;
+  light_mip_get(pos, mipLevel, tmp);
+  acc += tmp;
+
+
+
+  light_mip_set(pos, mipLevel, acc / 2.0);
+}

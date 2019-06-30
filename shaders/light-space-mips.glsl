@@ -19,6 +19,7 @@ bool light_mip_get(in vec3 pos, const in uint mip, out vec4 color) {
   );
 
   if (any(greaterThanEqual(p, d))) {
+    color = vec4(0.0);
     return false;
   }
 

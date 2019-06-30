@@ -72,7 +72,7 @@ void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
   float intensity = 1.0;
 
   uint mip = MAX_MIPS;
-  uint minMip = 1;
+  uint minMip = 0;
   uint maxMip = MAX_MIPS;
 
   float dt = 1.0 / length(volumeSlabDims);
@@ -93,22 +93,23 @@ void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
     vec4 pcolor = vec4(0.0);
     // light_mip_get(p, mip, pcolor);
     // light_mip_set(p, mip, (vec4(lightColor, 1.0) + pcolor) / 2.0);
-
+    //
 
     if (voxel_mip_get(p, mip, occlusion)) {
 
       if (mip == minMip) {
-        for (uint i=0; i<MAX_MIPS; i++) {
-          light_mip_get(p, i, pcolor);
-          //pcolor *= (1.0 - float(i) / float(MAX_MIPS));
-          light_mip_set(p, i, (vec4(lightColor, 1.0) + pcolor) / 2.0);
-        }
+        // for (uint i=0; i<MAX_MIPS; i++) {
+        //   light_mip_get(p, i, pcolor);
+        //   pcolor *= (1.0 - float(i) / float(MAX_MIPS));
+        //   light_mip_set(p, i, (vec4(lightColor, 1.0) + pcolor) / 2.0);
+        // }
         // vec3 pp = prevP + dir * 0.1;
         // light_mip_get(pp, mip, pcolor);
         // light_mip_set(pp, mip, (vec4(lightColor, 1.0) + pcolor) / 2.0);
         //
-        light_mip_get(p, mip, pcolor);
+        //light_mip_get(p, mip, pcolor);
         light_mip_set(p, mip, (vec4(lightColor, 1.0) + pcolor) / 2.0);
+        light_mip_set(p, mip, vec4(lightColor, 1.0));
         return;
       } else {
         intensity *= float(occlusion) / 255.0;
@@ -136,7 +137,7 @@ void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
 }
 
 void main() {
-  uvec2 o  = gl_GlobalInvocationID.xy - 1;
+  uvec2 o  = gl_GlobalInvocationID.xy * 2 - 1;
 
   vec3 pos;
   switch (axis) {
@@ -151,10 +152,12 @@ void main() {
   pos += (start == 0) ? 0.5 : -0.5;
 
   if (false) {
-    for (uint i=0; i<4; i++) {
-      target = lightPos + sampleBlueNoise(o.x * o.y * i * (axis + 1) + start) * 3.0;
+    for (uint i=0; i<5; i++) {
       vec3 p = pos;
+
+      target = lightPos + cdir(o.x * o.y * i * (axis + 1) + start, dir) * 2.0;
       dir = normalize(p - target);
+
       fillDirectionEmptySpaceSkip(target, dir);
     }
   } else {
