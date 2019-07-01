@@ -24,6 +24,8 @@ add_subdirectory(deps/libuv)
 
 SET(qu3e_build_demo OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/qu3e)
+
+set(ENABLE_HLSL OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glslang)
 
 add_subdirectory(shaders)
