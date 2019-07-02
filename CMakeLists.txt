@@ -91,7 +91,7 @@ add_executable(
 	deps/stb/stb_image.h
 )
 
-add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
+add_compile_definitions(STB_IMAGE_IMPLEMENTATION NOMINMAX=1)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT voxviz)
 
 source_group("shaders" FILES ${SHADER_FILES})
@@ -104,7 +104,8 @@ target_link_libraries(
   uv_a
 	qu3e
   ${OPENGL_gl_LIBRARY}
-  ${OPENCL_LIBRARIES}
+	glslang
+	glslang-default-resource-limits
  )
 
 file(COPY img DESTINATION ${CMAKE_BINARY_DIR})
