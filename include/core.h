@@ -1,6 +1,7 @@
 #ifndef __CORE_H
 #define __CORE_H
 
+// Production toggles to improve perf
 //#define DISABLE_DEBUG_GL_TIMED_COMPUTE
 //#define DISABLE_GL_ERROR
 
@@ -19,9 +20,11 @@
 
 #define RENDER_STATIC 1
 #define SHADER_HOTRELOAD 1
-//#define RENDER_DYNAMIC 1
 
-//#define FULLSCREEN
+
+#define TAA_HISTORY_LENGTH 16
+#define MAX_MIP_LEVELS 7
+
 
 #ifdef GPU_HOST
   #include <glm/glm.hpp>
@@ -34,5 +37,13 @@ struct Light {
   vec4 color;
 };
 
+struct RayTermination {
+  vec4 position;
+  vec4 normal;
+  vec4 color;
+  vec4 rayDir;
+  uvec4 index;
+  vec4 light;
+};
+
 #endif
-  

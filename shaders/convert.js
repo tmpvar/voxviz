@@ -50,7 +50,6 @@ if (argv.w) {
   })
 }
 
-
 function outputLine(line) {
   if (Array.isArray(line)) {
     const r = line.map(outputLine).join('\n')

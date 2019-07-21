@@ -1,9 +1,4 @@
-struct RayTermination {
-  vec4 position;
-  vec4 normal;
-  vec4 color;
-  vec4 rayDir;
-};
+#include "../include/core.h"
 
 float mincomp(vec3 v) {
   return min(v.x, min(v.y, v.z));

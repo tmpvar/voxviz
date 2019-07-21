@@ -22,6 +22,6 @@ void main() {
   // );
   uint color_idx = color_pos.x + color_pos.y * resolution.x;
   outColor = in_color[color_idx];
-  //outColor = in_termination[color_idx].color;
+  outColor = in_termination[color_idx].color;
   //outColor = vec4(gl_FragCoord.xy / vec2(resolution), 0.0, 0.0);
 }

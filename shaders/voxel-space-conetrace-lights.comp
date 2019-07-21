@@ -194,7 +194,7 @@ struct RayHit {
 float sum(vec3 v) { return dot(v, vec3(1.0)); }
 
 void main() {
-  uvec2 screen_pos = gl_GlobalInvocationID.xy * 2;
+  uvec2 screen_pos = gl_GlobalInvocationID.xy ;
   uint screen_idx = screen_pos.x + screen_pos.y * resolution.x;
   uint out_idx = screen_idx;// + terminationBufferIdx;
 
@@ -213,7 +213,7 @@ void main() {
     return;
   }
 
-  vec4 voxelColor = vec4(0.0);//o.color;
+  vec4 voxelColor = o.color;
   float intensity = 0.0;
   for (int i=0; i<lightCount; i++) {
     Light light = lights[i];
