@@ -22,5 +22,17 @@
 //#define RENDER_DYNAMIC 1
 
 //#define FULLSCREEN
+
+#ifdef GPU_HOST
+  #include <glm/glm.hpp>
+  using namespace glm;
+#endif
+
+
+struct Light {
+  vec4 position;
+  vec4 color;
+};
+
 #endif
   

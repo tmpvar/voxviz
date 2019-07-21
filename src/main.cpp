@@ -47,10 +47,6 @@ SSBO *raytraceOutput = nullptr;
 #define RAY_TERMINATION_BYTES 64
 #define MAX_MIP_LEVELS 7
 SSBO *terminationOutput = nullptr;
-typedef struct Light {
-  glm::vec4 position;
-  glm::vec4 color;
-};
 
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -266,7 +262,7 @@ int main(void) {
   
   #define MAX_LIGHTS 4
   SSBO *lightBuffer = new SSBO(
-    16 * MAX_LIGHTS // light position + color,intensity
+    sizeof(Light) * MAX_LIGHTS // light position + color,intensity
   );
 
   Program *fillVoxelSpace = new Program();
