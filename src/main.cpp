@@ -43,9 +43,6 @@ glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 FBO *fbo = nullptr;
 
 SSBO *raytraceOutput = nullptr;
-#define TAA_HISTORY_LENGTH 16
-
-#define MAX_MIP_LEVELS 7
 SSBO *terminationOutput = nullptr;
 
 
@@ -321,7 +318,7 @@ int main(void) {
   raytraceOutput = new SSBO(outputBytes);
   uint64_t terminationBytes =
     static_cast<uint64_t>(windowDimensions[0]) *
-    static_cast<uint64_t>(windowDimensions[1]) * RAY_TERMINATION_BYTES;
+    static_cast<uint64_t>(windowDimensions[1]) * sizeof(RayTermination);
 
   #define TAA_HISTORY_LENGTH 1
   terminationOutput = new SSBO(terminationBytes * static_cast<uint64_t>(TAA_HISTORY_LENGTH));
