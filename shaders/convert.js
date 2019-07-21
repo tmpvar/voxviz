@@ -59,6 +59,28 @@ function outputLine(line) {
   return (" ").repeat(8) + '"' + line.replace(/"/g,'\\"') + '\\n"'
 }
 
+function filterLines(lines) {
+  let inHost = false
+  return lines.filter((l) => {
+    var ret = true;
+
+    if (l.match(/#ifdef\W+GPU_HOST/)) {
+      inHost = true;
+    }
+
+    if (inHost) {
+      console.log("SKIP: %s", l)
+      ret = false;
+    }
+
+    if (l.indexOf("#endif") > -1) {
+      inHost = false;
+    }
+
+    return ret
+  })
+}
+
 function processFile(file) {
   const outFile = path.join(outBase, path.basename(file))
   dependencyMap[file] = []
@@ -150,6 +172,7 @@ static void on_change(uv_fs_event_t *handle, const char *path, int events, int s
 fs.writeFileSync(path.join(outBase, 'built.h'), s + '\n')
 
 function processIncludes(file, deps, lines) {
+  lines =  filterLines(lines)
   let out = []
   const baseDir = path.dirname(file)
   lines.unshift(`// start: ${path.basename(file)}`)
