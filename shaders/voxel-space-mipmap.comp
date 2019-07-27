@@ -3,18 +3,13 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-layout( local_size_x = 64, local_size_y = 4, local_size_z = 1 ) in;
-
-layout (std430) buffer volumeSlabBuffer {
-  uint8_t volumeSlab[];
-};
-uniform vec3 volumeSlabDims;
+layout( local_size_x = 8, local_size_y = 4, local_size_z = 1 ) in;
 
 uniform uvec3 mipDims;
 uniform uvec3 lowerMipDims;
 uniform uint mipLevel;
 
-#include "mips.glsl"
+#include "voxel-space-mips.glsl"
 
 uint read(uvec3 pos, uint offset) {
   uvec3 p = pos << 1;
@@ -29,6 +24,10 @@ uint read(uvec3 pos, uint offset) {
     p.z * lowerMipDims.x * lowerMipDims.y
   );
 
+  if (mipLevel > 1) {
+    idx = offset + EncodeMorton3(p);
+  }
+
   return uint(volumeSlab[idx]) > 0 ? 1 : 0;
 }
 
@@ -42,6 +41,9 @@ void write(uvec3 p, uint val) {
     p.y * mipDims.x +
     p.z * mipDims.x * mipDims.y
   );
+  if (mipLevel > 0) {
+    idx = offset + EncodeMorton3(p);
+  }
 
   volumeSlab[idx] = uint8_t(val);
 }

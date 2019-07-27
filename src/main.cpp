@@ -239,7 +239,7 @@ int main(void) {
   GLFWgamepadstate state;
 
   // Voxel space
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 256, 128);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 128, 1024);
 
   uint64_t voxelSpaceBytes =
     static_cast<uint64_t>(voxelSpaceDims.x) *
@@ -628,7 +628,7 @@ int main(void) {
     }
 
     // Generate mipmaps
-    if (true) {
+    if (time == 0) {
       double mipStart = glfwGetTime();
       // Generate mipmap for SSBO
       for (unsigned int i = 1; i <= MAX_MIP_LEVELS; i++) {
@@ -645,6 +645,7 @@ int main(void) {
           ->uniformVec3ui("mipDims", mipDims)
           ->uniformVec3ui("lowerMipDims", lowerMipDims)
           ->uniform1ui("mipLevel", i)
+          ->uniform1ui("lowerMipLevel", i-1)
           ->timedCompute(mipDebug.str().c_str(), mipDims);
         gl_error();
         // disable glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
