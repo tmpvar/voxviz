@@ -123,7 +123,7 @@ public:
 
     GLint isCompiled = 0;
     glGetShaderiv(new_handle, GL_COMPILE_STATUS, &isCompiled);
-    
+
     if (!isCompiled) {
       GLint l, m;
       glGetShaderiv(new_handle, GL_INFO_LOG_LENGTH, &m);
@@ -173,7 +173,7 @@ public:
 
   SSBO *resize(uint64_t bytes) {
     std::cout << "creating SSBO with " << bytes << " bytes" << endl;
-    
+
     if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
     }
@@ -182,11 +182,11 @@ public:
       return this;
     }
 
-    
+
 
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_DRAW); gl_error();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_COPY); gl_error();
     this->unbind();
 
     this->total_bytes = bytes;
@@ -294,7 +294,7 @@ public:
         std::cout << "resourceIndex returned invalid enum for: " << name << std::endl;
         return ret;
       }
-      
+
       if (ret == GL_INVALID_INDEX) {
         std::cout << "resourceIndex returned invalid index for: " << name << std::endl;
         return ret;
@@ -355,7 +355,7 @@ public:
     this->outputs.clear();
     this->uniforms.clear();
     this->ssbos.clear();
-    
+
     this->handle = glCreateProgram();
     this->compositeName = "";
     this->valid = true;
@@ -616,7 +616,7 @@ public:
     else {
       idx = this->ssbos[name];
     }
-  
+
     GLuint ssbo_handle = ssbo->bind();
     if (ssbo_handle != 0) {
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, idx, ssbo_handle); gl_error();

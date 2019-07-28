@@ -66,6 +66,7 @@ add_executable(
 	include/blue-noise.h
 	include/scene.h
 	include/obb.h
+  include/splats.h
 
   include/parser/vzd/vzd.h
   include/parser/magicavoxel/vox.h

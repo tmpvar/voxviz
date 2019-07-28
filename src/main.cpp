@@ -155,7 +155,7 @@ int main(void) {
     GLuint unusedIds = 0;
     glDebugMessageControl(GL_DONT_CARE,
       GL_DONT_CARE,
-      GL_DONT_CARE,
+      GL_DEBUG_SEVERITY_MEDIUM,
       0,
       &unusedIds,
       true);
@@ -284,6 +284,14 @@ int main(void) {
 
   Program *raytraceVoxelSpace_Blur = new Program();
   raytraceVoxelSpace_Blur->add(Shaders::get("voxel-space-blur.comp"))->link();
+
+  // Splats
+  Program *splatsGenerateIndirect = new Program();
+  splatsGenerateIndirect->add(Shaders::get("splats-generate-indirect.comp"))->link();
+
+  SSBO *splatIndirectBuffer = new SSBO(sizeof(DrawArraysIndirectCommand));
+  SSBO *splatInstanceBuffer = new SSBO(sizeof(Splat) * SPLATS_MAX);
+  SSBO *splatBucketsBuffer = new SSBO(sizeof(SplatBucket) * SPLAT_BUCKETS);
 
   //Program *gravityVoxelSpace = new Program();
   //gravityVoxelSpace->add(Shaders::get("voxel-space-gravity.comp"))->link();
@@ -844,7 +852,6 @@ int main(void) {
 	  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
-
     // Raytrace in compute
     if (true) {
       // Raytrace into `raytraceOutput`
@@ -938,6 +945,27 @@ int main(void) {
 
         fullscreen_surface->render(debugBindless);
       }
+    }
+
+    // Splatting
+    if (true) {
+      void *clear = splatIndirectBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
+      memset(clear, 0, sizeof(DrawArraysIndirectCommand));
+      splatIndirectBuffer->endMap();
+
+      splatsGenerateIndirect
+        ->use()
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+        ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+        ->ssbo("splatIndirectCommandBuffer", splatIndirectBuffer)
+        ->ssbo("splatInstanceBuffer", splatInstanceBuffer)
+        ->ssbo("splatBucketBuffer", splatBucketsBuffer)
+        ->timedCompute("splats: extraction", glm::uvec3(256));
+      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+      DrawArraysIndirectCommand *c = (DrawArraysIndirectCommand *)splatIndirectBuffer->beginMap(SSBO::MAP_READ_ONLY);
+      ImGui::Text("splats: total %i", c->primCount);
+      splatIndirectBuffer->endMap();
     }
 
     {

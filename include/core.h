@@ -21,13 +21,13 @@
 #define RENDER_STATIC 1
 #define SHADER_HOTRELOAD 1
 
-
 #define TAA_HISTORY_LENGTH 16
 #define MAX_MIP_LEVELS 7
 
 
 #ifdef GPU_HOST
   #include <glm/glm.hpp>
+  #include <stdint.h>
   using namespace glm;
 #endif
 
@@ -44,6 +44,27 @@ struct RayTermination {
   vec4 rayDir;
   uvec4 index;
   vec4 light;
+};
+
+struct Splat {
+  vec4 position;
+  vec4 color;
+};
+
+struct SplatBucket {
+  uint loc;
+  Splat splats[256];
+};
+
+#define SPLATS_MAX 1 << 24 // ~16M
+#define SPLAT_BUCKET_SIZE_SHIFT 8
+#define SPLAT_BUCKETS SPLATS_MAX >> SPLAT_BUCKET_SIZE_SHIFT // ~65k buckets
+
+struct DrawArraysIndirectCommand {
+  uint32_t count;
+  uint32_t primCount;
+  uint32_t first;
+  uint32_t baseInstance;
 };
 
 #endif
