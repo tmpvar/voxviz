@@ -24,5 +24,5 @@ void main() {
     pos.z * volumeSlabDims.x * volumeSlabDims.y
   );
 
-  volume[idx] = (pos.y < 40 || pos.z > volumeSlabDims.z - 5) ?  uint8_t(1) : uint8_t(0);
+  volume[idx] = (pos.y < 40 || pos.z > volumeSlabDims.z - 50) ?  uint8_t(1) : uint8_t(0);
 }

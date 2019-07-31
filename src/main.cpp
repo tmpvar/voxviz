@@ -40,6 +40,7 @@ bool yes = true;
 // int windowDimensions[2] = { 1024, 768 };
 int windowDimensions[2] = { 1440, 900 };
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
+const float fov = 45.0f;
 FBO *fbo = nullptr;
 
 SSBO *raytraceOutput = nullptr;
@@ -77,7 +78,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   // When reshape is called, update the view and projection matricies since this means the view orientation or size changed
 
   perspectiveMatrix = glm::perspective(
-    45.0f,
+    fov,
     window_aspect(window, &width, &height),
     0.1f,
     10000.0f
@@ -197,6 +198,14 @@ int main(void) {
     ->output("outColor")
     ->link();
 
+  Program *splat_debug_program = new Program();
+  splat_debug_program
+    ->add(Shaders::get("splat-debug.vert"))
+    ->add(Shaders::get("splat-debug.frag"))
+    ->output("outColor")
+    ->link();
+
+
   { // query up the workgroups
     int work_grp_size[3], work_grp_inv;
     // maximum global work group (total work in a dispatch)
@@ -289,6 +298,8 @@ int main(void) {
   Program *splatsGenerateIndirect = new Program();
   splatsGenerateIndirect->add(Shaders::get("splats-generate-indirect.comp"))->link();
 
+
+  SSBO *splatScratchBuffer = new SSBO(voxelSpaceBytes >> 3);
   SSBO *splatIndirectBuffer = new SSBO(sizeof(DrawArraysIndirectCommand));
   SSBO *splatInstanceBuffer = new SSBO(sizeof(Splat) * SPLATS_MAX);
   SSBO *splatBucketsBuffer = new SSBO(sizeof(SplatBucket) * SPLAT_BUCKETS);
@@ -479,11 +490,11 @@ int main(void) {
       }
 
       if (keys[GLFW_KEY_D]) {
-        camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
+        camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
       }
 
       if (keys[GLFW_KEY_A]) {
-        camera->ProcessKeyboard(Camera_Movement::RIGHT, speed);
+        camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
       }
 
       if (keys[GLFW_KEY_H]) {
@@ -529,7 +540,7 @@ int main(void) {
       // mouse look like free-fly/fps
       double xpos, ypos, delta[2];
       glfwGetCursorPos(window, &xpos, &ypos);
-      delta[0] = mouse[0] - xpos;
+      delta[0] = xpos - mouse[0];
       delta[1] = mouse[1] - ypos;
       mouse[0] = xpos;
       mouse[1] = ypos;
@@ -853,7 +864,7 @@ int main(void) {
     }
 
     // Raytrace in compute
-    if (true) {
+    if (false) {
       // Raytrace into `raytraceOutput`
       glm::uvec2 res = glm::uvec2(windowDimensions[0], windowDimensions[1]);
       {
@@ -948,9 +959,13 @@ int main(void) {
     }
 
     // Splatting
-    if (true) {
-      void *clear = splatIndirectBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
-      memset(clear, 0, sizeof(DrawArraysIndirectCommand));
+    if (true || time == 0 || debug) {
+      DrawArraysIndirectCommand *b = (DrawArraysIndirectCommand *)splatIndirectBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
+      //memset(clear, 0, sizeof(DrawArraysIndirectCommand));
+      b->baseInstance = 0;
+      b->count = 0;
+      b->first = 0;
+      b->primCount = 1;
       splatIndirectBuffer->endMap();
 
       splatsGenerateIndirect
@@ -960,12 +975,46 @@ int main(void) {
         ->ssbo("splatIndirectCommandBuffer", splatIndirectBuffer)
         ->ssbo("splatInstanceBuffer", splatInstanceBuffer)
         ->ssbo("splatBucketBuffer", splatBucketsBuffer)
-        ->timedCompute("splats: extraction", glm::uvec3(256));
-      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        ->timedCompute("splats: extraction", glm::uvec3(voxelSpaceDims));// / glm::uvec3(1 << 1) + glm::uvec3(1));
 
-      DrawArraysIndirectCommand *c = (DrawArraysIndirectCommand *)splatIndirectBuffer->beginMap(SSBO::MAP_READ_ONLY);
-      ImGui::Text("splats: total %i", c->primCount);
-      splatIndirectBuffer->endMap();
+      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    }
+    {
+      GLuint query;
+      GLuint64 elapsed_time;
+      GLint done = 0;
+      glGenQueries(1, &query);
+      glBeginQuery(GL_TIME_ELAPSED, query);
+      //DrawArraysIndirectCommand *c = (DrawArraysIndirectCommand *)splatIndirectBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
+      //ImGui::Text("splats: total %i", c->count);
+      //c->primCount = 1;
+      //splatIndirectBuffer->endMap();
+
+      glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+      splatIndirectBuffer->bind(GL_DRAW_INDIRECT_BUFFER);
+      splat_debug_program
+        ->use()
+        ->uniformMat4("perspective", perspectiveMatrix)
+        ->uniformMat4("view", viewMatrix)
+        ->uniformVec3("eye", currentEye)
+        ->uniformFloat("fov", fov)
+        ->uniformVec2ui("res", glm::uvec2(windowDimensions[0], windowDimensions[1]))
+        ->ssbo("splatInstanceBuffer", splatInstanceBuffer);
+
+      glEnable(GL_PROGRAM_POINT_SIZE);
+
+      glDrawArraysIndirect(GL_POINTS, nullptr);
+      gl_error();
+
+      glEndQuery(GL_TIME_ELAPSED);
+      while (!done) {
+        glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+      }
+
+      // get the query result
+      glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+      ImGui::Text("splat render: %.3f.ms", elapsed_time / 1000000.0);
+      glDeleteQueries(1, &query);
     }
 
     {

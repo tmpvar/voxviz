@@ -57,7 +57,7 @@ struct SplatBucket {
 };
 
 #define SPLATS_MAX 1 << 24 // ~16M
-#define SPLAT_BUCKET_SIZE_SHIFT 8
+#define SPLAT_BUCKET_SIZE_SHIFT 16
 #define SPLAT_BUCKETS SPLATS_MAX >> SPLAT_BUCKET_SIZE_SHIFT // ~65k buckets
 
 struct DrawArraysIndirectCommand {

@@ -186,7 +186,7 @@ public:
 
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_COPY); gl_error();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_STATIC_DRAW); gl_error();
     this->unbind();
 
     this->total_bytes = bytes;
@@ -215,9 +215,9 @@ public:
     this->mapped = false;
   }
 
-  GLuint bind() {
+  GLuint bind(GLuint type = GL_SHADER_STORAGE_BUFFER) {
     if (this->handle != 0) {
-      glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->handle); gl_error();
+      glBindBuffer(type, this->handle); gl_error();
     }
     return this->handle;
   }

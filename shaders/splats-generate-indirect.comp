@@ -2,14 +2,17 @@
 #extension GL_NV_shader_buffer_load: enable
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
+#extension GL_ARB_shader_ballot: enable
+#extension GL_NV_shader_thread_group : require
+#extension GL_NV_shader_thread_shuffle : require
 
-layout( local_size_x = 32, local_size_y = 16, local_size_z = 1 ) in;
+layout( local_size_x = 64, local_size_y = 16, local_size_z = 1 ) in;
 
 #include "voxel-space-mips.glsl"
 #include "splats.glsl"
 #include "palette.glsl"
 #include "morton.glsl"
-
+#include "hsl.glsl"
 
 layout (std430) buffer splatIndirectCommandBuffer {
   DrawArraysIndirectCommand command;
@@ -19,19 +22,68 @@ layout (std430) buffer splatInstanceBuffer {
   Splat splats[];
 };
 
-writeonly layout (std430) buffer splatBucketBuffer {
+layout (std430) buffer splatBucketBuffer {
   SplatBucket buckets[];
 };
 
-int read(vec3 p) {
-  if (any(lessThan(p, vec3(0.0))) || any(greaterThanEqual(p, volumeSlabDims))) {
+layout (std430) buffer splatScratchBuffer {
+  uint8_t scratch[];
+};
+
+uint read(vec3 p) {
+  if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, volumeSlabDims))) {
       return 0;
   }
   uint8_t nop;
   return voxel_mip_get(p, 0, nop) ? 1 : 0;
 }
 
-void main() {
+// ported from https://devblogs.nvidia.com/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/
+uint atomicAggInc(uint *ctr) {
+
+  uint active_threads = activeThreadsNV();
+  int leader = findLSB(active_threads);
+  int change = bitCount(active_threads);
+  //uint rank = bitCount(active & __lanemask_lt());
+  uint rank = gl_ThreadInWarpNV;
+  uint warp_res;
+  if(rank == 0) {
+    warp_res = atomicAdd(ctr, change);
+  }
+  //warp_res = __shfl_sync(active, warp_res, leader);
+  bool nop;
+  warp_res = shuffleNV(warp_res, active_threads, 32, nop);
+  return warp_res + rank;
+}
+
+bool visible(vec3 p) {
+  uint a = 0;
+  a+=read(p + vec3(1.0, 0.0, 0.0));
+  a+=read(p + vec3(-1.0, 0.0, 0.0));
+  // a+=read(p + vec3(1.0, -1.0, 0.0));
+  // a+=read(p + vec3(-1.0, -1.0, 0.0));
+  // a+=read(p + vec3(1.0, 1.0, 0.0));
+  // a+=read(p + vec3(-1.0, 1.0, 0.0));
+
+  a+=read(p + vec3(0.0, 1.0, 0.0));
+  a+=read(p + vec3(0.0, -1.0, 0.0));
+  // a+=read(p + vec3(0.0, 1.0, -1.0));
+  // a+=read(p + vec3(0.0, -1.0, -1.0));
+  // a+=read(p + vec3(0.0, 1.0, 1.0));
+  // a+=read(p + vec3(0.0, -1.0, 1.0));
+
+  a+=read(p + vec3(0.0, 0.0, 1.0));
+  a+=read(p + vec3(0.0, 0.0, -1.0));
+  // a+=read(p + vec3(-1.0, 0.0, 1.0));
+  // a+=read(p + vec3(-1.0, 0.0, -1.0));
+  // a+=read(p + vec3(1.0, 0.0, 1.0));
+  // a+=read(p + vec3(1.0, 0.0, -1.0));
+
+  return a < 6;
+}
+
+void main1() {
+
   // walk the octree and find edge voxels
   // for each edge voxel:
   // - add its position to a buffer
@@ -44,26 +96,94 @@ void main() {
     return;
   }
 
-  int a = 0;
-  a+=read(p + vec3(1.0, 0.0, 0.0));
-  a+=read(p + vec3(-1.0, 0.0, 0.0));
+  uint slot = EncodeMorton3(uvec3(p * 2.0));
 
-  a+=read(p + vec3(0.0, 1.0, 0.0));
-  a+=read(p + vec3(0.0, -1.0, 0.0));
+  vec3 o;
+  uint8_t v = uint8_t(0);
+  uint i;
+  for (o.x = 0; o.x < 2; o.x++) {
+    for (o.y = 0; o.y < 2; o.y++) {
+      for (o.z = 0; o.z < 2; o.z++) {
+        i++;
+        if (visible(p+o)) {
+        //   uint code = EncodeMorton3(uvec3(o));
+          // v |= uint8_t(1 << code);
+          v |= uint8_t(1 << i);
+        }
+      }
+    }
+  }
 
-  a+=read(p + vec3(0.0, 0.0, 1.0));
-  a+=read(p + vec3(0.0, 0.0, -1.0));
+  scratch[slot] = v;
+}
 
-  //if (a < 6) {
-    uint code = EncodeMorton3(uvec3(p));
-    uint bucketIdx = code >> SPLAT_BUCKET_SIZE_SHIFT;
-    // uint splatIdx = code & SPLAT_BUCKET_SIZE_SHIFT;
-    //atomicAdd(command.primCount, 1);
-    uint splatIdx = atomicAdd(buckets[bucketIdx].loc, 1);
-    Splat entry;
-    entry.position = vec4(p, 1.0);
-    entry.color = vec4(palette_color(palette_idx), 1.0);
 
-    buckets[bucketIdx].splats[splatIdx] = entry;
-  //}
+shared uint slots;
+
+void main() {
+  uint8_t palette_idx;
+  if (any(greaterThanEqual(gl_GlobalInvocationID.xyz, volumeSlabDims))) {
+    return;
+  }
+
+  vec3 p = vec3(gl_GlobalInvocationID.xyz);
+
+  // slots |= (uint(collect) << gl_ThreadInWarpNV);
+  //
+  // barrier();
+
+  if (
+    !voxel_mip_get(p, 0, palette_idx)
+  ) {
+    return;
+  }
+
+  if (!visible(p)) return;
+
+  //uint slot = EncodeMorton3(uvec3(p * 2.0));
+  // uint code = EncodeMorton3(uvec3(p));
+  // uint bucketIdx = code >> SPLAT_BUCKET_SIZE_SHIFT;
+
+  // uint active_threads = activeThreadsNV();
+  // uint leader = findMSB(active_threads);
+  // uint rank = bitCount(leader & gl_ThreadInWarpNV);
+  //
+
+  #if 0
+    int change = bitCount(active_threads);
+
+    uint rank = bitCount(leader & gl_ThreadInWarpNV);
+    uint warp_res;
+    if (rank == leader) {//(leader & gl_ThreadInWarpNV) > 0)  {
+      warp_res = atomicAdd(command.count, change);
+    }
+    bool nop;
+
+    warp_res = shuffleNV(warp_res, gl_ThreadInWarpNV, 32, nop);
+    uint splatIdx = warp_res + rank;
+  #else
+    uint splatIdx = atomicAdd(command.count, 1);
+  #endif
+
+  Splat entry;
+  entry.position = vec4(p, 1.0);
+  // if (findLSB(active_threads) == gl_ThreadInWarpNV) {
+  //   entry.color = vec4(1.0, 0.0, leader == 1? 1.0 : 0.0, 1.0);
+  //   entry.color = vec4(0.5);
+  // } else {
+  //   entry.color =  vec4(
+  //     hsl(vec3(float(gl_ThreadInWarpNV)/32.0, 0.9, 0.5)),
+  //     1.0
+  //   );
+  // }
+
+  // entry.color =  vec4(
+  //   hsl(vec3(float(splatIdx)/10000000.0, 0.9, 0.5)),
+  //   1.0
+  // );
+
+  //entry.color = leader == gl_ThreadInWarpNV ? vec4(1.0, 0.0, 1.0, 1.0): vec4(0.2);
+  entry.color = vec4(palette_color(palette_idx), 1.0);
+  //buckets[bucketIdx].splats[splatIdx] = entry;
+  splats[splatIdx] = entry;
 }
