@@ -32,6 +32,8 @@
 #include <queue>
 #include <map>
 
+#include "renderpipe.h"
+
 bool keys[1024];
 bool prevKeys[1024];
 double mouse[2];
@@ -107,7 +109,19 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   }
 }
 
-int main(void) {
+int main() {
+  // Setup the RenderPipe
+  renderpipe::RenderPipe &pipe = renderpipe::RenderPipe::instance();
+  pipe.setFilename("../pipelines/go.js");
+  uv_run(uv_default_loop(), UV_RUN_DEFAULT);
+  return 1;
+}
+
+int main1(void) {
+
+
+
+
   memset(keys, 0, sizeof(keys));
 
   int d = BRICK_DIAMETER;
@@ -244,6 +258,8 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
+
+
   const float movementSpeed = 0.01f;
   GLFWgamepadstate state;
 
@@ -454,6 +470,9 @@ int main(void) {
   glm::vec3 characterPos(20.0);
   int lastCharacterTime = -1;
   glm::vec3 lastCharacterPos(20.0);
+
+
+
   while (!glfwWindowShouldClose(window)) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();

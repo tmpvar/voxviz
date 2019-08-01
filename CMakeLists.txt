@@ -39,6 +39,7 @@ include_directories(
   deps/imgui
   deps/imgui/examples
   deps/stb
+	deps/json
 )
 
 ENABLE_TESTING()
@@ -67,6 +68,7 @@ add_executable(
 	include/scene.h
 	include/obb.h
   include/splats.h
+	include/renderpipe.h
 
   include/parser/vzd/vzd.h
   include/parser/magicavoxel/vox.h
