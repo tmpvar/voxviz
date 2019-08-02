@@ -203,7 +203,7 @@ int main() {
   while (!glfwWindowShouldClose(window)) {
     beginFrame(window, resolution);
 
-    pipe.runPipeline("render");
+//    pipe.runPipeline("render");
 
     endFrame(window);
   }
