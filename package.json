@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "chokidar": "^2.1.2",
+    "flatbuffers": "^1.11.0",
     "glob": "^7.1.1",
     "glsl-extract": "^1.0.0",
     "glslify": "^6.0.1",
@@ -9,7 +10,7 @@
     "yargs": "^12.0.5"
   },
   "scripts": {
-  	"glsl-reload": "node shaders/convert.js -w -o build/shaders",
+    "glsl-reload": "node shaders/convert.js -w -o build/shaders",
     "generate": "rm -rf build && mkdir build && cd build && cmake -DCMAKE_GENERATOR_PLATFORM=x64 .."
   }
 }

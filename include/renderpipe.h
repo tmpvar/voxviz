@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <filesystem>
 
-#include <json.hpp>
 #include <glm/glm.hpp>
 #include "uv.h"
 
