@@ -12,10 +12,17 @@ IF(WINDOWS)
 	set_target_properties(voxviz PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS /EHsc")
 ENDIF()
 
+# GLFW
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glfw)
+
+# FlatBuffers
+set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(deps/flatbuffers-1.11.0)
+# FLATBUFFERS_FLATC_EXECUTABLE
 
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1)
 
@@ -40,6 +47,7 @@ include_directories(
   deps/imgui/examples
   deps/stb
 	deps/json
+	deps/flatbuffers-1.11.0/include
 )
 
 ENABLE_TESTING()
@@ -107,6 +115,7 @@ target_link_libraries(
 	qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
+	libflatbuffers
  )
 
 file(COPY img DESTINATION ${CMAKE_BINARY_DIR})

@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 #include "uv.h"
 
+#include "flatbuffers/flatbuffers.h"
+
 using namespace std;
 using namespace glm;
 
@@ -20,6 +22,7 @@ namespace renderpipe {
 
   class Buffer {
       uvec3 dims;
+      flatbuffers::FlatBufferBuilder builder;
     public:
       Buffer() {}
   };
