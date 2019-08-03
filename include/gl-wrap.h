@@ -76,6 +76,9 @@ static const char *shader_type(GLuint type) {
 
 class Shader {
   bool valid = false;
+  bool can_reload_from_disk = true;
+  string src;
+
 public:
   GLuint handle;
   GLuint type;
@@ -83,13 +86,31 @@ public:
   string filename;
   size_t version;
 
+  /*
   Shader(const char *src, const char *filename, const char *name, const GLuint type) {
     this->version = 1;
     this->filename = filename;
+    if (this->filename.find("mem://", 0) != string::npos) {
+      this->can_reload_from_disk = false;
+    }
+    this->src = src;
+    this->type = type;
+    this->name = name;
+    this->reload();
+  }*/
+
+  Shader(string src, string filename, string name, const GLuint type) {
+    this->version = 1;
+    this->filename = filename;
+    if (this->filename.find("file://", 0) == string::npos) {
+      this->can_reload_from_disk = false;
+    }
+    this->src = src;
     this->type = type;
     this->name = name;
     this->reload();
   }
+
 
   bool isValid() {
     return this->valid;
@@ -97,18 +118,26 @@ public:
 
   bool reload() {
     this->valid = true;
-    std::cout << "reloading shader: " << this->name << std::endl;
-    std::ifstream t(this->filename);
-    std::string str;
+    GLchar *source = (GLchar *)this->src.c_str();
+    if (this->can_reload_from_disk) {
+      std::cout << "reloading shader: " << this->name << std::endl;
+      std::ifstream t(this->filename);
+      std::string str;
 
-    t.seekg(0, std::ios::end);
-    str.reserve(t.tellg());
-    t.seekg(0, std::ios::beg);
+      t.seekg(0, std::ios::end);
+      str.reserve(t.tellg());
+      t.seekg(0, std::ios::beg);
 
-    str.assign((std::istreambuf_iterator<char>(t)),
+      str.assign((std::istreambuf_iterator<char>(t)),
 
       std::istreambuf_iterator<char>());
-    const GLchar *source = (const GLchar *)str.c_str();
+      source = (GLchar *)str.c_str();
+    }
+    else if (this->src.empty()) {
+      std::cout << "invalid file and source" << std::endl;
+      this->valid = false;
+      return false;
+    }
     GLuint new_handle = glCreateShader(this->type);
     glShaderSource(new_handle, 1, &source, NULL);
     std::cout
@@ -246,14 +275,14 @@ class Program {
   GLuint texture_index;
   string compositeName;
   GLint local_layout[3];
-  bool isCompute = false;
-  bool valid = false;
+  bool is_compute = false;
+  bool is_valid = false;
 public:
   GLuint handle;
 
   Program() {
     this->handle = glCreateProgram();
-    this->valid = true;
+    this->is_valid = true;
   }
 
   ~Program() {
@@ -315,11 +344,11 @@ public:
     this->compositeName += shader->name + " ";
 
     if (shader->type == GL_COMPUTE_SHADER) {
-      this->isCompute = true;
+      this->is_compute = true;
     }
 
-    if (!shader->isValid() || !this->valid) {
-      this->valid = false;
+    if (!shader->isValid() || !this->is_valid) {
+      this->is_valid = false;
       return this;
     }
 
@@ -328,17 +357,25 @@ public:
     return this;
   }
 
+  bool isValid() {
+    return this->is_valid;
+  }
+
+  bool isCompute() {
+    return this->is_compute;
+  }
+
   Program *link() {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
-    std::cout << "linking" << this->compositeName << std::endl;
+    std::cout << "linking " << this->compositeName << std::endl;
     glLinkProgram(this->handle);
     gl_program_log(this->handle);
     gl_error();
 
-    if (this->isCompute) {
+    if (this->is_compute) {
       glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &this->local_layout[0]);
       gl_error();
     }
@@ -358,7 +395,7 @@ public:
 
     this->handle = glCreateProgram();
     this->compositeName = "";
-    this->valid = true;
+    this->is_valid = true;
 
     for (auto const& v : this->shader_versions) {
       Shader *shader = v.first;
@@ -393,7 +430,7 @@ public:
     }
     #endif
 
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -406,7 +443,7 @@ public:
   }
 
   Program *output(string name, const GLuint location = 0) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -418,7 +455,7 @@ public:
   }
 
   Program *attribute(string name) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -435,7 +472,7 @@ public:
   }
 
   Program *uniformFloat(string name, float v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -445,7 +482,7 @@ public:
   }
 
   Program *uniformVec2(string name, glm::vec2 v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -455,7 +492,7 @@ public:
   }
 
   Program *uniformVec2ui(string name, glm::uvec2 v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -465,7 +502,7 @@ public:
   }
 
   Program *uniformVec3(string name, glm::vec3 v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -476,7 +513,7 @@ public:
   }
 
   Program *uniformVec3fArray(string name, glm::vec3 *v, size_t count) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -496,7 +533,7 @@ public:
   }
 
   Program *uniformVec3i(string name, glm::ivec3 v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -506,7 +543,7 @@ public:
   }
 
   Program *uniformVec3ui(string name, glm::uvec3 v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -516,7 +553,7 @@ public:
   }
 
   Program *uniformVec4(string name, glm::vec4 v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -526,7 +563,7 @@ public:
   }
 
   Program *uniformMat4(string name, glm::mat4 v) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -536,7 +573,7 @@ public:
   }
 
   Program *uniform1i(string name, int i) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -546,7 +583,7 @@ public:
   }
 
   Program *uniform1ui(string name, uint32_t ui) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -556,7 +593,7 @@ public:
   }
 
   Program *texture2d(string name, GLuint  texture_id) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -568,7 +605,7 @@ public:
   }
 
   Program *texture3d(string name, GLuint  texture_id) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -580,7 +617,7 @@ public:
   }
 
   Program *bufferAddress(string name, GLuint64 val) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -590,7 +627,7 @@ public:
   }
 
   Program *ssbo(string name, SSBO *ssbo) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -628,7 +665,7 @@ public:
 
   Program *compute(glm::uvec3 dims) {
     this->use();
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 
@@ -654,7 +691,7 @@ public:
   }
 
   Program *timedCompute(const char *str, glm::uvec3 dims) {
-    if (!this->valid) {
+    if (!this->is_valid) {
       return this;
     }
 

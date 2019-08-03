@@ -1,0 +1,57 @@
+namespace renderpipe.proto;
+
+struct uvec3 {
+  x:uint32;
+  y:uint32;
+  z:uint32;
+}
+
+enum ShaderType:uint8 {
+  Fragment,
+  Vertex,
+  Compute
+}
+
+table Buffer {
+  //name:string;
+  //dims:uvec3;
+  id:uint32;
+  length:uint32;
+  initial:[uint8];
+}
+
+table Shader {
+  type:ShaderType;
+  hash:string;
+  filename:string;
+  source:string;
+}
+
+table Program {
+  type:string;
+  hash:string;
+  shaders:[Shader];
+}
+
+table ProgramInvocation {
+  // program in this form is a hash
+  program:string;
+  // TODO: add uniforms and all that junk
+  dims:uvec3;
+}
+
+table Stage {
+  // I'd like to use (key) here, but I don't think the
+  // flatbuffers js impl can handle it.
+  name:string;
+  invocations:[ProgramInvocation];
+}
+
+table Scene {
+  name:string;
+  buffers:[Buffer];
+  programs:[Program];
+  stages:[Stage];
+}
+
+root_type Scene;

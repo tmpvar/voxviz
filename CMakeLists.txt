@@ -38,9 +38,22 @@ include_directories(
   deps/imgui
   deps/imgui/examples
   deps/stb
-	deps/json
 	deps/flatbuffers-1.11.0/include
 )
+
+include(deps/flatbuffers-1.11.0/CMake/BuildFlatBuffers.cmake)
+SET(FLATBUFFERS_FLATC_EXECUTABLE OFF CACHE BOOL "" FORCE)
+SET(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS --js)
+build_flatbuffers(
+	"${CMAKE_CURRENT_SOURCE_DIR}/proto/renderpipe.fbs"
+	""
+	"renderpipe_proto"
+	""
+	"${CMAKE_CURRENT_SOURCE_DIR}/proto"
+	""
+	""
+	)
+
 
 ENABLE_TESTING()
 ADD_SUBDIRECTORY( test )
@@ -89,6 +102,9 @@ add_executable(
 
 	#stb
 	deps/stb/stb_image.h
+
+	# proto
+	proto
 )
 
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
@@ -96,7 +112,7 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT v
 
 source_group("shaders" FILES ${SHADER_FILES})
 
-add_dependencies(voxviz shaders_out)
+add_dependencies(voxviz shaders_out renderpipe_proto)
 add_definitions(-DGPU_HOST=1)
 
 

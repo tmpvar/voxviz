@@ -116,7 +116,7 @@ GLFWwindow* createWindow(ivec2 resolution) {
   }
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -164,12 +164,6 @@ void beginFrame(GLFWwindow *window, const ivec2 &resolution) {
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glViewport(0, 0, resolution.x, resolution.y);
-  glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
-  glDepthMask(GL_TRUE);
-
-  glCullFace(GL_BACK);
-  glEnable(GL_CULL_FACE);
 
   glClearDepth(1.0);
   glClearColor(0.0, 0.0, 0.0, 1.0);
@@ -177,6 +171,14 @@ void beginFrame(GLFWwindow *window, const ivec2 &resolution) {
 }
 
 void endFrame(GLFWwindow *window) {
+
+  // draw the current FPS
+  {
+    static float f = 0.0f;
+    static int counter = 0;
+    ImGui::Text("%.1fFPS (%.3f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+  }
+
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -203,7 +205,7 @@ int main() {
   while (!glfwWindowShouldClose(window)) {
     beginFrame(window, resolution);
 
-//    pipe.runPipeline("render");
+    pipe.run("frame");
 
     endFrame(window);
   }
