@@ -264,7 +264,11 @@ public:
   }
 
   SSBO *resize(uint64_t bytes) {
-    std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+    if (this->_dims.x > 0) {
+      std::cout << "creating SSBO with " << bytes << " bytes; dims:" << this->_dims.x << ", " << this->_dims.y << ", " << this->_dims.z << endl;
+    } else {
+      std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+    }
 
     if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
@@ -312,8 +316,8 @@ public:
     return this->handle;
   }
 
-  void unbind() {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
+  void unbind(GLuint type = GL_SHADER_STORAGE_BUFFER) {
+    glBindBuffer(type, 0); gl_error();
   }
 
   size_t size() {

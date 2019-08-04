@@ -433,8 +433,6 @@ int main(void) {
     voxelSpaceSSBO->endMap();
   }
 
-  Splats *splats = new Splats(voxelSpaceSSBO);
-
   double deltaTime = 0.0;
   double lastTime = glfwGetTime();
   float debug = 0.0;
@@ -947,8 +945,10 @@ int main(void) {
 
     // Splats
     if (true) {
-      splats->extract();
-      splats->render(
+      static Splats splats(voxelSpaceSSBO);
+
+      splats.extract();
+      splats.render(
         VP,
         currentEye,
         uvec2(windowDimensions[0], windowDimensions[1]),

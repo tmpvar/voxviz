@@ -25,9 +25,8 @@ void main() {
   float size;
   quadricProj(s.position.xyz + 0.5, 0.5, mvp, vec2(res)/2.0, outPos, size);
   pointSize = size;
-  gl_PointSize = pointSize * s.color.a;
-  // gl_PointSize = 2;
-  vec4 pos = mvp * s.position;
+  gl_PointSize = pointSize * s.position.w;
+  vec4 pos = mvp * vec4(s.position.xyz, 1.0);
   center = (pos.xy/pos.z);
   gl_Position = pos;
 }

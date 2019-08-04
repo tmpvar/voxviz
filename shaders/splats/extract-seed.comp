@@ -1,0 +1,81 @@
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+#extension GL_ARB_shader_ballot: enable
+#extension GL_NV_shader_thread_group : require
+#extension GL_NV_shader_thread_shuffle : require
+
+layout( local_size_x = 2, local_size_y = 2, local_size_z = 2 ) in;
+
+#include "../voxel-space-mips.glsl"
+#include "../splats.glsl"
+#include "../palette.glsl"
+#include "../morton.glsl"
+#include "../hsl.glsl"
+
+uniform uint mipLevel;
+
+layout (std430) buffer splatIndirectCommandBuffer {
+  DrawArraysIndirectCommand command;
+};
+
+layout (std430) buffer splatInstanceBuffer {
+  Splat splats[];
+};
+
+uint read(vec3 p) {
+  p *= (1<<mipLevel);
+  if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, volumeSlabDims))) {
+      return 0;
+  }
+  uint8_t nop;
+  return voxel_mip_get(p, mipLevel, nop) ? 1 : 0;
+}
+
+bool visible(vec3 p) {
+  uint a = 1;
+
+  a &= read(p + vec3(1.0, 0.0, 0.0));
+  a &= read(p + vec3(-1.0, 0.0, 0.0));
+
+  a &= read(p + vec3(0.0, 1.0, 0.0));
+  a &= read(p + vec3(0.0, -1.0, 0.0));
+
+  a &= read(p + vec3(0.0, 0.0, 1.0));
+  a &= read(p + vec3(0.0, 0.0, -1.0));
+
+  return a == 0;
+}
+
+shared uint slots;
+
+void main() {
+
+  uint8_t palette_idx;
+  uvec3 gridPos = uvec3(gl_GlobalInvocationID.xyz);
+  uvec3 worldPos = gl_GlobalInvocationID.xyz * (1 << mipLevel);
+  vec3 p = vec3(worldPos);
+
+  if (any(greaterThan(worldPos, volumeSlabDims))) {
+    return;
+  }
+
+  if (!voxel_mip_get(p, mipLevel, palette_idx)) {
+    return;
+  }
+
+  if (!visible(vec3(gridPos))) {
+    return;
+  }
+
+  uint splatIdx = atomicAdd(command.count, 1);
+  Splat entry;
+  entry.position = vec4(p, 10.0);//float(mipLevel + 1));
+  entry.color = vec4(
+    hsl(vec3(float(mipLevel)/float(MAX_MIP_LEVELS + 1) * 0.99, 0.9, 0.45)),
+    1.0
+  );
+  //vec4(palette_color(palette_idx), 1);
+  splats[splatIdx] = entry;
+}

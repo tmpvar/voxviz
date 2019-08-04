@@ -10,7 +10,6 @@ uniform uvec3 lowerMipDims;
 uniform uint mipLevel;
 
 #include "voxel-space-mips.glsl"
-
 uint read(uvec3 pos, uint offset) {
   uvec3 p = pos << 1;
 

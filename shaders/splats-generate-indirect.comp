@@ -101,8 +101,8 @@ void main() {
 
   uint splatIdx = atomicAdd(command.count, 1);
   Splat entry;
-  entry.position = vec4(p,  1.0);
-  entry.color = vec4(palette_color(palette_idx), float(miplevel + 1));
+  entry.position = vec4(p, 1.0);//float(miplevel + 1));
+  entry.color = vec4(palette_color(palette_idx), 1);
   splats[splatIdx] = entry;
 }
 

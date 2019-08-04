@@ -17,8 +17,10 @@ flat in float pointSize;
 void main() {
 
   vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
+
   if (dot(circCoord, circCoord) > 0.35) {
       discard;
   }
   outColor = color;
+  //outColor.a = dot(circCoord, circCoord);
 }
