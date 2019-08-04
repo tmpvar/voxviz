@@ -210,7 +210,7 @@ async function frame(program, buffer) {
   const triangle = program({
     shaders: [
       program.vert(`
-        #version 440
+        #version 410
         void main() {
           if (gl_VertexID == 0) gl_Position = vec4( 0.5, -0.5, 0, 1);
           if (gl_VertexID == 1) gl_Position = vec4( 0.0,  0.5, 0, 1);
@@ -218,7 +218,7 @@ async function frame(program, buffer) {
         }
       `),
       program.frag(`
-        #version 440
+        #version 410
         out vec4 color;
         void main() {
           color = vec4(1.0, 0.0, 1.0, 1.0);

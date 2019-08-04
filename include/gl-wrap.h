@@ -25,6 +25,13 @@
 #ifndef max
 #define max(a,b)            (((a) > (b)) ? (a) : (b))
 #endif
+#ifndef min
+#define max(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
+
+#ifdef __APPLE__
+  #define DebugBreak()
+#endif
 
 using namespace std;
 

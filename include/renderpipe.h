@@ -4,11 +4,11 @@
 #include <iostream>
 #include <vector>
 #include <unordered_map>
-#include <filesystem>
+#include <unistd.h>
 
 #include <glm/glm.hpp>
 #include "uv.h"
-
+#include "flatbuffers/flatbuffers.h"
 #include "renderpipe_generated.h"
 
 using namespace std;
@@ -50,8 +50,20 @@ namespace renderpipe {
       GLuint dummyvao;
 
       RenderPipe() {
+        #ifndef MAX_PATH
+        #define MAX_PATH 1024
+        #endif
+        #ifndef TCHAR
+        #define TCHAR char
+        #endif
         TCHAR NPath[MAX_PATH];
-        GetCurrentDirectory(MAX_PATH, NPath);
+
+        #ifdef __APPLE__
+          getcwd(NPath, MAX_PATH);
+        #else
+          GetCurrentDirectory(MAX_PATH, NPath);
+        #endif
+
         this->cwd = string(NPath);
 
         uv_pipe_init(uv_default_loop(), &this->process_stdout_pipe, 0);
@@ -104,7 +116,7 @@ namespace renderpipe {
         this->process_options.stdio_count = 3;
         this->process_options.exit_cb = renderpipe_process_exit;
         this->process_options.file = args[0];
-        this->process_options.args = args;
+        this->process_options.args = (char**)args;
 
 
         this->pipelineString.clear();
@@ -135,9 +147,11 @@ namespace renderpipe {
 
       void buildPipeline() {
         const uint8_t *data = (uint8_t *)this->pipelineString.data();
-        bool verified = proto::VerifySceneBuffer(
-          flatbuffers::Verifier(data, this->pipelineString.length())
+        auto verifier = flatbuffers::Verifier(
+          data,
+          this->pipelineString.length()
         );
+        bool verified = proto::VerifySceneBuffer(verifier);
 
         if (!verified) {
           cerr << "unable to verify flatbuffer" << endl;
