@@ -17,6 +17,7 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <sstream>
 #include <imgui.h>
 
 #include <glm/glm.hpp>
@@ -73,6 +74,13 @@ static const char *shader_type(GLuint type) {
   }
   return "Unknown";
 }
+
+struct ShaderFileLine {
+  string file;
+  size_t line;
+  size_t lineCount;
+  size_t skipLines;
+};
 
 class Shader {
   bool valid = false;
@@ -135,7 +143,76 @@ public:
       glGetShaderInfoLog(new_handle, m, &l, s);
       cout << this->name << "failed to compile" << endl
            << s << endl;
-      shaderLogs[this->name] = string(s);
+
+      // compute the line the error occurred on
+      std::stringstream errorLogStream(s);
+      stringstream sourceStream(str);
+      string findFile = "// start: ";
+      string errorLine;
+      stringstream fileLog;
+      while (std::getline(errorLogStream, errorLine, '\n')) {
+        string sourceLine;
+        string currentFile = "";
+        size_t fileStartLine = 0;
+        size_t currentLine = 1;
+        size_t absoluteSourceLine = 1;
+
+        size_t rawErrorLine = 0;
+        // here we assume that errors are of the form 0(<line>) <message>
+        size_t endingParenLoc = errorLine.substr(2).find(")");
+        if (endingParenLoc == string::npos) {
+          cout << "could not parse gl error line: " << errorLine << endl;
+          continue;
+        }
+
+        rawErrorLine = stoul(errorLine.substr(2, endingParenLoc));
+
+        cout << "error line: " << rawErrorLine << endl;
+        sourceStream.seekg(0);
+
+        vector<ShaderFileLine> file_stack;
+
+        while (std::getline(sourceStream, sourceLine, '\n')) {
+          absoluteSourceLine++;
+          size_t fileCommentLoc = sourceLine.find(findFile);
+          if (fileCommentLoc != string::npos) {
+            currentFile = sourceLine.substr(fileCommentLoc + findFile.length());
+            ShaderFileLine l;
+            l.file = currentFile;
+            l.line = absoluteSourceLine;
+            l.lineCount = 0;
+            l.skipLines = 0;
+            file_stack.push_back(l);
+          }
+
+          if (absoluteSourceLine == rawErrorLine) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+            fileLog << "^ " << errorLine.substr(5+endingParenLoc) << endl;
+          }
+
+          if (absoluteSourceLine == rawErrorLine + 1) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+            break;
+          }
+
+          if (sourceLine.find("// end: " + file_stack.back().file) != string::npos) {
+            size_t skipLines = file_stack.back().lineCount + file_stack.back().skipLines;
+            file_stack.pop_back();
+            file_stack.back().skipLines += skipLines;
+
+            if (absoluteSourceLine == rawErrorLine - 1) {
+              fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines)
+                << " #include \""
+                << file_stack.back().file
+                << "\"" << endl;
+            }
+          } else if (absoluteSourceLine == rawErrorLine - 1) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+          }
+          file_stack.back().lineCount++;
+        }
+      }
+      shaderLogs[this->name] = fileLog.str();
       free(s);
       gl_shader_log(new_handle);
       this->valid = false;
