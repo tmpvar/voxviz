@@ -94,7 +94,7 @@ function processFile(file) {
 }
 
 function spath(p) {
-  return p.replace(/\\/g, '\\\\')
+  return path.normalize(p).replace(/\\/g, '\\\\')
 }
 
 const init = files.map((file) => {
@@ -165,13 +165,27 @@ class Shaders {
 
 std::map<std::string, Shader *> Shaders::instances;
 
-static void on_change(uv_fs_event_t *handle, const char *path, int events, int status) {
+static void on_change(uv_fs_event_t *handle, const char *const_path, int events, int status) {
   if (events & UV_CHANGE) {
+    int i = 0;
+    size_t len = strlen(const_path) + 1;
+    char *path = (char *)malloc(len);
+    memset(path, 0, len);
+    memcpy(path, const_path, len - 1);
+
+    while(path[i] != '\\0') {
+      if(path[i] == '\\\\') {
+        path[i] = '/';
+      }
+      i++;
+    }
+
     Shader *shader = Shaders::get(path);
     if (shader != nullptr) {
       shader->reload();
     }
     printf("CHANGE: %s\\n", path);
+    free(path);
   }
 }
 #endif
