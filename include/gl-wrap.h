@@ -97,7 +97,11 @@ public:
 
   bool reload() {
     this->valid = true;
-    std::cout << "reloading shader: " << this->name << std::endl;
+    std::cout << "reloading shader: "
+      << this->name
+      << " (" << this->filename << ")"
+      << std::endl;
+
     std::ifstream t(this->filename);
     std::string str;
 
@@ -107,7 +111,7 @@ public:
 
     str.assign((std::istreambuf_iterator<char>(t)),
 
-      std::istreambuf_iterator<char>());
+    std::istreambuf_iterator<char>());
     const GLchar *source = (const GLchar *)str.c_str();
     GLuint new_handle = glCreateShader(this->type);
     glShaderSource(new_handle, 1, &source, NULL);
@@ -159,6 +163,7 @@ class SSBO {
   GLsizeiptr total_bytes = 0;
   GLuint handle = 0;
   bool mapped = false;
+  uvec3 _dims = uvec3(0);
 public:
 
   const enum MAP_TYPE {
@@ -171,6 +176,16 @@ public:
     this->resize(bytes);
   }
 
+  SSBO(uint64_t bytes, uvec3 dims) {
+    this->resize(bytes, dims);
+  }
+
+  SSBO *resize(uint64_t bytes, uvec3 dims) {
+    this->_dims = dims;
+    this->resize(bytes);
+    return this;
+  }
+
   SSBO *resize(uint64_t bytes) {
     std::cout << "creating SSBO with " << bytes << " bytes" << endl;
 
@@ -181,8 +196,6 @@ public:
     if (bytes == 0) {
       return this;
     }
-
-
 
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
@@ -229,6 +242,10 @@ public:
   size_t size() {
     return this->total_bytes;
   }
+
+  uvec3 dims() {
+    return this->_dims;
+  }
 };
 
 struct SSBOBinding {
@@ -254,6 +271,10 @@ public:
   Program() {
     this->handle = glCreateProgram();
     this->valid = true;
+  }
+
+  static Program *New() {
+    return new Program();
   }
 
   ~Program() {
@@ -311,6 +332,10 @@ public:
   }
 
   Program *add(Shader *shader) {
+    if (shader == nullptr) {
+      this->valid = false;
+      return this;
+    }
     this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
     this->compositeName += shader->name + " ";
 
@@ -333,7 +358,7 @@ public:
       return this;
     }
 
-    std::cout << "linking" << this->compositeName << std::endl;
+    std::cout << "linking " << this->compositeName << std::endl;
     glLinkProgram(this->handle);
     gl_program_log(this->handle);
     gl_error();
@@ -383,6 +408,10 @@ public:
     #ifdef SHADER_HOTRELOAD
     for (auto& it : this->shader_versions) {
       Shader *shader = it.first;
+      if (shader == nullptr) {
+        this->valid = false;
+        return this;
+      }
       size_t version = it.second;
       if (version != shader->version) {
         std::cout << "rebuild program before use: " << this->compositeName << std::endl;

@@ -67,4 +67,10 @@ struct DrawArraysIndirectCommand {
   uint32_t baseInstance;
 };
 
+struct DispatchIndirectCommand {
+  uint  num_groups_x;
+  uint  num_groups_y;
+  uint  num_groups_z;
+};
+
 #endif

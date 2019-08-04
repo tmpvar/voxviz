@@ -2,13 +2,15 @@ const fs = require('fs')
 const path = require('path')
 const glob = require('glob')
 const chokidar = require('chokidar')
+const mkdirp = require('mkdirp').sync
 const argv = require('yargs').argv
 
-const sourceGlob = path.join(__dirname, '*.{vert,frag,comp}')
+const sourceGlob = path.join(__dirname, '**/*.{vert,frag,comp}')
 const files = glob.sync(sourceGlob)
 const includeExp = /#include +['"<](.*)['">]/
 const splitExp = /\r?\n/
 const outBase = path.resolve(process.cwd(), argv.o)
+mkdirp(outBase)
 
 const types = {
   '.frag': 'GL_FRAGMENT_SHADER',
@@ -19,7 +21,6 @@ const types = {
 const dependencyMap = {
   // file: [dep, dep]
 }
-
 
 if (argv.w) {
   chokidar.watch(
@@ -50,6 +51,10 @@ if (argv.w) {
   })
 }
 
+function outRelative(file) {
+  return path.relative(__dirname, file).replace(/\\/g, '/')
+}
+
 function outputLine(line) {
   if (Array.isArray(line)) {
     const r = line.map(outputLine).join('\n')
@@ -68,7 +73,6 @@ function filterLines(lines) {
     }
 
     if (inHost) {
-      console.log("SKIP: %s", l)
       ret = false;
     }
 
@@ -81,7 +85,8 @@ function filterLines(lines) {
 }
 
 function processFile(file) {
-  const outFile = path.join(outBase, path.basename(file))
+  const outFile = path.join(outBase, outRelative(file))
+  mkdirp(path.dirname(outFile))
   dependencyMap[file] = []
   const lines = processIncludes(file, dependencyMap[file], fs.readFileSync(file, 'utf8').split(splitExp), 0)
   fs.writeFileSync(outFile, lines.join('\n'))
@@ -94,14 +99,16 @@ function spath(p) {
 
 const init = files.map((file) => {
   file = path.normalize(file);
-  const outFile = path.join(outBase, path.basename(file))
+  const outFile = path.join(outBase, path.relative(__dirname, file))
   const lines = processFile(file)
   const type = types[path.extname(file)]
   if (!type) {
     throw new Error(file + " could not be associated with a shader type")
   }
-  const relpath = path.relative(__dirname, file)
-  return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.map(outputLine).join('\n') + `, "${spath(outFile)}", "${relpath}", ${type});\n`
+  const relpath = outRelative(file)
+  return `Shaders::instances["${relpath}"] = new Shader(\n` +
+    lines.map(outputLine).join('\n') +
+    `, "${spath(outFile)}", "${relpath}", ${type});\n`
 }).join('\n      ')
 
 const s = `
@@ -142,6 +149,7 @@ class Shaders {
 
     static Shader *get(const std::string file) {
       if (Shaders::instances.find(file) == Shaders::instances.end()) {
+        cout << "Shader::get('" <<  file << "') failed" << endl;
         return nullptr;
       }
       return Shaders::instances.at(file);

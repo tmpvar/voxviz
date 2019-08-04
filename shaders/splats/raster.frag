@@ -2,7 +2,7 @@
 
 #extension GL_NV_gpu_shader5: enable
 
-#include "splats.glsl"
+#include "../splats.glsl"
 
 layout (std430) buffer splatInstanceBuffer {
   Splat splats[];

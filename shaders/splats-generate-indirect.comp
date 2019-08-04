@@ -14,6 +14,8 @@ layout( local_size_x = 64, local_size_y = 16, local_size_z = 1 ) in;
 #include "morton.glsl"
 #include "hsl.glsl"
 
+#define miplevel 2
+
 layout (std430) buffer splatIndirectCommandBuffer {
   DrawArraysIndirectCommand command;
 };
@@ -31,11 +33,12 @@ layout (std430) buffer splatScratchBuffer {
 };
 
 uint read(vec3 p) {
+  p *= (miplevel + 1);
   if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, volumeSlabDims))) {
       return 0;
   }
   uint8_t nop;
-  return voxel_mip_get(p, 0, nop) ? 1 : 0;
+  return voxel_mip_get(p, miplevel, nop) ? 1 : 0;
 }
 
 // ported from https://devblogs.nvidia.com/cuda-pro-tip-optimized-filtering-warp-aggregated-atomics/
@@ -57,72 +60,55 @@ uint atomicAggInc(uint *ctr) {
 }
 
 bool visible(vec3 p) {
-  uint a = 0;
-  a+=read(p + vec3(1.0, 0.0, 0.0));
-  a+=read(p + vec3(-1.0, 0.0, 0.0));
-  // a+=read(p + vec3(1.0, -1.0, 0.0));
-  // a+=read(p + vec3(-1.0, -1.0, 0.0));
-  // a+=read(p + vec3(1.0, 1.0, 0.0));
-  // a+=read(p + vec3(-1.0, 1.0, 0.0));
+  uint a = 1;
 
-  a+=read(p + vec3(0.0, 1.0, 0.0));
-  a+=read(p + vec3(0.0, -1.0, 0.0));
-  // a+=read(p + vec3(0.0, 1.0, -1.0));
-  // a+=read(p + vec3(0.0, -1.0, -1.0));
-  // a+=read(p + vec3(0.0, 1.0, 1.0));
-  // a+=read(p + vec3(0.0, -1.0, 1.0));
+  a &= read(p + vec3(1.0, 0.0, 0.0));
+  a &= read(p + vec3(-1.0, 0.0, 0.0));
 
-  a+=read(p + vec3(0.0, 0.0, 1.0));
-  a+=read(p + vec3(0.0, 0.0, -1.0));
-  // a+=read(p + vec3(-1.0, 0.0, 1.0));
-  // a+=read(p + vec3(-1.0, 0.0, -1.0));
-  // a+=read(p + vec3(1.0, 0.0, 1.0));
-  // a+=read(p + vec3(1.0, 0.0, -1.0));
+  a &= read(p + vec3(0.0, 1.0, 0.0));
+  a &= read(p + vec3(0.0, -1.0, 0.0));
 
-  return a < 6;
+  a &= read(p + vec3(0.0, 0.0, 1.0));
+  a &= read(p + vec3(0.0, 0.0, -1.0));
+
+  return a == 0;
 }
-
-void main1() {
-
-  // walk the octree and find edge voxels
-  // for each edge voxel:
-  // - add its position to a buffer
-  // - increment an atomic counter command.primCount
-  vec3 p = vec3(gl_GlobalInvocationID.xyz);
-
-  uint8_t palette_idx;
-
-  if (!voxel_mip_get(p, 0, palette_idx)) {
-    return;
-  }
-
-  uint slot = EncodeMorton3(uvec3(p * 2.0));
-
-  vec3 o;
-  uint8_t v = uint8_t(0);
-  uint i;
-  for (o.x = 0; o.x < 2; o.x++) {
-    for (o.y = 0; o.y < 2; o.y++) {
-      for (o.z = 0; o.z < 2; o.z++) {
-        i++;
-        if (visible(p+o)) {
-        //   uint code = EncodeMorton3(uvec3(o));
-          // v |= uint8_t(1 << code);
-          v |= uint8_t(1 << i);
-        }
-      }
-    }
-  }
-
-  scratch[slot] = v;
-}
-
 
 shared uint slots;
 
 void main() {
   uint8_t palette_idx;
-  if (any(greaterThanEqual(gl_GlobalInvocationID.xyz, volumeSlabDims))) {
+  uvec3 gridPos = uvec3(gl_GlobalInvocationID.xyz);
+  uvec3 worldPos = gl_GlobalInvocationID.xyz * (miplevel + 1);
+  vec3 p = vec3(worldPos);
+
+  if (any(greaterThan(worldPos, volumeSlabDims))) {
+    return;
+  }
+
+  if (!voxel_mip_get(p, miplevel, palette_idx)) {
+    return;
+  }
+
+  if (!visible(vec3(gridPos))) {
+    // uint splatIdx = atomicAdd(command.count, 1);
+    // Splat entry;
+    // entry.position = vec4(p, 1.0);
+    // entry.color = vec4(0.0, 1.0, 0.0, 1.0);
+    // splats[splatIdx] = entry;
+    return;
+  }
+
+  uint splatIdx = atomicAdd(command.count, 1);
+  Splat entry;
+  entry.position = vec4(p,  1.0);
+  entry.color = vec4(palette_color(palette_idx), float(miplevel + 1));
+  splats[splatIdx] = entry;
+}
+
+void main1() {
+  uint8_t palette_idx;
+  if (any(greaterThanEqual(gl_GlobalInvocationID.xyz * miplevel, volumeSlabDims))) {
     return;
   }
 
@@ -132,9 +118,7 @@ void main() {
   //
   // barrier();
 
-  if (
-    !voxel_mip_get(p, 0, palette_idx)
-  ) {
+  if (!voxel_mip_get(p, miplevel, palette_idx)) {
     return;
   }
 
