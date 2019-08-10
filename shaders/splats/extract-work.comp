@@ -31,23 +31,34 @@ layout (std430) buffer splatInstanceBuffer {
   Splat splats[];
 };
 
+layout (std430) buffer prevSplatInstanceBuffer {
+  Splat prevSplats[];
+};
+
 shared uint slots;
 
 void main() {
-  uint8_t palette_idx;
-  vec3 worldPos = vec3(gl_GlobalInvocationID.xyz * (1 << mipLevel));
+  uint prevSplatIdx = gl_WorkGroupID.x;
+  uvec3 localPos = gl_LocalInvocationID.xyz;
 
+  uint idx = uint(gl_GlobalInvocationID.x);
+
+  vec3 prevSplatPos = prevSplats[prevSplatIdx].position.xyz;
+  vec3 worldPos = prevSplatPos + vec3(localPos * (1<<mipLevel));
+
+  uint8_t palette_idx;
   if (
-    any(greaterThan(uvec3(worldPos), volumeSlabDims)) ||
     !voxel_mip_get(worldPos, mipLevel, palette_idx) ||
-    !visible(worldPos, mipLevel)
+    !visible(vec3(worldPos), mipLevel)
   ) {
     return;
   }
 
   uint splatIdx = atomicAdd(indirectRender.count, 1);
 
-  atomicAdd(nextIndirectCompute.num_groups_x, 1);
+  if (mipLevel > 0) {
+    atomicAdd(nextIndirectCompute.num_groups_x, 1);
+  }
 
   Splat entry;
   entry.position = vec4(worldPos, float(mipLevel+1));
@@ -55,6 +66,7 @@ void main() {
     hsl(vec3(float(mipLevel)/float(MAX_MIP_LEVELS + 1) * 0.99, 0.9, 0.45)),
     1.0
   );
+  entry.color = vec4(palette_color(palette_idx), 1);
 
   splats[splatIdx] = entry;
 }

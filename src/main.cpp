@@ -947,7 +947,7 @@ int main(void) {
     if (true) {
       static Splats splats(voxelSpaceSSBO);
 
-      splats.extract();
+      splats.tick();
       splats.render(
         VP,
         currentEye,

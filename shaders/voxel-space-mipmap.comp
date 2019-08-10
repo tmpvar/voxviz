@@ -23,9 +23,9 @@ uint read(uvec3 pos, uint offset) {
     p.z * lowerMipDims.x * lowerMipDims.y
   );
 
-  // if (mipLevel > 1) {
-  //   idx = offset + EncodeMorton3(p);
-  // }
+  if (mipLevel > 1) {
+    idx = offset + EncodeMorton3(p);
+  }
 
   return uint(volumeSlab[idx]) > 0 ? 1 : 0;
 }
@@ -40,9 +40,9 @@ void write(uvec3 p, uint val) {
     p.y * mipDims.x +
     p.z * mipDims.x * mipDims.y
   );
-  // if (mipLevel > 0) {
-  //   idx = offset + EncodeMorton3(p);
-  // }
+  if (mipLevel > 0) {
+    idx = offset + EncodeMorton3(p);
+  }
 
   volumeSlab[idx] = uint8_t(val);
 }

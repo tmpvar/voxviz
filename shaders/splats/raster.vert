@@ -29,4 +29,5 @@ void main() {
   vec4 pos = mvp * vec4(s.position.xyz, 1.0);
   center = (pos.xy/pos.z);
   gl_Position = pos;
+  //color = vec4(1.0 - distance(eye, s.position.xyz) / 1000);
 }

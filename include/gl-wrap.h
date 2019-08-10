@@ -294,18 +294,18 @@ public:
 
     this->bind();
     void *out = glMapBuffer(GL_SHADER_STORAGE_BUFFER, m); gl_error();
-    this->unbind();
+    //this->unbind();
     this->mapped = true;
     return out;
   }
 
   void endMap() {
-    if (this->total_bytes == 0 || !this->mapped || this->handle == 0) {
+    if (!this->mapped || this->handle == 0) {
       return;
     }
     this->bind();
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); gl_error();
-    this->unbind();
+    //this->unbind();
     this->mapped = false;
   }
 
@@ -704,6 +704,11 @@ public:
       return this;
     }
 
+    if (ssbo == nullptr) {
+      cout << "unable to bind ssbo because it was null. name: " << name << endl;
+      return this;
+    }
+
     GLint ri = this->resourceIndex(name, GL_SHADER_STORAGE_BLOCK);
 
     if (ri == GL_INVALID_ENUM) {
@@ -736,7 +741,7 @@ public:
   }
 
 
-  Program *compute(glm::uvec3 dims) {
+  Program *compute(glm::uvec3 dims, SSBO *indirect = nullptr) {
     this->use();
     if (!this->valid) {
       return this;
@@ -763,7 +768,7 @@ public:
     return this;
   }
 
-  Program *timedCompute(const char *str, glm::uvec3 dims) {
+  Program *timedCompute(const char *str, glm::uvec3 dims, SSBO *indirect = nullptr) {
     if (!this->valid) {
       return this;
     }
@@ -790,6 +795,37 @@ public:
       glDeleteQueries(1, &query);
       return this;
     #endif
+  }
+
+  Program *timedIndirectCompute(const char *str, SSBO *indirect) {
+    if (!this->valid || indirect == nullptr) {
+      return this;
+    }
+
+    indirect->bind(GL_DISPATCH_INDIRECT_BUFFER);
+    #ifndef DISABLE_DEBUG_GL_TIMED_COMPUTE
+      GLuint query;
+      GLuint64 elapsed_time;
+      GLint done = 0;
+      glGenQueries(1, &query);
+      glBeginQuery(GL_TIME_ELAPSED, query);
+    #endif
+
+    glDispatchComputeIndirect(0);
+    gl_error();
+
+    #ifndef DISABLE_DEBUG_GL_TIMED_COMPUTE
+      glEndQuery(GL_TIME_ELAPSED);
+      while (!done) {
+        glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+      }
+
+      // get the query result
+      glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+      ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+      glDeleteQueries(1, &query);
+    #endif
+    return this;
   }
 };
 

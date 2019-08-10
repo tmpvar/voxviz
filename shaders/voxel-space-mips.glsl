@@ -21,6 +21,7 @@ bool voxel_mip_get(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
   );
 
   if (any(greaterThanEqual(p, d))) {
+    palette_idx = uint8_t(0);
     return false;
   }
 
@@ -31,9 +32,9 @@ bool voxel_mip_get(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
   uint idx = offset + uint(
     p.x + p.y * d.x + p.z * d.x * d.y
   );
-  // if (mip > 0) {
-  //   idx = offset + EncodeMorton3(p);
-  // }
+  if (mip > 0) {
+    idx = offset + EncodeMorton3(p);
+  }
 
   palette_idx = volumeSlab[idx];
 
