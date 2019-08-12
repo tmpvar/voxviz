@@ -1,15 +1,27 @@
 cmake_minimum_required(VERSION 3.0)
 project(VoxelViz)
 find_package(OpenGL REQUIRED)
+# TODO: using CONFIG REQUIRED here breaks and im not sure how to fix it
+# Could not find a package configuration file provided by "openvdb" with any
+#   of the following names:
+#
+#     openvdbConfig.cmake
+#     openvdb-config.cmake
+#
+#   Add the installation prefix of "openvdb" to CMAKE_PREFIX_PATH or set
+set(VCPKG_APPLOCAL_DEPS ON CACHE BOOL "" FORCE)
+find_package(OpenEXR REQUIRED)
+find_package(OpenVDB REQUIRED)
+find_package(TBB CONFIG REQUIRED)
 
-# find opencl on osx/linux
-IF(UNIX)
-	set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/deps/cmake-findopencl/cmake")
-	set(CMAKE_CXX_FLAGS "-std=c++0x -g -march=native -msse4.2 -mavx")
-ENDIF()
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+
+find_package(OpenVR REQUIRED)
+
 
 IF(WINDOWS)
 	set_target_properties(voxviz PROPERTIES LINK_FLAGS "/ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS /EHsc")
+	add_definitions(-D_WIN32 -DNOMINMAX)
 ENDIF()
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
@@ -32,7 +44,8 @@ include_directories(
   ${OPENGL_INCLUDE_DIR}
   ${OPENCL_INCLUDE_DIRS}
   ${OpenCL_INCLUDE_DIRS}
-  ${CMAKE_CURRENT_BINARY_DIR}
+	# TODO: use a cmake var here.. I think vcpkg is stomping on the old value
+  build/
   deps/glm/
 	deps/qu3e/src
   deps/libuv/include
@@ -89,6 +102,12 @@ add_executable(
 	deps/stb/stb_image.h
 )
 
+target_include_directories(voxviz PRIVATE
+	${OPENVDB_INCLUDE_DIRS}
+	${TBB_INCLUDE_DIRS}
+  ${OPENVR_INCLUDE_DIRS}
+)
+
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT voxviz)
 
@@ -97,6 +116,13 @@ source_group("shaders" FILES ${SHADER_FILES})
 add_dependencies(voxviz shaders_out)
 add_definitions(-DGPU_HOST=1)
 
+get_cmake_property(_variableNames VARIABLES)
+list (SORT _variableNames)
+foreach (_variableName ${_variableNames})
+    message(STATUS "${_variableName}=${${_variableName}}")
+endforeach()
+
+message("SNAPPY_LIBRARIES: ${SNAPPY_LIBRARIES}")
 
 target_link_libraries(
   voxviz
@@ -105,6 +131,10 @@ target_link_libraries(
 	qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
+	${OPENVDB_LIBRARIES}
+	TBB::tbb
+	${OpenEXR_HALF_LIBRARY}
+  ${OPENVR_LIBRARIES}
  )
 
 file(COPY img DESTINATION ${CMAKE_BINARY_DIR})

@@ -18,7 +18,7 @@ void main() {
 
   vec2 circCoord = 2.0 * gl_PointCoord - 1.0;
 
-  if (dot(circCoord, circCoord) > 0.35) {
+  if (dot(circCoord, circCoord) > 0.5) {
       discard;
   }
   outColor = color;

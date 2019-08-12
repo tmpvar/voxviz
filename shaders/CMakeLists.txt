@@ -16,4 +16,5 @@ add_custom_command(
 )
 
 set(GENERATED_HEADER_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set(SHADER_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
 add_custom_target(shaders_out ALL DEPENDS built.h)

@@ -3,11 +3,7 @@
 #include "gl-wrap.h"
 
 class Splats {
-  // programs
-  Program *computeIndirectBuffer;
-  Program *computeCollectSeed;
-  Program *computeCollectWork;
-  Program *rasterSplats;
+
 
   // buffers
   SSBO *voxelSpaceSSBO;
@@ -21,6 +17,12 @@ class Splats {
   SSBO *mipBuckets[MAX_MIP_LEVELS+2];
 
   public:
+    // programs
+    Program *computeIndirectBuffer;
+    Program *computeCollectSeed;
+    Program *computeCollectWork;
+    Program *rasterSplats;
+
     Splats(SSBO *voxelSpaceSSBO) {
       this->voxelSpaceSSBO = voxelSpaceSSBO;
 

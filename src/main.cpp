@@ -33,6 +33,14 @@
 #include <queue>
 #include <map>
 
+#undef min
+#undef max
+
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/LevelSetSphere.h>
+#include <tbb/tbb.h>
+#include <openvr.h>
+
 bool keys[1024];
 bool prevKeys[1024];
 double mouse[2];
@@ -108,7 +116,131 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   }
 }
 
+string GetTrackedDeviceClassString(vr::ETrackedDeviceClass td_class) {
+
+  string str_td_class = "Unknown class";
+
+  switch (td_class)
+  {
+  case vr::TrackedDeviceClass_Invalid:			// = 0, the ID was not valid.
+    str_td_class = "invalid";
+    break;
+  case vr::TrackedDeviceClass_HMD:				// = 1, Head-Mounted Displays
+    str_td_class = "hmd";
+    break;
+  case vr::TrackedDeviceClass_Controller:			// = 2, Tracked controllers
+    str_td_class = "controller";
+    break;
+  case vr::TrackedDeviceClass_GenericTracker:		// = 3, Generic trackers, similar to controllers
+    str_td_class = "generic tracker";
+    break;
+  case vr::TrackedDeviceClass_TrackingReference:	// = 4, Camera and base stations that serve as tracking reference points
+    str_td_class = "base station";
+    break;
+  case vr::TrackedDeviceClass_DisplayRedirect:	// = 5, Accessories that aren't necessarily tracked themselves, but may redirect video output from other tracked devices
+    str_td_class = "display redirect";
+    break;
+  }
+
+  return str_td_class;
+}
+
+vr::IVRSystem* vr_context;
+vr::TrackedDevicePose_t tracked_device_pose[vr::k_unMaxTrackedDeviceCount];
+string tracked_device_type[vr::k_unMaxTrackedDeviceCount];
+
+string GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t unDevice, vr::TrackedDeviceProperty prop, vr::TrackedPropertyError *peError)
+{
+  uint32_t requiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, NULL, 0, peError);
+  if (requiredBufferLen == 0)
+    return "";
+
+  char *pchBuffer = new char[requiredBufferLen];
+  requiredBufferLen = pHmd->GetStringTrackedDeviceProperty(unDevice, prop, pchBuffer, requiredBufferLen, peError);
+  string sResult = pchBuffer;
+  delete[] pchBuffer;
+
+  return sResult;
+}
+
+void process_vr_event(const vr::VREvent_t & event)
+{
+  string str_td_class = GetTrackedDeviceClassString(vr_context->GetTrackedDeviceClass(event.trackedDeviceIndex));
+
+  switch (event.eventType)
+  {
+  case vr::VREvent_TrackedDeviceActivated:
+  {
+    cout << "Device " << event.trackedDeviceIndex << " attached (" << str_td_class << ")" << endl;
+    tracked_device_type[event.trackedDeviceIndex] = str_td_class;
+  }
+  break;
+  case vr::VREvent_TrackedDeviceDeactivated:
+  {
+    cout << "Device " << event.trackedDeviceIndex << " detached (" << str_td_class << ")" << endl;
+    tracked_device_type[event.trackedDeviceIndex] = "";
+  }
+  break;
+  case vr::VREvent_TrackedDeviceUpdated:
+  {
+    cout << "Device " << event.trackedDeviceIndex << " updated (" << str_td_class << ")" << endl;
+  }
+  break;
+  case vr::VREvent_ButtonPress:
+  {
+    vr::VREvent_Controller_t controller_data = event.data.controller;
+    cout << "Pressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+  }
+  break;
+  case vr::VREvent_ButtonUnpress:
+  {
+    vr::VREvent_Controller_t controller_data = event.data.controller;
+    cout << "Unpressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+  }
+  break;
+  case vr::VREvent_ButtonTouch:
+  {
+    vr::VREvent_Controller_t controller_data = event.data.controller;
+    cout << "Touched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+  }
+  break;
+  case vr::VREvent_ButtonUntouch:
+  {
+    vr::VREvent_Controller_t controller_data = event.data.controller;
+    cout << "Untouched button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+  }
+
+  break;
+  }
+}
+
+// lifted from https://github.com/highfidelity/hifi/blob/master/plugins/openvr/src/OpenVrHelpers.h
+inline mat4 toGlm(const vr::HmdMatrix34_t& m) {
+  mat4 result = mat4(
+    m.m[0][0], m.m[1][0], m.m[2][0], 0.0,
+    m.m[0][1], m.m[1][1], m.m[2][1], 0.0,
+    m.m[0][2], m.m[1][2], m.m[2][2], 0.0,
+    m.m[0][3], m.m[1][3], m.m[2][3], 1.0f);
+  return result;
+}
+
 int main(void) {
+
+  openvdb::initialize();
+  openvdb::FloatGrid::Ptr grid =
+    openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+      /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
+      /*voxel size=*/0.5, /*width=*/4.0);
+
+  if (!vr::VR_IsHmdPresent() || !vr::VR_IsRuntimeInstalled) {
+    return -1;
+  }
+
+  cout << "found hmd and openvr runtime!" << endl;
+  vr::HmdError err;
+  vr_context = vr::VR_Init(&err, vr::EVRApplicationType::VRApplication_Scene);
+  vr_context == NULL ? cout << "Error while initializing SteamVR runtime. Error code is " << vr::VR_GetVRInitErrorAsSymbol(err) << endl : cout << "SteamVR runtime successfully initialized" << endl;
+
   memset(keys, 0, sizeof(keys));
 
   int d = BRICK_DIAMETER;
@@ -358,9 +490,9 @@ int main(void) {
   BlueNoise1x64x64x64 *blue_noise = new BlueNoise1x64x64x64();
   blue_noise->upload();
 
-  VoxEntity *catModel;
+  VoxEntity *catModel = nullptr;
   // Load vox models
-  {
+  if (false) {
     catModel = new VoxEntity(
       "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
       glm::vec3(200.0, 50.0, 10.0)
@@ -431,6 +563,23 @@ int main(void) {
     voxModelRh2house->paintInto(buf, voxelSpaceDims);
 
     voxelSpaceSSBO->endMap();
+  }
+
+  SSBO *splatBuffer = new SSBO(sizeof(Splat) * 1 << 25);
+  size_t splat_count = 0;
+  // Collect VDB splats
+  {
+    using GridType = openvdb::FloatGrid;
+    using TreeType = GridType::TreeType;
+    // Iterate over all active values but don't allow them to be changed.
+    Splat *splatArray = (Splat *)splatBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
+
+    for (GridType::ValueOnCIter iter = grid->cbeginValueOn(); iter.test(); ++iter) {
+      openvdb::Vec3d c = iter.getCoord().asVec3d();
+      splatArray[splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
+      splat_count++;
+    }
+    splatBuffer->endMap();
   }
 
   double deltaTime = 0.0;
@@ -547,18 +696,21 @@ int main(void) {
           fabs(y) > 0.1 ? -y * 100 * deltaTime : 0.0,
           fabs(z) > 0.1 ? -z * 100 * deltaTime : 0.0
         );
-        catModel->move(move);
-        catModel->clampPosition(glm::vec3(8.0, 16, 0.0), glm::vec3(voxelSpaceDims) - glm::vec3(8.0, 0.0, 16.0));
+
+        if (catModel != nullptr) {
+          catModel->move(move);
+          catModel->clampPosition(glm::vec3(8.0, 16, 0.0), glm::vec3(voxelSpaceDims) - glm::vec3(8.0, 0.0, 16.0));
 
 
-        if (fabs(x) > 0.1 || fabs(z) > 0.1) {
-          float dir = atan2(-move.x, -move.z);
+          if (fabs(x) > 0.1 || fabs(z) > 0.1) {
+            float dir = atan2(-move.x, -move.z);
 
-          catModel->setRotation(glm::vec3(
-            0.0,
-            dir,
-            0.0
-          ));
+            catModel->setRotation(glm::vec3(
+              0.0,
+              dir,
+              0.0
+            ));
+          }
         }
 
         /*lastCharacterPos = characterPos;
@@ -594,7 +746,7 @@ int main(void) {
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     // Regenerate world
-    if (true) {
+    if (false) {
       // Clear the voxel space volume
       glm::uvec3 sdfDims(40, 40, 40);
 
@@ -623,7 +775,9 @@ int main(void) {
       lastCharacterTime = time;
 
       uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
-      catModel->paintInto(buf, voxelSpaceDims);
+      if (catModel != nullptr) {
+        catModel->paintInto(buf, voxelSpaceDims);
+      }
       voxelSpaceSSBO->endMap();
 
 
@@ -632,7 +786,7 @@ int main(void) {
     }
 
     // Generate mipmaps
-    if (time == 0) {
+    if (false && time == 0) {
       double mipStart = glfwGetTime();
       // Generate mipmap for SSBO
       for (unsigned int i = 1; i <= MAX_MIP_LEVELS; i++) {
@@ -943,17 +1097,85 @@ int main(void) {
       }
     }
 
+    // OpenVR Debug
+    {
+      if (vr_context != NULL) {
+        // Process SteamVR events
+        vr::VREvent_t vr_event;
+        while (vr_context->PollNextEvent(&vr_event, sizeof(vr_event))) {
+          process_vr_event(vr_event);
+        }
+
+        // Obtain tracking device poses
+        vr_context->GetDeviceToAbsoluteTrackingPose(vr::ETrackingUniverseOrigin::TrackingUniverseStanding, 0, tracked_device_pose, vr::k_unMaxTrackedDeviceCount);
+
+        int actual_y = 110, tracked_device_count = 0;
+        for (int nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; nDevice++)
+        {
+          if ((tracked_device_pose[nDevice].bDeviceIsConnected) && (tracked_device_pose[nDevice].bPoseIsValid))
+          {
+            // Check whether the tracked device is a controller. If so, set text color based on the trigger button state
+            vr::VRControllerState_t controller_state;
+
+            // We take just the translation part of the matrix (actual position of tracked device, not orientation)
+            float v[3] = {
+              tracked_device_pose[nDevice].mDeviceToAbsoluteTracking.m[0][3],
+              tracked_device_pose[nDevice].mDeviceToAbsoluteTracking.m[1][3],
+              tracked_device_pose[nDevice].mDeviceToAbsoluteTracking.m[2][3]
+            };
+
+
+
+            ImGui::Text("device #%i (%s)\n   pos (%.3f, %.3f, %.3f)", nDevice, tracked_device_type[nDevice].c_str(), v[0], v[1], v[2]);
+
+            tracked_device_count++;
+          }
+        }
+
+
+//       tracked_device_pose[2].mDeviceToAbsoluteTracking.m[0][3] *= 500.0;
+//       tracked_device_pose[2].mDeviceToAbsoluteTracking.m[1][3] *= 500.0;
+//       tracked_device_pose[2].mDeviceToAbsoluteTracking.m[2][3] *= 500.0;
+
+        glm::mat4 M = toGlm(tracked_device_pose[2].mDeviceToAbsoluteTracking);
+
+        VP = perspectiveMatrix * viewMatrix * M;
+
+        ImGui::Text("devices: %i", tracked_device_count);
+      }
+
+    }
+
+
     // Splats
     if (true) {
       static Splats splats(voxelSpaceSSBO);
 
-      splats.tick();
-      splats.render(
-        VP,
-        currentEye,
-        uvec2(windowDimensions[0], windowDimensions[1]),
-        fov
-      );
+      // Raster splats using draw arrays
+      {
+        splats.rasterSplats
+          ->use()
+          ->uniformMat4("mvp", VP)
+          ->uniformVec3("eye", currentEye)
+          ->uniformFloat("fov", fov)
+          ->uniformVec2ui("res", uvec2(windowDimensions[0], windowDimensions[1]))
+          ->uniform1ui("mipLevel", 0)
+          ->ssbo("splatInstanceBuffer", splatBuffer);
+
+        glEnable(GL_PROGRAM_POINT_SIZE);
+        glDrawArrays(GL_POINTS, 0, splat_count);
+        gl_error();
+       }
+      // Raster splats using indirect draw arrays
+      if (false) {
+        splats.tick();
+        splats.render(
+          VP,
+          currentEye,
+          uvec2(windowDimensions[0], windowDimensions[1]),
+          fov
+        );
+      }
     }
 
     {
@@ -961,7 +1183,9 @@ int main(void) {
       static int counter = 0;
       ImGui::Text("%.1fFPS (%.3f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
       ImGui::Text("camera(%.3f, %.3f, %.3f)", camera->Position.x, camera->Position.y, camera->Position.z);
-      ImGui::Text("cat(%.3f, %.3f, %.3f)", catModel->getPosition().x, catModel->getPosition().y, catModel->getPosition().z);
+      if (catModel != nullptr) {
+        ImGui::Text("cat(%.3f, %.3f, %.3f)", catModel->getPosition().x, catModel->getPosition().y, catModel->getPosition().z);
+      }
       ImGui::End();
 
       if (!shaderLogs.empty()) {

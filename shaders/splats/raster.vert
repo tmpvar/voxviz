@@ -23,11 +23,13 @@ void main() {
 
   vec4 outPos;
   float size;
-  quadricProj(s.position.xyz + 0.5, 0.5, mvp, vec2(res)/2.0, outPos, size);
-  pointSize = size;
+  quadricProj(s.position.xyz, 0.5, mvp, vec2(res)/2.0, outPos, size);
+  //pointSize = size;
   gl_PointSize = pointSize * s.position.w;
+  gl_PointSize = 10;
   vec4 pos = mvp * vec4(s.position.xyz, 1.0);
   center = (pos.xy/pos.z);
   gl_Position = pos;
-  //color = vec4(1.0 - distance(eye, s.position.xyz) / 1000);
+  color = vec4(1.0 - distance(eye, s.position.xyz) / 1000);
+  color = vec4(s.position.xyz / 100.0, 1.0);
 }

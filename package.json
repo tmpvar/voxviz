@@ -11,6 +11,7 @@
   },
   "scripts": {
     "glsl-reload": "node shaders/convert.js -w -o build/shaders",
-    "generate": "rm -rf build && mkdir build && cd build && cmake -DCMAKE_GENERATOR_PLATFORM=x64 .."
+    "generate": "rm -rf build && mkdir build && cd build && cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DCMAKE_TOOLCHAIN_FILE=E:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_APPLOCAL_DEPS=on -DVCPKG_TARGET_TRIPLET=x64-windows ..",
+    "regenerate": "cd build && cmake -DCMAKE_GENERATOR_PLATFORM=x64 -DCMAKE_TOOLCHAIN_FILE=E:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows .."
   }
 }
