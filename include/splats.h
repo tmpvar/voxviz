@@ -1,6 +1,32 @@
 #pragma once
 
 #include "gl-wrap.h"
+//#include <openvdb/openvdb.h>
+
+
+//using GridType = openvdb::FloatGrid;
+//using TreeType = GridType::TreeType;
+
+class SplatBuffer {
+  public:
+    SSBO *ssbo = nullptr;
+    size_t splat_count = 0;
+    Splat *data = nullptr;
+    glm::mat4 model;
+    size_t max_splats;
+    SplatBuffer() {
+      this->max_splats = (1 << 25);
+      this->ssbo = new SSBO(sizeof(Splat) * max_splats);
+      this->data = (Splat *)ssbo->beginMapPersistent();
+      this->model = glm::mat4(1.0);
+    }
+
+    ~SplatBuffer() {
+      this->ssbo->endMap();
+      delete this->ssbo;
+    }
+};
+
 
 class Splats {
 

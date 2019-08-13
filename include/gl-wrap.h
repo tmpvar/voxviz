@@ -280,7 +280,9 @@ public:
 
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_STATIC_DRAW); gl_error();
+    //glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_STATIC_DRAW); gl_error();
+    GLbitfield flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, 0, flags);
     this->unbind();
 
     this->total_bytes = bytes;
@@ -295,6 +297,21 @@ public:
     this->bind();
     void *out = glMapBuffer(GL_SHADER_STORAGE_BUFFER, m); gl_error();
     //this->unbind();
+    this->mapped = true;
+    return out;
+  }
+
+  void *beginMapPersistent() {
+    if (this->total_bytes == 0) {
+      return nullptr;
+    }
+
+    GLuint access = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+
+    this->bind();
+    void *out = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this->total_bytes, access);
+    gl_error();
+
     this->mapped = true;
     return out;
   }

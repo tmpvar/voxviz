@@ -32,12 +32,16 @@
 #include <string.h>
 #include <queue>
 #include <map>
+#include <chrono>
 
 #undef min
 #undef max
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/LevelSetPlatonic.h>
+#include <openvdb/tools/Composite.h>
+#include <openvdb/tools/GridTransformer.h>
 #include <tbb/tbb.h>
 #include <openvr.h>
 
@@ -163,6 +167,9 @@ string GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t unDe
   return sResult;
 }
 
+
+bool vrcontrollerButtons[255];
+
 void process_vr_event(const vr::VREvent_t & event)
 {
   string str_td_class = GetTrackedDeviceClassString(vr_context->GetTrackedDeviceClass(event.trackedDeviceIndex));
@@ -190,6 +197,10 @@ void process_vr_event(const vr::VREvent_t & event)
   {
     vr::VREvent_Controller_t controller_data = event.data.controller;
     cout << "Pressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+
+    if (controller_data.button == vr::k_EButton_Axis1) {
+      cout << "yuuuupp" << endl;
+    }
   }
   break;
   case vr::VREvent_ButtonUnpress:
@@ -224,13 +235,52 @@ inline mat4 toGlm(const vr::HmdMatrix34_t& m) {
   return result;
 }
 
+SplatBuffer *fillSplatBuffer(SplatBuffer *buf, openvdb::FloatGrid::Ptr grid) {
+  buf->splat_count = 0;
+  using GridType = openvdb::FloatGrid;
+  using TreeType = GridType::TreeType;
+
+  for (GridType::ValueOnCIter iter = grid->cbeginValueOn(); iter.test(); ++iter) {
+    openvdb::Vec3d c = grid->transform().indexToWorld(iter.getCoord().asVec3d());
+    buf->data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
+    buf->splat_count++;
+  }
+  return buf;
+}
+
 int main(void) {
 
   openvdb::initialize();
-  openvdb::FloatGrid::Ptr grid =
+
+
+  openvdb::FloatGrid::Ptr toolGrid =
     openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
       /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
-      /*voxel size=*/0.5, /*width=*/4.0);
+      /*voxel size=*/2, /*width=*/1.1);
+
+  openvdb::math::Transform::Ptr toolIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
+  toolGrid->setTransform(toolIdentity);
+  /*
+  openvdb::math::BBox<openvdb::Vec3d> worldGridBounds(
+    openvdb::Vec3d(-200, -5, -200),
+    openvdb::Vec3d(100, 5, 100)
+  );
+
+  openvdb::math::Transform::Ptr worldIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
+
+  openvdb::FloatGrid::Ptr worldGrid = openvdb::tools::createLevelSetBox<openvdb::FloatGrid>(
+    worldGridBounds,
+    *worldIdentity,
+    1.1f
+  );
+  */
+
+  openvdb::FloatGrid::Ptr worldGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+    /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
+    /*voxel size=*/2, /*width=*/1.1);
+
+  openvdb::math::Transform::Ptr worldIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
+  worldGrid->setTransform(toolIdentity);
 
   if (!vr::VR_IsHmdPresent() || !vr::VR_IsRuntimeInstalled) {
     return -1;
@@ -309,7 +359,7 @@ int main(void) {
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwGetCursorPos(window, &mouse[0], &mouse[1]);
   FreeCamera *camera = new FreeCamera(
-    glm::vec3(100, 100, -200),
+    glm::vec3(1, -1, -1),
 	glm::vec3(0.0, 1.0, 0.0),
 	90.0,
 	0.0
@@ -370,7 +420,7 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.01f;
+  const float movementSpeed = 0.0001f;
   GLFWgamepadstate state;
 
   // Voxel space
@@ -565,22 +615,20 @@ int main(void) {
     voxelSpaceSSBO->endMap();
   }
 
-  SSBO *splatBuffer = new SSBO(sizeof(Splat) * 1 << 25);
-  size_t splat_count = 0;
+  vector <SplatBuffer *>splatBuffers;
+
+  SplatBuffer *toolBuffer = new SplatBuffer();//new SSBO(sizeof(Splat) * 1 << 25);
+  splatBuffers.push_back(toolBuffer);
+
+  SplatBuffer *worldBuffer = new SplatBuffer();//new SSBO(sizeof(Splat) * 1 << 25);
+  splatBuffers.push_back(worldBuffer);
+
   // Collect VDB splats
   {
-    using GridType = openvdb::FloatGrid;
-    using TreeType = GridType::TreeType;
-    // Iterate over all active values but don't allow them to be changed.
-    Splat *splatArray = (Splat *)splatBuffer->beginMap(SSBO::MAP_WRITE_ONLY);
-
-    for (GridType::ValueOnCIter iter = grid->cbeginValueOn(); iter.test(); ++iter) {
-      openvdb::Vec3d c = iter.getCoord().asVec3d();
-      splatArray[splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
-      splat_count++;
-    }
-    splatBuffer->endMap();
+    fillSplatBuffer(toolBuffer, toolGrid);
+    fillSplatBuffer(worldBuffer, worldGrid);
   }
+
 
   double deltaTime = 0.0;
   double lastTime = glfwGetTime();
@@ -629,6 +677,54 @@ int main(void) {
 
       if (keys[GLFW_KEY_A]) {
         camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
+      }
+
+      if (keys[GLFW_KEY_SPACE]) {
+        {
+          using GridType = openvdb::FloatGrid;
+          using TreeType = GridType::TreeType;
+          float *s = glm::value_ptr(toolBuffer->model);
+
+          /*(
+            static_cast<double>(s[0]), static_cast<double>(s[4]), static_cast<double>(s[8]), static_cast<double>(s[12]),
+            static_cast<double>(s[1]), static_cast<double>(s[5]), static_cast<double>(s[9]), static_cast<double>(s[13]),
+            static_cast<double>(s[2]), static_cast<double>(s[6]), static_cast<double>(s[10]), static_cast<double>(s[14]),
+            static_cast<double>(s[3]), static_cast<double>(s[7]), static_cast<double>(s[11]), static_cast<double>(s[15])
+          );*/
+
+          const openvdb::math::Transform
+            &toolXform = toolGrid->transform(),
+            &worldXform = worldGrid->transform();
+
+          openvdb::tools::GridTransformer transformer(
+            toolXform.baseMap()->getAffineMap()->getMat4()// *
+            //worldXform.baseMap()->getAffineMap()->getMat4().inverse()
+          );
+
+          glm::vec3 toolPos = toolBuffer->model[3];
+
+          openvdb::tools::GridTransformer transformer2(
+            openvdb::Vec3R(0.0, 0.0, 0.0),
+            openvdb::Vec3R(1.0, 1.0, 1.0),
+            openvdb::Vec3R(0.0, 0.0, 0.0),
+            openvdb::Vec3R(toolPos.x* 500.0, toolPos.y* 500.0, toolPos.z* 500.0)
+         );
+
+          openvdb::FloatGrid::Ptr tmpGrid = openvdb::FloatGrid::create(
+            toolGrid->background()
+          );
+
+          transformer2.transformGrid<openvdb::tools::BoxSampler, openvdb::FloatGrid>(
+            *toolGrid,
+            *tmpGrid
+          );
+
+          //openvdb::tools::csgUnion(*worldGrid, *tmpGrid);
+          openvdb::tools::compMin(*worldGrid, *tmpGrid);
+          worldGrid->tree().prune();
+
+          fillSplatBuffer(worldBuffer, worldGrid);
+        }
       }
 
       if (keys[GLFW_KEY_H]) {
@@ -1097,6 +1193,7 @@ int main(void) {
       }
     }
 
+
     // OpenVR Debug
     {
       if (vr_context != NULL) {
@@ -1107,8 +1204,8 @@ int main(void) {
         }
 
         // Obtain tracking device poses
-        vr_context->GetDeviceToAbsoluteTrackingPose(vr::ETrackingUniverseOrigin::TrackingUniverseStanding, 0, tracked_device_pose, vr::k_unMaxTrackedDeviceCount);
-
+        vr_context->GetDeviceToAbsoluteTrackingPose(vr::ETrackingUniverseOrigin::TrackingUniverseSeated, 0, tracked_device_pose, vr::k_unMaxTrackedDeviceCount);
+        vr::VRControllerState_t controllerState;
         int actual_y = 110, tracked_device_count = 0;
         for (int nDevice = 0; nDevice < vr::k_unMaxTrackedDeviceCount; nDevice++)
         {
@@ -1125,7 +1222,6 @@ int main(void) {
             };
 
 
-
             ImGui::Text("device #%i (%s)\n   pos (%.3f, %.3f, %.3f)", nDevice, tracked_device_type[nDevice].c_str(), v[0], v[1], v[2]);
 
             tracked_device_count++;
@@ -1136,45 +1232,75 @@ int main(void) {
 //       tracked_device_pose[2].mDeviceToAbsoluteTracking.m[0][3] *= 500.0;
 //       tracked_device_pose[2].mDeviceToAbsoluteTracking.m[1][3] *= 500.0;
 //       tracked_device_pose[2].mDeviceToAbsoluteTracking.m[2][3] *= 500.0;
+        //static bool worldSetup = false;
+        //if (!worldSetup) {
+//          worldSetup = true;
+  //        worldBuffer->model = toGlm(tracked_device_pose[1].mDeviceToAbsoluteTracking);
+    //    }
 
-        glm::mat4 M = toGlm(tracked_device_pose[2].mDeviceToAbsoluteTracking);
+        static glm::vec3 initialPosition = glm::vec3(
+          tracked_device_pose[1].mDeviceToAbsoluteTracking.m[0][3],
+          tracked_device_pose[1].mDeviceToAbsoluteTracking.m[1][3],
+          tracked_device_pose[1].mDeviceToAbsoluteTracking.m[2][3]
+        );
 
-        VP = perspectiveMatrix * viewMatrix * M;
+        tracked_device_pose[1].mDeviceToAbsoluteTracking.m[0][3] -= initialPosition.x;
+        tracked_device_pose[1].mDeviceToAbsoluteTracking.m[1][3] -= initialPosition.y;
+        tracked_device_pose[1].mDeviceToAbsoluteTracking.m[2][3] -= initialPosition.z;
+
+        toolBuffer->model = toGlm(tracked_device_pose[1].mDeviceToAbsoluteTracking);
+
+
 
         ImGui::Text("devices: %i", tracked_device_count);
       }
 
     }
 
+    //toolBuffer->model = glm::translate(glm::mat4(1.0), glm::vec3(((float)time)/1000.0, 0.0, 0.0));
+
+    /*openvdb::Mat4R toolMat = openvdb::Mat4R::identity();
+    toolMat.setTranslation(
+      openvdb::Vec3s(
+        toolBuffer->model[3][0],
+        toolBuffer->model[3][1],
+        toolBuffer->model[3][2]
+      )
+    );
+    toolGrid->setTransform(openvdb::math::Transform::createLinearTransform(toolMat));
+    */
+
 
     // Splats
     if (true) {
-      static Splats splats(voxelSpaceSSBO);
+      static Program* rasterSplats = Program::New()
+        ->add(Shaders::get("splats/raster.vert"))
+        ->add(Shaders::get("splats/raster.frag"))
+        ->output("outColor")
+        ->link();
 
       // Raster splats using draw arrays
       {
-        splats.rasterSplats
+        rasterSplats
           ->use()
-          ->uniformMat4("mvp", VP)
+
           ->uniformVec3("eye", currentEye)
           ->uniformFloat("fov", fov)
           ->uniformVec2ui("res", uvec2(windowDimensions[0], windowDimensions[1]))
-          ->uniform1ui("mipLevel", 0)
-          ->ssbo("splatInstanceBuffer", splatBuffer);
+          ->uniform1ui("mipLevel", 0);
 
         glEnable(GL_PROGRAM_POINT_SIZE);
-        glDrawArrays(GL_POINTS, 0, splat_count);
+        size_t total_splats = 0;
+        for (auto &buffer : splatBuffers) {
+          total_splats += buffer->splat_count;
+          rasterSplats
+            ->ssbo("splatInstanceBuffer", buffer->ssbo)
+            ->uniformMat4("mvp", perspectiveMatrix * viewMatrix * buffer->model);
+          glDrawArrays(GL_POINTS, 0, buffer->splat_count);
+        }
+
+        ImGui::Text("splats: %lu", total_splats);
         gl_error();
-       }
-      // Raster splats using indirect draw arrays
-      if (false) {
-        splats.tick();
-        splats.render(
-          VP,
-          currentEye,
-          uvec2(windowDimensions[0], windowDimensions[1]),
-          fov
-        );
       }
     }
 
