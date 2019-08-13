@@ -14,10 +14,12 @@ class SplatBuffer {
     Splat *data = nullptr;
     glm::mat4 model;
     size_t max_splats;
-    SplatBuffer() {
+    SplatBuffer(bool startMap = false) {
       this->max_splats = (1 << 25);
       this->ssbo = new SSBO(sizeof(Splat) * max_splats);
-      this->data = (Splat *)ssbo->beginMapPersistent();
+      if (startMap) {
+        this->data = (Splat *)ssbo->beginMapPersistent();
+      }
       this->model = glm::mat4(1.0);
     }
 

@@ -47,8 +47,7 @@ struct RayTermination {
 };
 
 struct Splat {
-  vec4 position;
-  vec4 color;
+  vec3 position;
 };
 
 struct SplatBucket {

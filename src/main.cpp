@@ -239,12 +239,13 @@ SplatBuffer *fillSplatBuffer(SplatBuffer *buf, openvdb::FloatGrid::Ptr grid) {
   buf->splat_count = 0;
   using GridType = openvdb::FloatGrid;
   using TreeType = GridType::TreeType;
-
+  Splat *data = (Splat *)buf->ssbo->beginMap(SSBO::MAP_WRITE_ONLY);
   for (GridType::ValueOnCIter iter = grid->cbeginValueOn(); iter.test(); ++iter) {
     openvdb::Vec3d c = grid->transform().indexToWorld(iter.getCoord().asVec3d());
-    buf->data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
+    data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
     buf->splat_count++;
   }
+  buf->ssbo->endMap();
   return buf;
 }
 
@@ -256,7 +257,7 @@ int main(void) {
   openvdb::FloatGrid::Ptr toolGrid =
     openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
       /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
-      /*voxel size=*/2, /*width=*/1.1);
+      /*voxel size=*/1, /*width=*/1.1);
 
   openvdb::math::Transform::Ptr toolIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
   toolGrid->setTransform(toolIdentity);
@@ -277,7 +278,7 @@ int main(void) {
 
   openvdb::FloatGrid::Ptr worldGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
     /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
-    /*voxel size=*/2, /*width=*/1.1);
+    /*voxel size=*/1, /*width=*/1.1);
 
   openvdb::math::Transform::Ptr worldIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
   worldGrid->setTransform(toolIdentity);

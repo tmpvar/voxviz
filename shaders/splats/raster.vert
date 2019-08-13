@@ -19,15 +19,14 @@ out vec2 center;
 
 void main() {
   Splat s = splats[gl_VertexID];
-  color = s.color;
 
   vec4 outPos;
   float size;
   quadricProj(s.position.xyz, 0.5, mvp, vec2(res)/2.0, outPos, size);
-  //pointSize = size;
-  gl_PointSize = pointSize * s.position.w;
-  gl_PointSize = 30;
-  vec4 pos = mvp * vec4(s.position.xyz / 500.0, 1.0);
+
+  gl_PointSize = size;
+  gl_PointSize =2 ;
+  vec4 pos = mvp * vec4(s.position.xyz, 1.0);
   center = (pos.xy/pos.z);
   gl_Position = pos;
   color = vec4(1.0 - distance(eye, s.position.xyz) / 1000);
