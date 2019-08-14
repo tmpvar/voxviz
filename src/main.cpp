@@ -256,7 +256,7 @@ int main(void) {
 
   openvdb::FloatGrid::Ptr toolGrid =
     openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
-      /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
+      /*radius=*/5.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
       /*voxel size=*/1, /*width=*/1.1);
 
   openvdb::math::Transform::Ptr toolIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
@@ -720,8 +720,8 @@ int main(void) {
             *tmpGrid
           );
 
-          //openvdb::tools::csgUnion(*worldGrid, *tmpGrid);
-          openvdb::tools::compMin(*worldGrid, *tmpGrid);
+          openvdb::tools::csgUnion(*worldGrid, *tmpGrid);
+          //openvdb::tools::compMin(*worldGrid, *tmpGrid);
           worldGrid->tree().prune();
 
           fillSplatBuffer(worldBuffer, worldGrid);

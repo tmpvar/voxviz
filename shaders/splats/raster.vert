@@ -18,7 +18,7 @@ flat out float pointSize;
 
 void main() {
   Splat s = splats[gl_VertexID];
-  float voxelScale = 0.001;
+  float voxelScale = 0.01;
   vec4 outPos;
   float size;
   quadricProj(s.position.xyz, 1, mvp, vec2(res)/2.0, outPos, size);
