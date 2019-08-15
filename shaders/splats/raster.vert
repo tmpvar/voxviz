@@ -4,6 +4,7 @@
 
 #include "../splats.glsl"
 #include "../shared/quadric-proj.glsl"
+#include "../hsl.glsl"
 
 layout (std430) buffer splatInstanceBuffer {
   Splat splats[];
@@ -13,12 +14,13 @@ uniform mat4 mvp;
 uniform vec3 eye;
 uniform uvec2 res;
 uniform float fov;
+uniform uint32_t maxSplats;
 flat out vec4 color;
 flat out float pointSize;
 
 void main() {
   Splat s = splats[gl_VertexID];
-  float voxelScale = 0.01;
+  float voxelScale = 1.0;
   vec4 outPos;
   float size;
   quadricProj(s.position.xyz, 1, mvp, vec2(res)/2.0, outPos, size);
@@ -29,4 +31,8 @@ void main() {
   gl_Position = pos;
   color = vec4(1.0 - distance(eye, s.position.xyz) / 1000);
   color = vec4(s.position.xyz * voxelScale, 1.0) * 20.0;
+  color = vec4(
+    hsl(vec3(0.7 - (float(gl_VertexID)/float(maxSplats) * 0.9), 0.9, 0.5)),
+    1.0
+  );
 }

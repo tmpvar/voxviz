@@ -169,7 +169,7 @@ string GetTrackedDeviceString(vr::IVRSystem *pHmd, vr::TrackedDeviceIndex_t unDe
 
 
 bool vrcontrollerButtons[255];
-
+bool triggerDown = false;
 void process_vr_event(const vr::VREvent_t & event)
 {
   string str_td_class = GetTrackedDeviceClassString(vr_context->GetTrackedDeviceClass(event.trackedDeviceIndex));
@@ -199,7 +199,7 @@ void process_vr_event(const vr::VREvent_t & event)
     cout << "Pressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
 
     if (controller_data.button == vr::k_EButton_Axis1) {
-      cout << "yuuuupp" << endl;
+      triggerDown = true;
     }
   }
   break;
@@ -207,6 +207,9 @@ void process_vr_event(const vr::VREvent_t & event)
   {
     vr::VREvent_Controller_t controller_data = event.data.controller;
     cout << "Unpressed button " << vr_context->GetButtonIdNameFromEnum((vr::EVRButtonId) controller_data.button) << " of device " << event.trackedDeviceIndex << " (" << str_td_class << ")" << endl;
+    if (controller_data.button == vr::k_EButton_Axis1) {
+      triggerDown = false;
+    }
   }
   break;
   case vr::VREvent_ButtonTouch:
@@ -276,9 +279,11 @@ int main(void) {
   );
   */
 
-  openvdb::FloatGrid::Ptr worldGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
-    /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
-    /*voxel size=*/1, /*width=*/1.1);
+  //openvdb::FloatGrid::Ptr worldGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+  //  /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
+  //  /*voxel size=*/1, /*width=*/1.1);
+
+  openvdb::FloatGrid::Ptr worldGrid = openvdb::FloatGrid::create(1000.0f);
 
   openvdb::math::Transform::Ptr worldIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
   worldGrid->setTransform(toolIdentity);
@@ -421,7 +426,7 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.0001f;
+  const float movementSpeed = 0.1f;
   GLFWgamepadstate state;
 
   // Voxel space
@@ -680,11 +685,11 @@ int main(void) {
         camera->ProcessKeyboard(Camera_Movement::LEFT, speed);
       }
 
-      if (keys[GLFW_KEY_SPACE]) {
+      if (triggerDown || keys[GLFW_KEY_SPACE]) {
         {
           using GridType = openvdb::FloatGrid;
           using TreeType = GridType::TreeType;
-          float *s = glm::value_ptr(toolBuffer->model);
+          //float *s = glm::value_ptr(toolBuffer->model);
 
           /*(
             static_cast<double>(s[0]), static_cast<double>(s[4]), static_cast<double>(s[8]), static_cast<double>(s[12]),
@@ -708,7 +713,7 @@ int main(void) {
             openvdb::Vec3R(0.0, 0.0, 0.0),
             openvdb::Vec3R(1.0, 1.0, 1.0),
             openvdb::Vec3R(0.0, 0.0, 0.0),
-            openvdb::Vec3R(toolPos.x* 500.0, toolPos.y* 500.0, toolPos.z* 500.0)
+            openvdb::Vec3R(toolPos.x, toolPos.y, toolPos.z)
          );
 
           openvdb::FloatGrid::Ptr tmpGrid = openvdb::FloatGrid::create(
@@ -1239,18 +1244,19 @@ int main(void) {
   //        worldBuffer->model = toGlm(tracked_device_pose[1].mDeviceToAbsoluteTracking);
     //    }
 
+        int controller = 2;
         static glm::vec3 initialPosition = glm::vec3(
-          tracked_device_pose[1].mDeviceToAbsoluteTracking.m[0][3],
-          tracked_device_pose[1].mDeviceToAbsoluteTracking.m[1][3],
-          tracked_device_pose[1].mDeviceToAbsoluteTracking.m[2][3]
+          tracked_device_pose[controller].mDeviceToAbsoluteTracking.m[0][3],
+          tracked_device_pose[controller].mDeviceToAbsoluteTracking.m[1][3],
+          tracked_device_pose[controller].mDeviceToAbsoluteTracking.m[2][3]
         );
 
-        tracked_device_pose[1].mDeviceToAbsoluteTracking.m[0][3] -= initialPosition.x;
-        tracked_device_pose[1].mDeviceToAbsoluteTracking.m[1][3] -= initialPosition.y;
-        tracked_device_pose[1].mDeviceToAbsoluteTracking.m[2][3] -= initialPosition.z;
+        tracked_device_pose[controller].mDeviceToAbsoluteTracking.m[0][3] -= initialPosition.x;
+        tracked_device_pose[controller].mDeviceToAbsoluteTracking.m[1][3] -= initialPosition.y;
+        tracked_device_pose[controller].mDeviceToAbsoluteTracking.m[2][3] -= initialPosition.z;
 
-        toolBuffer->model = toGlm(tracked_device_pose[1].mDeviceToAbsoluteTracking);
-
+        toolBuffer->model = toGlm(tracked_device_pose[controller].mDeviceToAbsoluteTracking);
+        toolBuffer->model[3] *= glm::vec4(1000.0, 1000.0, 1000.0, 1.0);
 
 
         ImGui::Text("devices: %i", tracked_device_count);
@@ -1296,6 +1302,7 @@ int main(void) {
           total_splats += buffer->splat_count;
           rasterSplats
             ->ssbo("splatInstanceBuffer", buffer->ssbo)
+            ->uniform1ui("maxSplats", buffer->max_splats)
             ->uniformMat4("mvp", perspectiveMatrix * viewMatrix * buffer->model);
           glDrawArrays(GL_POINTS, 0, buffer->splat_count);
         }
