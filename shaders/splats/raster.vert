@@ -26,7 +26,7 @@ void main() {
   quadricProj(s.position.xyz, 1, mvp, vec2(res)/2.0, outPos, size);
 
   gl_PointSize = min(20.0, size);
-  gl_PointSize = 2 ;
+  gl_PointSize = 1 ;
   vec4 pos = mvp * vec4(s.position.xyz * voxelScale, 1.0);
   gl_Position = pos;
   color = vec4(1.0 - distance(eye, s.position.xyz) / 1000);
