@@ -1,0 +1,50 @@
+#version 430 core
+
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+#extension GL_NV_gpu_shader5: enable
+#extension GL_ARB_gpu_shader_int64 : enable
+#extension GL_NV_shader_atomic_int64 : enable
+
+layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
+
+#include "../splats.glsl"
+#include "../shared/quadric-proj.glsl"
+#include "../hsl.glsl"
+
+layout (std430) buffer splatInstanceBuffer {
+  Splat splats[];
+};
+
+layout (std430) buffer pixelBuffer {
+  uint64_t pixel[];
+};
+
+uniform uvec2 resolution;
+uniform mat4 MVP;
+
+void main() {
+  uint splat_idx = gl_GlobalInvocationID.x;
+  Splat splat = splats[splat_idx];
+  vec4 uv_pos = MVP * splat.position;
+
+  if (
+    uv_pos.w <= 0.0 ||
+    uv_pos.x < -1.0 ||
+    uv_pos.x > 1.0 ||
+    uv_pos.y < -1.0 ||
+    uv_pos.y > 1.0
+  ) {
+		return;
+	}
+
+  uvec2 pixel_pos = uvec2((uv_pos.xy * 0.5 + 0.5) * resolution);
+
+  uint pixel_idx = uint(pixel_pos.x + pixel_pos.y * resolution.x);
+  double uv_depth = uv_pos.w;
+	int64_t pixel_depth = int64_t(uv_depth * 1000000.0lf);
+
+	int64_t pixel_value = (pixel_depth << 24) | int64_t(0xFF00FF);
+
+	atomicMin(pixel[pixel_idx], pixel_value);
+}

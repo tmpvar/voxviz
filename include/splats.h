@@ -16,7 +16,10 @@ class SplatBuffer {
     size_t max_splats;
     SplatBuffer(bool startMap = false) {
       this->max_splats = (1 << 26);
-      this->ssbo = new SSBO(sizeof(Splat) * max_splats);
+      this->ssbo = new SSBO(
+        sizeof(Splat) * max_splats,
+        GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT
+      );
       if (startMap) {
         this->data = (Splat *)ssbo->beginMapPersistent();
       }

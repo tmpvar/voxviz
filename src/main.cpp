@@ -338,7 +338,7 @@ int main(void) {
   glfwSwapInterval(0);
 
   //Compute *compute = new Compute();
-  if (false && glDebugMessageCallback) {
+  if (glDebugMessageCallback) {
     cout << "Register OpenGL debug callback " << endl;
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(openglCallbackFunction, nullptr);
@@ -741,35 +741,80 @@ int main(void) {
 
     // Splats
     if (true) {
-      static Program* rasterSplats = Program::New()
-        ->add(Shaders::get("splats/raster.vert"))
-        ->add(Shaders::get("splats/raster.frag"))
-        ->output("outColor")
-        ->link();
+      glm::uvec2 resolution(windowDimensions[0], windowDimensions[1]);
+      // Raster with GL_POINT
+      if (!debug) {
+        static Program* rasterSplats = Program::New()
+          ->add(Shaders::get("splats/raster.vert"))
+          ->add(Shaders::get("splats/raster.frag"))
+          ->output("outColor")
+          ->link();
 
-      // Raster splats using draw arrays
-      {
+        // Raster splats using draw arrays
+
         rasterSplats
           ->use()
 
           ->uniformVec3("eye", currentEye)
           ->uniformFloat("fov", fov)
-          ->uniformVec2ui("res", uvec2(windowDimensions[0], windowDimensions[1]))
+          ->uniformVec2ui("res", resolution)
           ->uniform1ui("mipLevel", 0);
 
         glEnable(GL_PROGRAM_POINT_SIZE);
         size_t total_splats = 0;
         for (auto &buffer : splatBuffers) {
+          GLuint query;
+          GLuint64 elapsed_time;
+          GLint done = 0;
+          glGenQueries(1, &query);
+          glBeginQuery(GL_TIME_ELAPSED, query);
+
           total_splats += buffer->splat_count;
           rasterSplats
             ->ssbo("splatInstanceBuffer", buffer->ssbo)
             ->uniform1ui("maxSplats", buffer->max_splats)
             ->uniformMat4("mvp", perspectiveMatrix * viewMatrix * buffer->model);
           glDrawArrays(GL_POINTS, 0, buffer->splat_count);
+
+          glEndQuery(GL_TIME_ELAPSED);
+          while (!done) {
+            glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+          }
+
+          // get the query result
+          glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+          ImGui::Text("gl_points: %.3f.ms", elapsed_time / 1000000.0);
+          glDeleteQueries(1, &query);
         }
 
         ImGui::Text("splats: %lu", total_splats);
         gl_error();
+      }
+
+      if (true || debug) {
+        static Program* rasterSplats_Compute = Program::New()
+          ->add(Shaders::get("splats/raster.comp"))
+          ->link();
+        static SSBO* pixelBuffer = new SSBO(0);
+
+        pixelBuffer->resize(
+          8 * resolution.x * resolution.y,
+          glm::vec3(resolution.x, resolution.y, 0)
+        );
+
+        size_t total_splats = 0;
+        for (auto &buffer : splatBuffers) {
+          total_splats += buffer->splat_count;
+
+          rasterSplats_Compute->use()
+            ->uniformVec2ui("resolution", resolution)
+            ->uniformMat4("MVP", MVP)
+            ->ssbo("splatInstanceBuffer", buffer->ssbo)
+            ->ssbo("pixelBuffer", pixelBuffer)
+            ->timedCompute("splats compute", glm::uvec3(buffer->splat_count, 1, 1));
+
+          glDrawArrays(GL_POINTS, 0, buffer->splat_count);
+        }
       }
     }
 

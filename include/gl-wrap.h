@@ -241,6 +241,8 @@ class SSBO {
   GLuint handle = 0;
   bool mapped = false;
   uvec3 _dims = uvec3(0);
+  GLbitfield _flags = GL_STATIC_DRAW;
+  bool _persistent = false;
 public:
 
   const enum MAP_TYPE {
@@ -249,21 +251,34 @@ public:
     MAP_WRITE_ONLY = GL_WRITE_ONLY,
   };
 
-  SSBO(uint64_t bytes) {
+  SSBO(uint64_t bytes, bool persistent = false) {
+    this->_persistent = persistent;
+    if (persistent) {
+      this->_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
+    }
     this->resize(bytes);
   }
 
-  SSBO(uint64_t bytes, uvec3 dims) {
+  SSBO(uint64_t bytes, uvec3 dims, bool persistent = false) {
+    this->_persistent = persistent;
+    if (persistent) {
+      this->_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
+    }
     this->resize(bytes, dims);
   }
 
   SSBO *resize(uint64_t bytes, uvec3 dims) {
+    if (glm::all(glm::equal(dims, this->_dims)) && this->total_bytes == bytes) {
+      return this;
+    }
+
     this->_dims = dims;
     this->resize(bytes);
     return this;
   }
 
   SSBO *resize(uint64_t bytes) {
+    // TODO: what do we do if we're mapped?
     if (this->_dims.x > 0) {
       std::cout << "creating SSBO with " << bytes << " bytes; dims:" << this->_dims.x << ", " << this->_dims.y << ", " << this->_dims.z << endl;
     } else {
@@ -280,9 +295,13 @@ public:
 
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    //glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_STATIC_DRAW); gl_error();
-    GLbitfield flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
-    glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, 0, flags);
+    if (this->_persistent) {
+      glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, NULL, this->_flags);
+    } else {
+      glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, this->_flags);
+    }
+
+    gl_error();
     this->unbind();
 
     this->total_bytes = bytes;
