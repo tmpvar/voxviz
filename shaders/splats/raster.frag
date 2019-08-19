@@ -8,7 +8,7 @@ layout (std430) buffer splatInstanceBuffer {
   Splat splats[];
 };
 
-uniform uvec2 res;
+uniform uvec2 resolution;
 
 out vec4 outColor;
 flat in vec4 color;

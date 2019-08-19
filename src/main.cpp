@@ -42,6 +42,8 @@
 #include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/GridTransformer.h>
+#include <openvdb/tools/GridOperators.h>
+#include <openvdb/io/Stream.h>
 #include <tbb/tbb.h>
 #include <openvr.h>
 
@@ -242,12 +244,36 @@ SplatBuffer *fillSplatBuffer(SplatBuffer *buf, openvdb::FloatGrid::Ptr grid) {
   buf->splat_count = 0;
   using GridType = openvdb::FloatGrid;
   using TreeType = GridType::TreeType;
+
+  openvdb::VectorGrid::Ptr gradientGrid = openvdb::tools::gradient(*grid);
+
   Splat *data = (Splat *)buf->ssbo->beginMap(SSBO::MAP_WRITE_ONLY);
-  for (GridType::ValueOnCIter iter = grid->cbeginValueOn(); iter.test(); ++iter) {
+
+
+  // TODO: make use of a parallel collection mechanism
+  //openvdb::tools::foreach(gradientGrid->beginValueOn(), Local::visit, true);
+  auto gridAccessor = grid->getConstAccessor();
+  for (openvdb::VectorGrid::ValueOnIter iter = gradientGrid->beginValueOn(); iter.test(); ++iter) {
+    if (gridAccessor.getValue(iter.getCoord()) < 0.0) {
+      continue;
+    }
+
+
+    openvdb::Vec3d c = grid->transform().indexToWorld(iter.getCoord().asVec3d());
+    data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
+    openvdb::Vec3f grad = iter.getValue();
+    data[buf->splat_count].normal = glm::vec4(grad.x(), grad.y(), grad.z(), 1.0);
+    buf->splat_count++;
+  }
+
+  /*for (GridType::ValueOnCIter iter = gradientGrid->cbeginValueOn(); iter.test(); ++iter) {
+    if (iter.getValue() < 0.0) {
+      continue;
+    }
     openvdb::Vec3d c = grid->transform().indexToWorld(iter.getCoord().asVec3d());
     data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
     buf->splat_count++;
-  }
+  }*/
   buf->ssbo->endMap();
   return buf;
 }
@@ -283,8 +309,11 @@ int main(void) {
   //  /*radius=*/50.0, /*center=*/openvdb::Vec3f(1.5, 2, 3),
   //  /*voxel size=*/1, /*width=*/1.1);
 
-  openvdb::FloatGrid::Ptr worldGrid = openvdb::FloatGrid::create(1000.0f);
+  std::ifstream ifile("E:\\vdb-models\\dragon.vdb", std::ios_base::binary);
+  auto grids = openvdb::io::Stream(ifile).getGrids();
+  auto dragonGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(grids->at(0));
 
+  auto worldGrid = openvdb::FloatGrid::create(1000.0f);;
   openvdb::math::Transform::Ptr worldIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
   worldGrid->setTransform(toolIdentity);
 
@@ -359,7 +388,6 @@ int main(void) {
   glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
   window_resize(window);
 
-  Raytracer *raytracer = new Raytracer(dims);
   float max_distance = 10000.0f;
 
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -496,10 +524,29 @@ int main(void) {
   SplatBuffer *worldBuffer = new SplatBuffer();//new SSBO(sizeof(Splat) * 1 << 25);
   splatBuffers.push_back(worldBuffer);
 
+  SplatBuffer *dragonBuffer = new SplatBuffer();//new SSBO(sizeof(Splat) * 1 << 25);
+  splatBuffers.push_back(dragonBuffer);
+
   // Collect VDB splats
   {
     fillSplatBuffer(toolBuffer, toolGrid);
     fillSplatBuffer(worldBuffer, worldGrid);
+    fillSplatBuffer(dragonBuffer, dragonGrid);
+    /*
+    dragonBuffer->splat_count = 0;
+    using GridType = openvdb::FloatGrid;
+    using TreeType = GridType::TreeType;
+    Splat *data = (Splat *)dragonBuffer->ssbo->beginMap(SSBO::MAP_WRITE_ONLY);
+    for (GridType::ValueOnCIter iter =  iter.test(); ++iter) {
+      if (iter.getValue() < 0.0) {
+        continue;
+      }
+      openvdb::Vec3d c = dragonGrid->transform().indexToWorld(iter.getCoord().asVec3d());
+      data[dragonBuffer->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
+      dragonBuffer->splat_count++;
+    }
+    dragonBuffer->ssbo->endMap();
+    */
   }
 
 
@@ -590,13 +637,6 @@ int main(void) {
         worldGrid->tree().prune();
 
         fillSplatBuffer(worldBuffer, worldGrid);
-      }
-
-      if (keys[GLFW_KEY_H]) {
-        raytracer->showHeat = 1;
-      }
-      else {
-        raytracer->showHeat = 0;
       }
 
       if (keys[GLFW_KEY_TAB]) {
@@ -740,10 +780,12 @@ int main(void) {
     }
 
     // Splats
-    if (true) {
+    {
       glm::uvec2 resolution(windowDimensions[0], windowDimensions[1]);
+      size_t total_splats = 0;
+
       // Raster with GL_POINT
-      if (!debug) {
+      if (debug) {
         static Program* rasterSplats = Program::New()
           ->add(Shaders::get("splats/raster.vert"))
           ->add(Shaders::get("splats/raster.frag"))
@@ -754,68 +796,72 @@ int main(void) {
 
         rasterSplats
           ->use()
-
           ->uniformVec3("eye", currentEye)
           ->uniformFloat("fov", fov)
-          ->uniformVec2ui("res", resolution)
+          ->uniformVec2ui("resolution", resolution)
           ->uniform1ui("mipLevel", 0);
 
         glEnable(GL_PROGRAM_POINT_SIZE);
-        size_t total_splats = 0;
-        for (auto &buffer : splatBuffers) {
-          GLuint query;
-          GLuint64 elapsed_time;
-          GLint done = 0;
-          glGenQueries(1, &query);
-          glBeginQuery(GL_TIME_ELAPSED, query);
 
+        for (auto &buffer : splatBuffers) {
           total_splats += buffer->splat_count;
           rasterSplats
             ->ssbo("splatInstanceBuffer", buffer->ssbo)
             ->uniform1ui("maxSplats", buffer->max_splats)
             ->uniformMat4("mvp", perspectiveMatrix * viewMatrix * buffer->model);
           glDrawArrays(GL_POINTS, 0, buffer->splat_count);
-
-          glEndQuery(GL_TIME_ELAPSED);
-          while (!done) {
-            glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
-          }
-
-          // get the query result
-          glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
-          ImGui::Text("gl_points: %.3f.ms", elapsed_time / 1000000.0);
-          glDeleteQueries(1, &query);
         }
 
-        ImGui::Text("splats: %lu", total_splats);
+
         gl_error();
       }
 
-      if (true || debug) {
+      if (!debug) {
         static Program* rasterSplats_Compute = Program::New()
           ->add(Shaders::get("splats/raster.comp"))
           ->link();
-        static SSBO* pixelBuffer = new SSBO(0);
+
+        static Program* outputSplats = Program::New()
+          ->add(Shaders::get("splats/output.vert"))
+          ->add(Shaders::get("splats/output.frag"))
+          ->output("outColor")
+          ->link();
+
+        static SSBO* pixelBuffer = (new SSBO(
+          8 * resolution.x * resolution.y,
+          glm::vec3(resolution.x, resolution.y, 0)
+        ))->clear(0xFF);
+
 
         pixelBuffer->resize(
           8 * resolution.x * resolution.y,
           glm::vec3(resolution.x, resolution.y, 0)
         );
 
-        size_t total_splats = 0;
+        rasterSplats_Compute->use()
+          ->ssbo("pixelBuffer", pixelBuffer)
+          ->uniformVec2ui("resolution", resolution);
+
         for (auto &buffer : splatBuffers) {
           total_splats += buffer->splat_count;
 
-          rasterSplats_Compute->use()
-            ->uniformVec2ui("resolution", resolution)
-            ->uniformMat4("MVP", MVP)
+          rasterSplats_Compute
+            ->uniformMat4("mvp", perspectiveMatrix * viewMatrix * buffer->model)
+            ->uniformVec3("eye", currentEye)
             ->ssbo("splatInstanceBuffer", buffer->ssbo)
-            ->ssbo("pixelBuffer", pixelBuffer)
-            ->timedCompute("splats compute", glm::uvec3(buffer->splat_count, 1, 1));
+            ->compute(glm::uvec3(buffer->splat_count, 1, 1));
+            //->timedCompute("splats compute", glm::uvec3(buffer->splat_count, 1, 1));
 
-          glDrawArrays(GL_POINTS, 0, buffer->splat_count);
         }
+        outputSplats->use()
+          ->uniformVec2ui("resolution", resolution)
+          ->ssbo("pixelBuffer", pixelBuffer);
+
+        fullscreen_surface->render(outputSplats);
+
       }
+
+      ImGui::Text("splats: %lu", total_splats);
     }
 
     // Frame stats
@@ -862,7 +908,6 @@ int main(void) {
 
   delete fullscreen_program;
   delete fullscreen_surface;
-  delete raytracer;
   Shaders::destroy();
   uv_stop(uv_default_loop());
   uv_loop_close(uv_default_loop());

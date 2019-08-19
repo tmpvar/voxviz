@@ -2,11 +2,10 @@
 
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
-#extension GL_NV_gpu_shader5: enable
 #extension GL_ARB_gpu_shader_int64 : enable
 #extension GL_NV_shader_atomic_int64 : enable
 
-layout( local_size_x = 128, local_size_y = 1, local_size_z = 1 ) in;
+layout( local_size_x = 32 ) in;
 
 #include "../splats.glsl"
 #include "../shared/quadric-proj.glsl"
@@ -21,13 +20,28 @@ layout (std430) buffer pixelBuffer {
 };
 
 uniform uvec2 resolution;
-uniform mat4 MVP;
+uniform mat4 mvp;
+uniform vec3 eye;
+
+int get_pixel_pos(ivec2 p, ivec2 d) {
+  return int(mix(
+    p.x + p.y * d.x,
+    -1,
+    any(lessThan(p, ivec2(0))) || any(greaterThanEqual(p, d))
+  ));
+}
 
 void main() {
   uint splat_idx = gl_GlobalInvocationID.x;
   Splat splat = splats[splat_idx];
-  vec4 uv_pos = MVP * splat.position;
+  vec3 n = normalize(splat.normal.xyz);
 
+  if (dot((splat.position.xyz - eye), n) >= 0) {
+    return;
+  }
+
+  vec4 uv_pos = mvp * vec4(splat.position.xyz, 1.0);
+  uv_pos.xyz = uv_pos.xyz / uv_pos.w;
   if (
     uv_pos.w <= 0.0 ||
     uv_pos.x < -1.0 ||
@@ -38,13 +52,23 @@ void main() {
 		return;
 	}
 
-  uvec2 pixel_pos = uvec2((uv_pos.xy * 0.5 + 0.5) * resolution);
+  uv_pos.xy = (uv_pos.xy * 0.5 + 0.5) * vec2(resolution);
 
-  uint pixel_idx = uint(pixel_pos.x + pixel_pos.y * resolution.x);
+  int pixel_idx = get_pixel_pos(ivec2(uv_pos.xy), ivec2(resolution));
+  if (pixel_idx < 0) {
+    return;
+  }
+
   double uv_depth = uv_pos.w;
-	int64_t pixel_depth = int64_t(uv_depth * 1000000.0lf);
+  int64_t pixel_depth = 0;//int64_t(uv_depth * 1000000.0lf);
 
-	int64_t pixel_value = (pixel_depth << 24) | int64_t(0xFF00FF);
+  uint64_t color = 0;
 
-	atomicMin(pixel[pixel_idx], pixel_value);
+  color |= uint64_t(n.x * 255.0) << 16;
+  color |= uint64_t(n.y * 255.0) << 8;
+  color |= uint64_t(n.z * 255.0) << 0;
+
+  uint64_t pixel_value = (pixel_depth << 24) | color;
+
+	atomicMin(pixel[uint(pixel_idx)], pixel_value);
 }

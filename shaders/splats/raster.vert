@@ -12,7 +12,7 @@ layout (std430) buffer splatInstanceBuffer {
 
 uniform mat4 mvp;
 uniform vec3 eye;
-uniform uvec2 res;
+uniform uvec2 resolution;
 uniform float fov;
 uniform uint32_t maxSplats;
 flat out vec4 color;
@@ -23,7 +23,7 @@ void main() {
   float voxelScale = 1.0;
   vec4 outPos;
   float size;
-  quadricProj(s.position.xyz, 1, mvp, vec2(res)/2.0, outPos, size);
+  quadricProj(s.position.xyz, 1, mvp, vec2(resolution)/2.0, outPos, size);
 
   gl_PointSize = min(20.0, size);
   gl_PointSize = 1 ;

@@ -363,6 +363,18 @@ public:
   uvec3 dims() {
     return this->_dims;
   }
+
+  SSBO *clear(uint8_t val) {
+    this->bind();
+    glClearBufferData(
+      GL_SHADER_STORAGE_BUFFER,
+      GL_R8,
+      GL_RED,
+      GL_UNSIGNED_BYTE,
+      &val
+    );
+    return this;
+  }
 };
 
 struct SSBOBinding {
