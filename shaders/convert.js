@@ -23,11 +23,10 @@ const dependencyMap = {
 }
 
 if (argv.w) {
-  chokidar.watch(
-    path.join(__dirname, '..'), {
-      ignored: path.join(__dirname, '..', 'build')
-    }
-  ).on('change', (p) => {
+  chokidar.watch([
+    __dirname,
+    path.join(__dirname, '../includes')
+  ]).on('change', (p) => {
     if (p.indexOf(".git") > -1) {
       return
     }

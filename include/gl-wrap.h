@@ -158,14 +158,22 @@ public:
         size_t absoluteSourceLine = 1;
 
         size_t rawErrorLine = 0;
+
+        size_t startingParenLoc = errorLine.find("(");
+        if (startingParenLoc == string::npos) {
+          cout << "could not parse gl error line: " << errorLine << endl;
+          continue;
+        }
+        startingParenLoc += 1;
+
         // here we assume that errors are of the form 0(<line>) <message>
-        size_t endingParenLoc = errorLine.substr(2).find(")");
+        size_t endingParenLoc = errorLine.substr(startingParenLoc).find(")");
         if (endingParenLoc == string::npos) {
           cout << "could not parse gl error line: " << errorLine << endl;
           continue;
         }
 
-        rawErrorLine = stoul(errorLine.substr(2, endingParenLoc));
+        rawErrorLine = stoul(errorLine.substr(startingParenLoc, endingParenLoc));
 
         cout << "error line: " << rawErrorLine << endl;
         sourceStream.seekg(0);
@@ -198,6 +206,9 @@ public:
           if (sourceLine.find("// end: " + file_stack.back().file) != string::npos) {
             size_t skipLines = file_stack.back().lineCount + file_stack.back().skipLines;
             file_stack.pop_back();
+            if (file_stack.size() == 0) {
+              continue;
+            }
             file_stack.back().skipLines += skipLines;
 
             if (absoluteSourceLine == rawErrorLine - 1) {
@@ -494,7 +505,9 @@ public:
 
     if (this->isCompute) {
       glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &this->local_layout[0]);
-      gl_error();
+      if (GL_ERROR()) {
+        this->valid = false;
+      }
     }
     return this;
   }

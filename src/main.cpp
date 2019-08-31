@@ -247,36 +247,114 @@ SplatBuffer *fillSplatBuffer(SplatBuffer *buf, openvdb::FloatGrid::Ptr grid) {
 
   openvdb::VectorGrid::Ptr gradientGrid = openvdb::tools::gradient(*grid);
 
-  Splat *data = (Splat *)buf->ssbo->beginMap(SSBO::MAP_WRITE_ONLY);
-
-
   // TODO: make use of a parallel collection mechanism
   //openvdb::tools::foreach(gradientGrid->beginValueOn(), Local::visit, true);
   auto gridAccessor = grid->getConstAccessor();
+
+  vector<Splat *> splatList;
+
   for (openvdb::VectorGrid::ValueOnIter iter = gradientGrid->beginValueOn(); iter.test(); ++iter) {
     if (gridAccessor.getValue(iter.getCoord()) < 0.0) {
       continue;
     }
 
-
     openvdb::Vec3d c = grid->transform().indexToWorld(iter.getCoord().asVec3d());
-    data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
+    //data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
     openvdb::Vec3f grad = iter.getValue();
-    data[buf->splat_count].normal = glm::vec4(grad.x(), grad.y(), grad.z(), 1.0);
-    buf->splat_count++;
+    glm::vec3 n = glm::normalize(glm::vec3(grad.x(), grad.y(), grad.z()));
+    //data[buf->splat_count].normal = glm::vec4(n, 1.0);
+
+
+    Splat *s = new Splat();
+    s->position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
+    s->normal = glm::vec4(n, 1.0);
+    splatList.push_back(s);
+
+    //buf->bucketSplat(&data[buf->splat_count]);
+
+    //buf->splat_count++;
   }
 
-  /*for (GridType::ValueOnCIter iter = gradientGrid->cbeginValueOn(); iter.test(); ++iter) {
-    if (iter.getValue() < 0.0) {
-      continue;
-    }
-    openvdb::Vec3d c = grid->transform().indexToWorld(iter.getCoord().asVec3d());
-    data[buf->splat_count].position = glm::vec4(c.x(), c.y(), c.z(), 1.0);
-    buf->splat_count++;
-  }*/
+  // Sort the splats by morton order
+  openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+  openvdb::Vec3d gridOffset = bbox.min().asVec3d();
+
+  std::sort(splatList.begin(), splatList.end(), [gridOffset](Splat *a, Splat *b) {
+    // compute morton index on offset coord
+    u64 amorton = libmorton::morton3D_64_encode(
+      static_cast<u64>(a->position.x - gridOffset.x()),
+      static_cast<u64>(a->position.y - gridOffset.y()),
+      static_cast<u64>(a->position.z - gridOffset.z())
+    );
+
+    u64 bmorton = libmorton::morton3D_64_encode(
+      static_cast<u64>(b->position.x - gridOffset.x()),
+      static_cast<u64>(b->position.y - gridOffset.y()),
+      static_cast<u64>(b->position.z - gridOffset.z())
+    );
+
+    return amorton > bmorton;
+  });
+
+  buf->splat_count = splatList.size();
+  Splat *data = (Splat *)buf->ssbo->beginMap(SSBO::MAP_WRITE_ONLY);
+  for (u32 i = 0; i < buf->splat_count; i++) {
+    data[i].position = splatList[i]->position;
+    data[i].normal = splatList[i]->normal;
+  }
   buf->ssbo->endMap();
+
+
+  // collect into buckets
+  {
+    SplatMipBucket *buckets = (SplatMipBucket *)buf->buckets->beginMap(SSBO::MAP_WRITE_ONLY);
+
+    glm::vec4 pos(0.0);
+    glm::vec4 norm(0.0);
+    glm::vec3 lower = glm::vec3(FLT_MAX);;
+    glm::vec3 upper = glm::vec3(-FLT_MAX);;
+
+    u32 bucket_idx = 0;
+
+    for (u32 i = 0; i < buf->splat_count; i++) {
+      pos += splatList[i]->position;
+      norm += splatList[i]->normal;
+      lower.x = glm::min(splatList[i]->position.x, lower.x);
+      lower.y = glm::min(splatList[i]->position.y, lower.y);
+      lower.z = glm::min(splatList[i]->position.z, lower.z);
+
+      upper.x = glm::max(splatList[i]->position.x, upper.x);
+      upper.y = glm::max(splatList[i]->position.y, upper.y);
+      upper.z = glm::max(splatList[i]->position.z, upper.z);
+
+      if (i > 0 && i % SPLAT_BUCKET_SIZE == 0) {
+
+        buckets[bucket_idx].lower = lower;
+        buckets[bucket_idx].lower = upper;
+
+        buckets[bucket_idx].normal = glm::normalize(glm::vec3(
+          norm.x / float(SPLAT_BUCKET_SIZE),
+          norm.y / float(SPLAT_BUCKET_SIZE),
+          norm.z / float(SPLAT_BUCKET_SIZE)
+        ));
+
+        buckets[bucket_idx].position = glm::vec3(
+          pos.x / float(SPLAT_BUCKET_SIZE),
+          pos.y / float(SPLAT_BUCKET_SIZE),
+          pos.z / float(SPLAT_BUCKET_SIZE)
+        );
+
+        bucket_idx++;
+        lower = glm::vec3(FLT_MAX);
+        upper = glm::vec3(-FLT_MAX);
+      }
+    }
+    buf->buckets->endMap();
+  }
   return buf;
 }
+
+
 
 int main(void) {
 
@@ -317,14 +395,16 @@ int main(void) {
   openvdb::math::Transform::Ptr worldIdentity = openvdb::math::Transform::createLinearTransform(openvdb::Mat4R::identity());
   worldGrid->setTransform(toolIdentity);
 
-  if (!vr::VR_IsHmdPresent() || !vr::VR_IsRuntimeInstalled) {
-    return -1;
-  }
+  #ifdef OPENVR_ENABLE
+    if (!vr::VR_IsHmdPresent() || !vr::VR_IsRuntimeInstalled) {
+      return -1;
+    }
 
-  cout << "found hmd and openvr runtime!" << endl;
-  vr::HmdError err;
-  vr_context = vr::VR_Init(&err, vr::EVRApplicationType::VRApplication_Scene);
-  vr_context == NULL ? cout << "Error while initializing SteamVR runtime. Error code is " << vr::VR_GetVRInitErrorAsSymbol(err) << endl : cout << "SteamVR runtime successfully initialized" << endl;
+    cout << "found hmd and openvr runtime!" << endl;
+    vr::HmdError err;
+    vr_context = vr::VR_Init(&err, vr::EVRApplicationType::VRApplication_Scene);
+    vr_context == NULL ? cout << "Error while initializing SteamVR runtime. Error code is " << vr::VR_GetVRInitErrorAsSymbol(err) << endl : cout << "SteamVR runtime successfully initialized" << endl;
+  #endif
 
   memset(keys, 0, sizeof(keys));
 
@@ -454,7 +534,7 @@ int main(void) {
 
   // Start the ImGui frame
   ImGui::CreateContext();
-  const float movementSpeed = 0.1f;
+  const float movementSpeed = 0.01f;
 
   // Voxel space
   const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 128, 1024);
@@ -529,8 +609,8 @@ int main(void) {
 
   // Collect VDB splats
   {
-    fillSplatBuffer(toolBuffer, toolGrid);
-    fillSplatBuffer(worldBuffer, worldGrid);
+    //fillSplatBuffer(toolBuffer, toolGrid);
+    //fillSplatBuffer(worldBuffer, worldGrid);
     fillSplatBuffer(dragonBuffer, dragonGrid);
     /*
     dragonBuffer->splat_count = 0;
@@ -723,6 +803,7 @@ int main(void) {
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     // OpenVR Debug
+    #ifdef OPENVR_ENABLE
     {
       if (vr_context != NULL) {
         // Process SteamVR events
@@ -778,7 +859,7 @@ int main(void) {
         ImGui::Text("devices: %i", tracked_device_count);
       }
     }
-
+    #endif
     // Splats
     {
       glm::uvec2 resolution(windowDimensions[0], windowDimensions[1]);
@@ -840,6 +921,7 @@ int main(void) {
 
         rasterSplats_Compute->use()
           ->ssbo("pixelBuffer", pixelBuffer)
+          ->uniformFloat("fov", fov)
           ->uniformVec2ui("resolution", resolution);
 
         for (auto &buffer : splatBuffers) {
@@ -849,7 +931,8 @@ int main(void) {
             ->uniformMat4("mvp", perspectiveMatrix * viewMatrix * buffer->model)
             ->uniformVec3("eye", currentEye)
             ->ssbo("splatInstanceBuffer", buffer->ssbo)
-            ->compute(glm::uvec3(buffer->splat_count, 1, 1));
+            ->ssbo("splatBucketsBuffer", buffer->buckets)
+            ->compute(glm::uvec3(buffer->splat_count / SPLAT_BUCKET_SIZE, 1, 1));
             //->timedCompute("splats compute", glm::uvec3(buffer->splat_count, 1, 1));
 
         }

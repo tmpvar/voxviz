@@ -23,12 +23,21 @@
 
 #define TAA_HISTORY_LENGTH 16
 #define MAX_MIP_LEVELS 7
+//#define OPENVR_ENABLE
 
 
 #ifdef GPU_HOST
   #include <glm/glm.hpp>
   #include <stdint.h>
   using namespace glm;
+
+  typedef uint8_t u8;
+  typedef uint16_t u16;
+  typedef uint32_t u32;
+  typedef uint64_t u64;
+  typedef float f32;
+  typedef double f64;
+
 #endif
 
 
@@ -56,9 +65,18 @@ struct SplatBucket {
   Splat splats[256];
 };
 
+struct SplatMipBucket {
+  vec3 lower;
+  vec3 upper;
+  vec3 normal;
+  vec3 position;
+};
+
 #define SPLATS_MAX 1 << 24 // ~16M
 #define SPLAT_BUCKET_SIZE_SHIFT 16
 #define SPLAT_BUCKETS SPLATS_MAX >> SPLAT_BUCKET_SIZE_SHIFT // ~65k buckets
+
+#define SPLAT_BUCKET_SIZE 32
 
 struct DrawArraysIndirectCommand {
   uint32_t count;

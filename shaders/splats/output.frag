@@ -23,7 +23,7 @@ vec4 extractColor(uint64_t v){
 		return vec4(0, 0, 0, 255);
 	}
 
-	//return 255.0 * unpackUnorm4x8(ucol);
+	return unpackUnorm4x8(ucol);
   return vec4(
       float(v & 0xFF0000) / float(0xFF0000),
       float(v & 0x00FF00) / float(0x00FF00),

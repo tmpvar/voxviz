@@ -15,6 +15,10 @@ layout (std430) buffer splatInstanceBuffer {
   Splat splats[];
 };
 
+layout (std430) buffer splatBucketsBuffer {
+  SplatMipBucket buckets[];
+};
+
 layout (std430) buffer pixelBuffer {
   uint64_t pixel[];
 };
@@ -23,7 +27,7 @@ uniform uvec2 resolution;
 uniform mat4 mvp;
 uniform vec3 eye;
 
-int get_pixel_pos(ivec2 p, ivec2 d) {
+int get_pixel_index(ivec2 p, ivec2 d) {
   return int(mix(
     p.x + p.y * d.x,
     -1,
@@ -31,10 +35,18 @@ int get_pixel_pos(ivec2 p, ivec2 d) {
   ));
 }
 
-void main() {
-  uint splat_idx = gl_GlobalInvocationID.x;
-  Splat splat = splats[splat_idx];
-  vec3 n = normalize(splat.normal.xyz);
+bool write_pixel(vec2 pos, uint64_t val) {
+  int pixel_idx = get_pixel_index(ivec2(pos.xy), ivec2(resolution));
+  if (pixel_idx < 0) {
+    return false;
+  }
+
+  return atomicMin(pixel[uint(pixel_idx)], val) < val;
+}
+
+void draw_splat(uint idx, int radius) {
+  Splat splat = splats[idx];
+  vec3 n = splat.normal.xyz;
 
   if (dot((splat.position.xyz - eye), n) >= 0) {
     return;
@@ -49,18 +61,13 @@ void main() {
     uv_pos.y < -1.0 ||
     uv_pos.y > 1.0
   ) {
-		return;
-	}
-
-  uv_pos.xy = (uv_pos.xy * 0.5 + 0.5) * vec2(resolution);
-
-  int pixel_idx = get_pixel_pos(ivec2(uv_pos.xy), ivec2(resolution));
-  if (pixel_idx < 0) {
     return;
   }
 
+  vec2 pixel_pos = (uv_pos.xy * 0.5 + 0.5) * vec2(resolution);
+
   double uv_depth = uv_pos.w;
-  int64_t pixel_depth = 0;//int64_t(uv_depth * 1000000.0lf);
+  int64_t pixel_depth = int64_t(uv_depth * 1000000.0lf);
 
   uint64_t color = 0;
 
@@ -70,5 +77,94 @@ void main() {
 
   uint64_t pixel_value = (pixel_depth << 24) | color;
 
-	atomicMin(pixel[uint(pixel_idx)], pixel_value);
+  for (int x = -radius; x<=radius; x++) {
+    for (int y = -radius; y<=radius; y++) {
+      if (distance(vec2(0, 0), vec2(x, y)) > radius) {
+        continue;
+      }
+      write_pixel(pixel_pos + vec2(x, y), pixel_value);
+    }
+  }
+}
+
+void main() {
+  uint idx = gl_GlobalInvocationID.x;
+  SplatMipBucket splat = buckets[idx];
+  vec3 n = splat.normal.xyz;
+
+  if (dot((splat.position.xyz - eye), n) >= 0) {
+    return;
+  }
+  vec4 outPos;
+  float size = 2;
+  //quadricProj(splat.position.xyz, 0.5, mvp, vec2(resolution)/2.0, outPos, size);
+  float screenSize = 100.0 * 1.0 / tan(45.0 / 360.0 * 6.28) * 1.0 / distance(eye, splat.position.xyz);
+
+  vec4 uv_pos = mvp * vec4(splat.position.xyz, 1.0);
+  uv_pos.xyz = uv_pos.xyz / uv_pos.w;
+  if (
+    uv_pos.w <= 0.0 ||
+    uv_pos.x < -1.0 ||
+    uv_pos.x > 1.0 ||
+    uv_pos.y < -1.0 ||
+    uv_pos.y > 1.0
+  ) {
+    return;
+  }
+
+  vec2 pixel_pos = (uv_pos.xy * 0.5 + 0.5) * vec2(resolution);
+
+  double uv_depth = uv_pos.w * 100;
+  int64_t pixel_depth = int64_t(uv_depth * 1000000.0lf);
+  const int splatRadius = min(10, max(1, int(screenSize))) * 10;
+
+  uint64_t color = 0;
+  vec3 c = hsl(vec3(0.7 - (float(idx)/float(gl_NumWorkGroups.x * gl_WorkGroupSize.x) * 0.9), 0.9, 0.5));
+  color |= uint64_t(n.x * 255.0) << 16;
+  color |= uint64_t(n.y * 255.0) << 8;
+  color |= uint64_t(n.z * 255.0) << 0;
+
+  // if (screenSize <= 1.0) {
+  //   color |= uint64_t(100.0) << 16;
+  //   color |= uint64_t(100.0) << 8;
+  //   color |= uint64_t(100.0) << 0;
+  // } else {
+  //   color |= uint64_t(100.0) << 16;
+  //   color |= uint64_t(0.0) << 8;
+  //   color |= uint64_t(100.0) << 0;
+  // }
+
+  uint64_t pixel_value = (pixel_depth << 24) | color;
+  int bucketR = int(screenSize * 5.0);
+  if (screenSize > 1.0) {
+    // int splatCount = min(splatRadius*splatRadius, SPLAT_BUCKET_SIZE);
+    // int r = splatRadius / splatCount;
+    // for (uint i=0; i<splatCount; i++) {
+    //   draw_splat(i + idx*SPLAT_BUCKET_SIZE, 2);
+    // }
+    for (uint i=0; i<SPLAT_BUCKET_SIZE; i++) {
+      draw_splat(i + idx*SPLAT_BUCKET_SIZE, 4);
+    }
+  } else {
+
+    for (int x = -bucketR; x<=bucketR; x++) {
+      for (int y = -bucketR; y<=bucketR; y++) {
+        // if (distance(vec2(0, 0), vec2(x, y)) > bucketR) {
+        //   continue;
+        // }
+        write_pixel(pixel_pos + vec2(x, y), pixel_value);
+      }
+    }
+  }
+
+  for (int x = -bucketR; x<=bucketR; x++) {
+    for (int y = -bucketR; y<=bucketR; y++) {
+      if (distance(vec2(0, 0), vec2(x, y)) > bucketR) {
+        continue;
+      }
+      write_pixel(pixel_pos + vec2(x, y), pixel_value);
+    }
+  }
+
+
 }

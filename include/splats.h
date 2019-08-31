@@ -1,29 +1,60 @@
 #pragma once
 
 #include "gl-wrap.h"
-//#include <openvdb/openvdb.h>
 
+#include "libmorton/morton.h"
 
-//using GridType = openvdb::FloatGrid;
-//using TreeType = GridType::TreeType;
+#include <map>
+#include <vector>
+using namespace std;
 
 class SplatBuffer {
   public:
     SSBO *ssbo = nullptr;
+    SSBO *buckets = nullptr;
     size_t splat_count = 0;
     Splat *data = nullptr;
     glm::mat4 model;
     size_t max_splats;
+
+    map<u64, SplatBucket *> splatBuckets;
+
     SplatBuffer(bool startMap = false) {
       this->max_splats = (1 << 26);
       this->ssbo = new SSBO(
         sizeof(Splat) * max_splats,
         GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT
       );
+
+      this->buckets = new SSBO(
+        sizeof(SplatMipBucket) * (max_splats / SPLAT_BUCKET_SIZE),
+        GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT
+      );
+
       if (startMap) {
         this->data = (Splat *)ssbo->beginMapPersistent();
       }
       this->model = glm::mat4(1.0);
+    }
+
+    void bucketSplat(Splat *splat) {
+      // compute bucket address using truncated coords
+      u64 bucket_idx = libmorton::morton3D_64_encode(
+        static_cast<u32>(splat->position.x) >> 8,
+        static_cast<u32>(splat->position.y) >> 8,
+        static_cast<u32>(splat->position.z) >> 8
+      );
+
+      // upsert a bucket into splatBuckets
+      if (this->splatBuckets.find(bucket_idx) == this->splatBuckets.end()) {
+        this->splatBuckets[bucket_idx] = new SplatBucket;
+      }
+
+      // insert the splat into the appropriate bucket
+      SplatBucket *bucket = this->splatBuckets[bucket_idx];
+      memcpy((void *)&bucket->splats[bucket->loc], splat, sizeof(Splat));
+      bucket->loc++;
+
     }
 
     ~SplatBuffer() {
