@@ -28,7 +28,8 @@ void main() {
   vec3 pos = texture(iPosition, uv).xyz * maxDistance;
   vec4 s = depthBiasMVP * vec4(pos, 1.0);
   vec3 color = texture(iColor, uv).xyz;
-
+  outColor = texture(iColor, uv);
+  return;
   float dd = dot(pos - light, light - color);
 
   // float bias = 0.001;//clamp(0.0001 + dd, 0.0001, 0.0016);

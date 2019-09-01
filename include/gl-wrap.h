@@ -17,6 +17,7 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <sstream>
 #include <imgui.h>
 
 #include <glm/glm.hpp>
@@ -74,6 +75,13 @@ static const char *shader_type(GLuint type) {
   return "Unknown";
 }
 
+struct ShaderFileLine {
+  string file;
+  size_t line;
+  size_t lineCount;
+  size_t skipLines;
+};
+
 class Shader {
   bool valid = false;
 public:
@@ -97,15 +105,13 @@ public:
 
   bool reload() {
     this->valid = true;
-    std::cout << "reloading shader: " << this->name << std::endl;
+    std::cout << "reloading shader: "
+      << this->name
+      << " (" << this->filename << ")"
+      << std::endl;
+
     std::ifstream t(this->filename);
     std::string str;
-
-    if (!t.is_open()) {
-      shaderLogs[this->name] = "file could not be opened\npath: " + string(this->filename) + "\n";
-      this->valid = false;
-      return true;
-    }
 
     t.seekg(0, std::ios::end);
     str.reserve(t.tellg());
@@ -137,7 +143,88 @@ public:
       glGetShaderInfoLog(new_handle, m, &l, s);
       cout << this->name << "failed to compile" << endl
         << s << endl;
-      shaderLogs[this->name] = string(s);
+
+      // compute the line the error occurred on
+      std::stringstream errorLogStream(s);
+      stringstream sourceStream(str);
+      string findFile = "// start: ";
+      string errorLine;
+      stringstream fileLog;
+      while (std::getline(errorLogStream, errorLine, '\n')) {
+        string sourceLine;
+        string currentFile = "";
+        size_t fileStartLine = 0;
+        size_t currentLine = 1;
+        size_t absoluteSourceLine = 1;
+
+        size_t rawErrorLine = 0;
+
+        size_t startingParenLoc = errorLine.find("(");
+        if (startingParenLoc == string::npos) {
+          cout << "could not parse gl error line: " << errorLine << endl;
+          continue;
+        }
+        startingParenLoc += 1;
+
+        // here we assume that errors are of the form 0(<line>) <message>
+        size_t endingParenLoc = errorLine.substr(startingParenLoc).find(")");
+        if (endingParenLoc == string::npos) {
+          cout << "could not parse gl error line: " << errorLine << endl;
+          continue;
+        }
+
+        rawErrorLine = stoul(errorLine.substr(startingParenLoc, endingParenLoc));
+
+        cout << "error line: " << rawErrorLine << endl;
+        sourceStream.seekg(0);
+
+        vector<ShaderFileLine> file_stack;
+
+        while (std::getline(sourceStream, sourceLine, '\n')) {
+          absoluteSourceLine++;
+          size_t fileCommentLoc = sourceLine.find(findFile);
+          if (fileCommentLoc != string::npos) {
+            currentFile = sourceLine.substr(fileCommentLoc + findFile.length());
+            ShaderFileLine l;
+            l.file = currentFile;
+            l.line = absoluteSourceLine;
+            l.lineCount = 0;
+            l.skipLines = 0;
+            file_stack.push_back(l);
+          }
+
+          if (absoluteSourceLine == rawErrorLine) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+            fileLog << "^ " << errorLine.substr(5 + endingParenLoc) << endl;
+          }
+
+          if (absoluteSourceLine == rawErrorLine + 1) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+            break;
+          }
+
+          if (sourceLine.find("// end: " + file_stack.back().file) != string::npos) {
+            size_t skipLines = file_stack.back().lineCount + file_stack.back().skipLines;
+            file_stack.pop_back();
+            if (file_stack.size() == 0) {
+              continue;
+            }
+            file_stack.back().skipLines += skipLines;
+
+            if (absoluteSourceLine == rawErrorLine - 1) {
+              fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines)
+                << " #include \""
+                << file_stack.back().file
+                << "\"" << endl;
+            }
+          }
+          else if (absoluteSourceLine == rawErrorLine - 1) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+          }
+          file_stack.back().lineCount++;
+        }
+      }
+      shaderLogs[this->name] = fileLog.str();
       free(s);
       gl_shader_log(new_handle);
       this->valid = false;
@@ -165,6 +252,9 @@ class SSBO {
   GLsizeiptr total_bytes = 0;
   GLuint handle = 0;
   bool mapped = false;
+  uvec3 _dims = uvec3(0);
+  GLbitfield _flags = GL_STATIC_DRAW;
+  bool _persistent = false;
 public:
 
   const enum MAP_TYPE {
@@ -173,12 +263,40 @@ public:
     MAP_WRITE_ONLY = GL_WRITE_ONLY,
   };
 
-  SSBO(uint64_t bytes) {
+  SSBO(uint64_t bytes, bool persistent = false) {
+    this->_persistent = persistent;
+    if (persistent) {
+      this->_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
+    }
     this->resize(bytes);
   }
 
+  SSBO(uint64_t bytes, uvec3 dims, bool persistent = false) {
+    this->_persistent = persistent;
+    if (persistent) {
+      this->_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
+    }
+    this->resize(bytes, dims);
+  }
+
+  SSBO *resize(uint64_t bytes, uvec3 dims) {
+    if (glm::all(glm::equal(dims, this->_dims)) && this->total_bytes == bytes) {
+      return this;
+    }
+
+    this->_dims = dims;
+    this->resize(bytes);
+    return this;
+  }
+
   SSBO *resize(uint64_t bytes) {
-    std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+    // TODO: what do we do if we're mapped?
+    if (this->_dims.x > 0) {
+      std::cout << "creating SSBO with " << bytes << " bytes; dims:" << this->_dims.x << ", " << this->_dims.y << ", " << this->_dims.z << endl;
+    }
+    else {
+      std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+    }
 
     if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
@@ -188,11 +306,16 @@ public:
       return this;
     }
 
-
-
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_DRAW); gl_error();
+    if (this->_persistent) {
+      glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, NULL, this->_flags);
+    }
+    else {
+      glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, this->_flags);
+    }
+
+    gl_error();
     this->unbind();
 
     this->total_bytes = bytes;
@@ -206,34 +329,65 @@ public:
 
     this->bind();
     void *out = glMapBuffer(GL_SHADER_STORAGE_BUFFER, m); gl_error();
-    this->unbind();
+    //this->unbind();
+    this->mapped = true;
+    return out;
+  }
+
+  void *beginMapPersistent() {
+    if (this->total_bytes == 0) {
+      return nullptr;
+    }
+
+    GLuint access = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+
+    this->bind();
+    void *out = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this->total_bytes, access);
+    gl_error();
+
     this->mapped = true;
     return out;
   }
 
   void endMap() {
-    if (this->total_bytes == 0 || !this->mapped || this->handle == 0) {
+    if (!this->mapped || this->handle == 0) {
       return;
     }
     this->bind();
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); gl_error();
-    this->unbind();
+    //this->unbind();
     this->mapped = false;
   }
 
-  GLuint bind() {
+  GLuint bind(GLuint type = GL_SHADER_STORAGE_BUFFER) {
     if (this->handle != 0) {
-      glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->handle); gl_error();
+      glBindBuffer(type, this->handle); gl_error();
     }
     return this->handle;
   }
 
-  void unbind() {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
+  void unbind(GLuint type = GL_SHADER_STORAGE_BUFFER) {
+    glBindBuffer(type, 0); gl_error();
   }
 
   size_t size() {
     return this->total_bytes;
+  }
+
+  uvec3 dims() {
+    return this->_dims;
+  }
+
+  SSBO *clear(uint8_t val) {
+    this->bind();
+    glClearBufferData(
+      GL_SHADER_STORAGE_BUFFER,
+      GL_R8,
+      GL_RED,
+      GL_UNSIGNED_BYTE,
+      &val
+    );
+    return this;
   }
 };
 
@@ -312,7 +466,6 @@ public:
   }
 };
 
-
 class Program {
   map<string, GLint> uniforms;
   map<string, GLint> attributes;
@@ -331,6 +484,10 @@ public:
   Program() {
     this->handle = glCreateProgram();
     this->valid = true;
+  }
+
+  static Program *New() {
+    return new Program();
   }
 
   ~Program() {
@@ -392,6 +549,10 @@ public:
   }
 
   Program *add(Shader *shader) {
+    if (shader == nullptr) {
+      this->valid = false;
+      return this;
+    }
     this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
     this->compositeName += shader->name + " ";
 
@@ -414,14 +575,16 @@ public:
       return this;
     }
 
-    std::cout << "linking" << this->compositeName << std::endl;
+    std::cout << "linking " << this->compositeName << std::endl;
     glLinkProgram(this->handle);
     gl_program_log(this->handle);
     gl_error();
 
     if (this->isCompute) {
       glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &this->local_layout[0]);
-      gl_error();
+      if (GL_ERROR()) {
+        this->valid = false;
+      }
     }
     return this;
   }
@@ -464,11 +627,11 @@ public:
 #ifdef SHADER_HOTRELOAD
     for (auto& it : this->shader_versions) {
       Shader *shader = it.first;
-      size_t version = it.second;
-      if (!shader->isValid()) {
+      if (shader == nullptr) {
         this->valid = false;
-        break;
+        return this;
       }
+      size_t version = it.second;
       if (version != shader->version) {
         std::cout << "rebuild program before use: " << this->compositeName << std::endl;
         this->rebuild();
@@ -679,15 +842,20 @@ public:
       return this;
     }
 
+    if (ssbo == nullptr) {
+      cout << "unable to bind ssbo because it was null. name: " << name << endl;
+      return this;
+    }
+
     GLint ri = this->resourceIndex(name, GL_SHADER_STORAGE_BLOCK);
 
     if (ri == GL_INVALID_ENUM) {
-      shaderLogs[this->compositeName] = "SSBO binding failed, invalid enum " + name + "\n";
+      printf("SSBO binding failed, invalid enum '%s'\n", name.c_str());
       return this;
     }
 
     if (ri == GL_INVALID_INDEX) {
-      shaderLogs[this->compositeName] = "SSBO binding failed, could not find " + name + "\n";
+      printf("SSBO binding failed, could not find '%s'\n", name.c_str());
       return this;
     }
 
@@ -711,7 +879,8 @@ public:
   }
 
 
-  Program *compute(glm::uvec3 dims) {
+  Program *compute(glm::uvec3 dims, SSBO *indirect = nullptr) {
+    this->use();
     if (!this->valid) {
       return this;
     }
@@ -737,7 +906,7 @@ public:
     return this;
   }
 
-  Program *timedCompute(const char *str, glm::uvec3 dims) {
+  Program *timedCompute(const char *str, glm::uvec3 dims, SSBO *indirect = nullptr) {
     if (!this->valid) {
       return this;
     }
@@ -764,6 +933,37 @@ public:
     glDeleteQueries(1, &query);
     return this;
 #endif
+  }
+
+  Program *timedIndirectCompute(const char *str, SSBO *indirect) {
+    if (!this->valid || indirect == nullptr) {
+      return this;
+    }
+
+    indirect->bind(GL_DISPATCH_INDIRECT_BUFFER);
+#ifndef DISABLE_DEBUG_GL_TIMED_COMPUTE
+    GLuint query;
+    GLuint64 elapsed_time;
+    GLint done = 0;
+    glGenQueries(1, &query);
+    glBeginQuery(GL_TIME_ELAPSED, query);
+#endif
+
+    glDispatchComputeIndirect(0);
+    gl_error();
+
+#ifndef DISABLE_DEBUG_GL_TIMED_COMPUTE
+    glEndQuery(GL_TIME_ELAPSED);
+    while (!done) {
+      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+    }
+
+    // get the query result
+    glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+    ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+    glDeleteQueries(1, &query);
+#endif
+    return this;
   }
 };
 
@@ -862,9 +1062,9 @@ public:
 
 class Mesh {
 public:
-  GLuint vao = 0xFFFFFFFF;
-  GLuint vbo = 0xFFFFFFFF;
-  GLuint ebo = 0xFFFFFFFF;
+  GLuint vao;
+  GLuint vbo;
+  GLuint ebo;
   std::vector<GLfloat> verts;
   std::vector<GLuint> faces;
 
@@ -955,9 +1155,6 @@ public:
   }
 
   void render(Program *program, const char* attribute) {
-    if (!program->isValid()) {
-      return;
-    }
     program->attribute(attribute);
     gl_error();
     glEnableVertexAttribArray(0);
@@ -1136,21 +1333,8 @@ public:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    
 
-    /*glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, this->width, this->height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    */
-
-    glFramebufferTexture(
-      GL_FRAMEBUFFER,
-      GL_DEPTH_ATTACHMENT,
-      this->texture_depth,
-      0/*mipmap level*/
-    );
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture_depth, 0/*mipmap level*/);
 
     this->status();
     return this;

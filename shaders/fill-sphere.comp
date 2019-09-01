@@ -34,5 +34,5 @@ void main() {
 		bits |= d < 0.0 ? mask : 0;
 	}
 
-	bricks[brick_index].data[idx] = bits;
+	bricks[brick_index].data[idx] = uint8_t(bits);
 }

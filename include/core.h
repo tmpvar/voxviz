@@ -6,7 +6,7 @@
 #define INV_BRICK_DIAMETER 1.0 / float(BRICK_DIAMETER)
 #define BRICK_VOXEL_COUNT BRICK_DIAMETER*BRICK_DIAMETER*BRICK_DIAMETER
 
-#define VOXEL_WORD_BITS 32
+#define VOXEL_WORD_BITS 8
 #define BRICK_VOXEL_BYTES BRICK_VOXEL_COUNT / 8
 #define BRICK_VOXEL_WORDS BRICK_VOXEL_COUNT / VOXEL_WORD_BITS
 
@@ -20,5 +20,13 @@
 
 //#define FULLSCREEN
 
+
+#ifdef GPU_HOST
+  #include <glm/glm.hpp>
+  #include <stdint.h>
+  using namespace glm;
+
+
+#endif
 
 #endif

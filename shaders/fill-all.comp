@@ -17,5 +17,5 @@ uniform uint val;
 
 void main() {
 	BrickData brick = bricks[brick_index];
-	brick.data[gl_GlobalInvocationID.x] = val;
+	brick.data[gl_GlobalInvocationID.x] = uint8_t(val);
 }

@@ -8,7 +8,7 @@
   #include <algorithm>
   #include <glm/glm.hpp>
   #include <string.h>
-  
+
   #include "volume.h"
 
   #include "brick.h"
@@ -23,7 +23,7 @@
 
     Raytracer(int *dimensions) {
       this->showHeat = 0;
-     
+
       this->program = new Program();
       this->program
           ->add(Shaders::get("raytrace.vert"))
@@ -36,9 +36,9 @@
     }
 
     ~Raytracer() {
-    
+
     }
-    
+
     void render(Volume *volume, Program *p) {
       if (volume->bricks.size() == 0) {
         return;
@@ -49,7 +49,7 @@
       }
 
       size_t activeBricks = volume->bind();
-      
+
 
       glDrawElementsInstanced(
         GL_TRIANGLES,

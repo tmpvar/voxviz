@@ -59,5 +59,5 @@ void main() {
 
 	  val |= voxel_get(brick_index_tool, vec3(toolVoxel)) ? set_mask : 0;
 	}
-  bricks[brick_index_stock].data[idx] = val;
+  bricks[brick_index_stock].data[idx] = uint8_t(val);
 }

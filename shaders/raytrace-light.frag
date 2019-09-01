@@ -56,6 +56,7 @@ float march(in out vec3 pos, vec3 rayDir, out vec3 center, out vec3 normal, out 
 }
 
 void main() {
+  return;
   // TODO: handle the case where the camera is inside of a brick
   vec3 eyeToPlane = (brickSurfacePos + brickTranslation) - invEye;
   vec3 dir = normalize(eyeToPlane);

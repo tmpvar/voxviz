@@ -76,14 +76,14 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
     0.1f,
     10000.0f
   );
-  
+
   shadowmap->depthProjectionMatrix = glm::perspective(
     45.0f,
     (float)(width / height),
     0.001f,
     10000.0f
   );
-  
+
   glViewport(0, 0, width, height);
   if (fbo != nullptr) {
     fbo->setDimensions(width, height);
@@ -92,7 +92,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   if (shadowFBO != nullptr) {
     shadowFBO->setDimensions(width, height);
   }
-  
+
 }
 
 /*void update_volumes(Raytracer *raytracer, Compute *compute, int time) {
@@ -132,7 +132,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   CL_CHECK_ERROR(clEnqueueAcquireGLObjects(queue, total, mem, 0, nullptr, &opengl_get_completion));
   clWaitForEvents(1, &opengl_get_completion);
   clReleaseEvent(opengl_get_completion);
- 
+
   compute->opCut(raytracer->bricks[0], raytracer->bricks[1]);
 
   CL_CHECK_ERROR(clEnqueueReleaseGLObjects(queue, total, mem, 0, 0, NULL));
@@ -296,7 +296,7 @@ int main(void) {
   fillSphereProgram
     ->add(Shaders::get("fill-sphere.comp"))
     ->link();
- 
+
 
   Program *fillAllProgram = new Program();
   fillAllProgram
@@ -358,7 +358,7 @@ int main(void) {
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     printf("max computer shader invocations %i\n", work_grp_inv);
   }
-  
+
   // TODO: if we want to enable multiple space overlapping volumes,
   //       we will need to group them together as far as physics is
   //       concerned.
@@ -370,28 +370,28 @@ int main(void) {
     volumeManager,
     physicsScene,
     bodyDef
-  );*/
+  );
 
   VOXParser::parse(
     "D:\\work\\voxel-model\\vox\\character\\chr_cat.vox",
     volumeManager,
     physicsScene,
     bodyDef
-  );
+  );*/
 
   Volume *tool = new Volume(glm::vec3(-5.0, 0 , 0.0));
-  
+
   Brick *toolBrick = tool->AddBrick(glm::ivec3(1, 0, 0), &boxDef);
   toolBrick->createGPUMemory();
   toolBrick->fill(fillSphereProgram);
-  
-  
+
+
 
   Brick *toolBrick2 = tool->AddBrick(glm::ivec3(2, 0, 0), &boxDef);
   toolBrick2->createGPUMemory();
   toolBrick2->fillConst(0xFFFFFFFF);
-  
-  
+
+
   volumeManager->addVolume(tool);
 
 
@@ -413,18 +413,18 @@ int main(void) {
   //floorBrick->fillConst(1.0);
   //floor->cut(tool);
   //return 1;
-  
-  tool->scale.x = 2.0;
-  tool->scale.y = 2.0;
-  tool->scale.z = 2.0;
+
+  tool->scale.x = 4.0;
+  tool->scale.y = 4.0;
+  tool->scale.z = 4.0;
  // tool->rotation.z = M_PI / 4.0;
   //floor->rotation.z = M_PI / 2.0;
 
   volumeManager->addVolume(floor);
 
-  for (int x = 0; x < 64; x++) {
-    for (int y = 0; y < 8; y++) {
-      for (int z = 0; z < 64; z++) {
+  for (int x = 0; x < 128; x++) {
+    for (int y = 0; y < 64; y++) {
+      for (int z = 0; z < 128; z++) {
         floor->AddBrick(glm::ivec3(x, y, z));
       }
     }
@@ -449,7 +449,7 @@ int main(void) {
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   fbo = new FBO(windowDimensions[0], windowDimensions[1]);
   shadowFBO = new FBO(windowDimensions[0], windowDimensions[1]);
-  
+
   uint32_t total_affected = 0;
 
   // Setup Dear ImGui binding
@@ -474,7 +474,7 @@ int main(void) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    
+
     // input
     {
       float speed = movementSpeed * (keys[GLFW_KEY_LEFT_SHIFT] ? 10.0 : 1.0);
@@ -539,7 +539,7 @@ int main(void) {
       mouse[1] = ypos;
 
       camera->ProcessMouseMovement((float)delta[0], (float)-delta[1]);
-    
+
       if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
         int axis_count;
         const float *axis = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axis_count);
@@ -563,7 +563,7 @@ int main(void) {
         new_tool_pos.y * 10.0f
       );
     }
-    
+
 
     viewMatrix = camera->GetViewMatrix();
 
@@ -586,7 +586,7 @@ int main(void) {
     ImGui::Begin("stats");
 
     // render shadow map
-    if (true) {
+    if (false) {
       Timer shadowMapTimer;
       shadowMapTimer.begin("shadowmap");
       shadowFBO->bind();
@@ -633,8 +633,8 @@ int main(void) {
       shadowmap->end();
       shadowFBO->unbind();
       shadowMapTimer.end()->waitUntilComplete()->debug();
-    }    
-    
+    }
+
     // primary rays + proxy geometry rasterization
     if (true) {
       Timer primaryRaysTimer;
@@ -650,7 +650,7 @@ int main(void) {
       glClearDepth(1.0);
       glClearColor(0.0, 0.0, 0.0, 1.0);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
+
 
       glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
@@ -688,11 +688,11 @@ int main(void) {
       tool->rotation.z += 0.001;
       tool->rotation.y += 0.002;
       //tool->rotation.x += 0.005;
-    
+
       fbo->unbind();
       primaryRaysTimer.end()->waitUntilComplete()->debug();
     }
-    
+
     // render with shadow buffer
     if (true) {
       Timer compositeTimer;
@@ -712,13 +712,13 @@ int main(void) {
         ->texture2d("iShadowColor", shadowFBO->texture_color)
         ->texture2d("iShadowPosition", shadowFBO->texture_position)
         ->uniformMat4("depthBiasMVP", shadowmap->depthBiasMVP);
-    
+
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glEnable(GL_DEPTH_TEST);
 
       fullscreen_surface->render(fullscreen_program);
       compositeTimer.end()->waitUntilComplete()->debug();
-  }   
+  }
 
     // Tool based boolean operations
     // opCut
@@ -727,7 +727,7 @@ int main(void) {
         if (volume == tool) {
           continue;
         }
-        
+
         volume->booleanOp(tool, false, brickCutProgram);
       }
     }
@@ -791,14 +791,14 @@ int main(void) {
     clFinish(compute->job.command_queues[0]);
     */
     time++;
-    
+
     shadowmap->eye.x = -1024.0f + sinf(time / 500.0f) * 1000.0f;
 
     // TODO: not in glfw 3.3
     /*if (glfwJoystickPresent(GLFW_JOYSTICK_1)) {
       glfwSetJoystickVibration(GLFW_JOYSTICK_1, total_affected, 0);
     }*/
-    
+
     if (total_affected <= 1000) {
       total_affected = 0;
     }
