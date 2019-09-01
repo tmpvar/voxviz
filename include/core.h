@@ -19,8 +19,21 @@
 
 #define RENDER_STATIC 1
 #define SHADER_HOTRELOAD 1
+
 //#define RENDER_DYNAMIC 1
 
 //#define FULLSCREEN
+#ifdef GPU_HOST
+  #include <glm/glm.hpp>
+  #include <stdint.h>
+  using namespace glm;
+
+  typedef uint8_t u8;
+  typedef uint16_t u16;
+  typedef uint32_t u32;
+  typedef uint64_t u64;
+  typedef float f32;
+  typedef double f64;
 #endif
-  
+
+#endif

@@ -63,3 +63,10 @@ void light_mip_set(in vec3 pos, const in uint mip, const in vec4 color) {
 
   lightSlab[idx] = color;
 }
+
+void accumulate(vec3 p, uint mip, float amount, inout vec4 acc) {
+  vec4 tmp;
+  if (light_mip_get(p, mip, tmp)) {
+    acc += tmp * amount;
+  }
+}

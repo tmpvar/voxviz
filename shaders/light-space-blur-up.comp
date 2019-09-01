@@ -25,34 +25,41 @@ void main() {
   vec4 acc = vec4(0.0);
   vec4 tmp;
 
-  light_mip_get(pos + vec3(0.0, 0.0, 0.0), lowerMip, tmp);
-  acc += tmp;
+  accumulate(pos + vec3( ls, 0.0, 0.0), lowerMip, 1.0, acc);
+  accumulate(pos + vec3(-ls, 0.0, 0.0), lowerMip, 0.75, acc);
+  accumulate(pos + vec3(0.0,  ls, 0.0), lowerMip, 0.75, acc);
+  accumulate(pos + vec3(0.0, -ls, 0.0), lowerMip, 0.75, acc);
+  accumulate(pos + vec3(0.0, 0.0,  ls), lowerMip, 0.75, acc);
+  accumulate(pos + vec3(0.0, 0.0, -ls), lowerMip, 0.75, acc);
 
-  light_mip_get(pos + vec3(0.0, 0.0, ls), lowerMip, tmp);
-  acc += tmp;
+  accumulate(pos + vec3( ls, 0.0,  ls), lowerMip, 0.25, acc);
+  accumulate(pos + vec3(-ls, 0.0,  ls), lowerMip, 0.25, acc);
+  accumulate(pos + vec3(-ls, 0.0, -ls), lowerMip, 0.25, acc);
+  accumulate(pos + vec3(-ls, 0.0,  ls), lowerMip, 0.25, acc);
 
-  light_mip_get(pos + vec3(0.0, ls, 0.0), lowerMip, tmp);
-  acc += tmp;
+  accumulate(pos + vec3( ls,  ls, 0.0), lowerMip, 0.25, acc);
+  accumulate(pos + vec3(-ls,  ls, 0.0), lowerMip, 0.25, acc);
+  accumulate(pos + vec3(-ls, -ls, 0.0), lowerMip, 0.25, acc);
+  accumulate(pos + vec3( ls, -ls, 0.0), lowerMip, 0.25, acc);
 
-  light_mip_get(pos + vec3(0.0, ls, ls), lowerMip, tmp);
-  acc += tmp;
+  accumulate(pos + vec3( 0.0,  ls,  ls), lowerMip, 0.25, acc);
+  accumulate(pos + vec3( 0.0, -ls,  ls), lowerMip, 0.25, acc);
+  accumulate(pos + vec3( 0.0, -ls, -ls), lowerMip, 0.25, acc);
+  accumulate(pos + vec3( 0.0,  ls, -ls), lowerMip, 0.25, acc);
 
-  light_mip_get(pos + vec3(ls, 0.0, 0.0), lowerMip, tmp);
-  acc += tmp;
+  accumulate(pos + vec3(  ls,  ls,  ls), lowerMip, 0.125, acc);
+  accumulate(pos + vec3( -ls,  ls,  ls), lowerMip, 0.125, acc);
+  accumulate(pos + vec3( -ls, -ls,  ls), lowerMip, 0.125, acc);
+  accumulate(pos + vec3( -ls, -ls, -ls), lowerMip, 0.125, acc);
+  accumulate(pos + vec3( -ls,  ls, -ls), lowerMip, 0.125, acc);
+  accumulate(pos + vec3(  ls,  ls, -ls), lowerMip, 0.125, acc);
+  accumulate(pos + vec3(  ls, -ls, -ls), lowerMip, 0.125, acc);
 
-  light_mip_get(pos + vec3(ls, 0.0, ls), lowerMip, tmp);
-  acc += tmp;
+  acc /= 3;
 
-  light_mip_get(pos + vec3(ls, ls, 0.0), lowerMip, tmp);
-  acc += tmp;
-
-  light_mip_get(pos + vec3(ls, ls, ls), lowerMip, tmp);
-  acc += tmp;
-
-  acc /= 3.0;
   vec4 orig;
   light_mip_get(pos, mipLevel, orig);
   light_mip_set(pos, mipLevel, max(acc, orig));
 
-  //light_mip_set(pos, mipLevel, acc);
+  //light_mip_set(pos, mipLevel, acc) / 2.0);
 }

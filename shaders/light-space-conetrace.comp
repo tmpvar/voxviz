@@ -47,35 +47,38 @@ void main2() {
   vec4 acc = vec4(0.0);
   vec4 tmp = vec4(0.0);
   vec3 p = o.position.xyz;
-  if (false) {
-    light_mip_get(o.position.xyz, 1, tmp);
-    acc+=tmp;
-    light_mip_get(o.position.xyz + uvec3(1, 0, 0), 0, tmp);
-    acc+=tmp;
-    light_mip_get(o.position.xyz + uvec3(-1, 0, 0), 0, tmp);
-    acc+=tmp;
+  // if (false) {
+  //   light_mip_get(o.position.xyz, 1, tmp);
+  //   acc+=tmp;
+  //   light_mip_get(o.position.xyz + uvec3(1, 0, 0), 0, tmp);
+  //   acc+=tmp;
+  //   light_mip_get(o.position.xyz + uvec3(-1, 0, 0), 0, tmp);
+  //   acc+=tmp;
+  //
+  //   // light_mip_get(o.position.xyz + o.rayDir.xyz, 0, tmp);
+  //
+  //   // acc+=tmp;
+  //   //
+  //   //
+  //   acc /= 3;
+  // } else {
+  //   for (uint j = 0; j<2; j++) {
+  //     vec3 jitter = cdir(j * screen_idx, o.normal.xyz);
+  //     for (uint i=0; i<7; i++) {
+  //       if (light_mip_get(p + o.normal.xyz - jitter, i, tmp)) {
+  //         if (tmp.a > 0.0) {
+  //           acc += tmp * (1.0 - float(i) / float(MAX_MIPS));
+  //         }
+  //       }
+  //     }
+  //   }
+  //   acc /= (MAX_MIPS);
+  // }
 
-    // light_mip_get(o.position.xyz + o.rayDir.xyz, 0, tmp);
+  light_mip_get(o.position.xyz, 0, tmp);
+  acc = tmp;
 
-    // acc+=tmp;
-    //
-    //
-    acc /= 3;
-  } else {
-    for (uint j = 0; j<2; j++) {
-      vec3 jitter = cdir(j * screen_idx, o.normal.xyz);
-      for (uint i=0; i<7; i++) {
-        if (light_mip_get(p + o.normal.xyz - jitter, i, tmp)) {
-          if (tmp.a > 0.0) {
-            acc += tmp * (1.0 - float(i) / float(MAX_MIPS));
-          }
-        }
-      }
-    }
-    acc /= (MAX_MIPS);
-  }
-
-  out_termination[out_idx].color = o.color.rgba * (acc);//vec4(o.color.rgb * (acc.rgb * acc.a), 1.0);
+  out_termination[out_idx].color = vec4(1.0, 0.0, 0.0, 1.0);//tmp;//o.color.rgba * (acc);//vec4(o.color.rgb * (acc.rgb * acc.a), 1.0);
 }
 
 void main3() {
@@ -131,13 +134,15 @@ void main() {
 
   vec4 acc = vec4(0.0);
   vec4 tmp;
-  for (uint i=0; i<MAX_MIPS; i++) {
+  uint mips = 2;
+  for (uint i=1; i<mips; i++) {
     if (light_mip_get(o.position.xyz, i, tmp)) {
        acc += tmp * (1.0 - float(i) / MAX_MIPS);
      }
   }
-  acc /= 8;
-  // light_mip_get(o.position.xyz, 1, acc);
+  acc /= float(mips);
+  acc = sqrt(acc);
+
   out_termination[out_idx].color = o.color.rgba * acc * acc.a;//vec4(o.color.rgb * (acc.rgb * acc.a), 1.0);
 }
 

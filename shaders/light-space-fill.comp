@@ -53,9 +53,14 @@ void fillDirection(vec3 origin, vec3 dir) {
     }
 
     vec4 color = vec4(0.0);
+    vec4 pcolor = vec4(0.0);
     if (voxel_mip_get(p, 0, occlusion)) {
       // TODO: merge this with any existing light value
-      light_mip_set(p, 0, vec4(lightColor, intensity));
+
+      light_mip_get(p, 0, pcolor);
+      if (pcolor.a == 0.0) {
+        light_mip_set(p, 0, vec4(lightColor + pcolor.xyz / 2.0, intensity));
+      }
       return;
     }
 
@@ -65,7 +70,7 @@ void fillDirection(vec3 origin, vec3 dir) {
 
 void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
   uint8_t occlusion;
-  uint steps = 128;
+  uint steps = 64;
   float ratio = 1 / float(steps);
   float t = 0.0;
   uvec3 d = uvec3(lightSlabDims);
@@ -83,6 +88,9 @@ void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
   vec3 prevP = origin;
   vec3 p = origin;
   for (uint i=0; i<steps; i++) {
+
+    minMip = uint(float(i)/float(steps) * MAX_MIPS * 0.25);
+
     prevP = p;
     p = origin + dir * t;
 
@@ -108,7 +116,7 @@ void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
         // light_mip_set(pp, mip, (vec4(lightColor, 1.0) + pcolor) / 2.0);
         //
         //light_mip_get(p, mip, pcolor);
-        light_mip_set(p, mip, (vec4(lightColor, 1.0) + pcolor) / 2.0);
+        //light_mip_set(p, mip, (vec4(lightColor, 1.0) + pcolor) / 2.0);
         light_mip_set(p, mip, vec4(lightColor, 1.0));
         return;
       } else {
@@ -137,7 +145,8 @@ void fillDirectionEmptySpaceSkip(vec3 origin, vec3 dir) {
 }
 
 void main() {
-  uvec2 o  = gl_GlobalInvocationID.xy * 2 - 1;
+
+  uvec2 o  = gl_GlobalInvocationID.xy - 1;
 
   vec3 pos;
   switch (axis) {
@@ -151,11 +160,14 @@ void main() {
   vec3 target = lightPos;
   pos += (start == 0) ? 0.5 : -0.5;
 
-  if (false) {
-    for (uint i=0; i<5; i++) {
+  if (true) {
+    for (uint i=0; i<8; i++) {
       vec3 p = pos;
 
-      target = lightPos + cdir(o.x * o.y * i * (axis + 1) + start, dir) * 2.0;
+      //vec2 bn = 2.0 * blueNoise[(o.x + o.y * uint(lightSlabDims.x) + i) % (4096 * 64)].xy - 1.0;
+
+      target = lightPos + cdir(o.x * o.y * i * (axis + 1) + start, dir) * 0.0;
+      //target = lightPos + sphereRandom(normalize(vec2(o) * vec2(i, i*256))) * 0.001;
       dir = normalize(p - target);
 
       fillDirectionEmptySpaceSkip(target, dir);
@@ -164,10 +176,4 @@ void main() {
     dir = normalize(pos - target);
     fillDirectionEmptySpaceSkip(target, dir);
   }
-  // vec3 dir = normalize(pos - lightPos);
-  // fillDirectionEmptySpaceSkip(lightPos, dir);
-  //
-  //
-  // dir = normalize(pos - lightPos);
-  // fillDirectionEmptySpaceSkip(lightPos, dir);
 }

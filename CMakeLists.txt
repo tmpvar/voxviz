@@ -94,6 +94,7 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT v
 source_group("shaders" FILES ${SHADER_FILES})
 
 add_dependencies(voxviz shaders_out)
+add_definitions(-DGPU_HOST=1)
 
 target_link_libraries(
   voxviz

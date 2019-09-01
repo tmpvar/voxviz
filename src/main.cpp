@@ -91,7 +91,7 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
   );
 
   printf("window resize %ix%i\n", width, height);
-  
+
   glViewport(0, 0, width, height);
   if (fbo != nullptr) {
     fbo->setDimensions(width, height);
@@ -222,10 +222,10 @@ int main(void) {
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     printf("max computer shader invocations %i\n", work_grp_inv);
   }
-    
+
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
   fbo = new FBO(windowDimensions[0], windowDimensions[1]);
-  
+
 
   // Setup Dear ImGui binding
   IMGUI_CHECKVERSION();
@@ -244,10 +244,10 @@ int main(void) {
   ImGui::CreateContext();
   const float movementSpeed = 0.01f;
   GLFWgamepadstate state;
-  
+
   // Voxel space
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 256, 128);
-   
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(256, 256, 256);
+
   uint64_t voxelSpaceBytes =
     static_cast<uint64_t>(voxelSpaceDims.x) *
     static_cast<uint64_t>(voxelSpaceDims.y) *
@@ -263,7 +263,7 @@ int main(void) {
 
   uint64_t total_light_slab_slots = total_voxel_slab_slots;
   SSBO *lightSpaceSSBO = new SSBO(total_light_slab_slots * uint64_t(16));
-  
+
   #define MAX_LIGHTS 4
   SSBO *lightBuffer = new SSBO(
     16 * MAX_LIGHTS // light position + color,intensity
@@ -283,7 +283,7 @@ int main(void) {
 
   Program *raytraceVoxelSpace_Compute = new Program();
   raytraceVoxelSpace_Compute->add(Shaders::get("voxel-space-raytrace.comp"))->link();
-  
+
   //Program *skyRays_Compute = new Program();
   //skyRays_Compute->add(Shaders::get("voxel-space-sky-rays.comp"))->link();
 
@@ -315,7 +315,7 @@ int main(void) {
 
   Program *lightSpaceConeTrace_Compute = new Program();
   lightSpaceConeTrace_Compute->add(Shaders::get("light-space-conetrace.comp"))->link();
-  
+
   uint64_t outputBytes =
     static_cast<uint64_t>(windowDimensions[0]) *
     static_cast<uint64_t>(windowDimensions[1]) * 16;
@@ -427,13 +427,13 @@ int main(void) {
     voxMonu5->paintInto(buf, voxelSpaceDims);
     voxMonu6->paintInto(buf, voxelSpaceDims);
     voxMonu7->paintInto(buf, voxelSpaceDims);
-    
+
     voxModelFirst->paintInto(buf, voxelSpaceDims);
     voxModelRh2house->paintInto(buf, voxelSpaceDims);
 
     voxelSpaceSSBO->endMap();
   }
-   
+
   double deltaTime = 0.0;
   double lastTime = glfwGetTime();
   float debug = 0.0;
@@ -456,7 +456,7 @@ int main(void) {
       ImGui::SetNextWindowSize(ImVec2(300, windowDimensions[1] - 40));
     }
 
-    
+
     ImGui::Begin("stats");
 
     double nowTime = glfwGetTime();
@@ -542,7 +542,7 @@ int main(void) {
         const float x = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
         const float y = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
         const float z = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
-        
+
         glm::vec3 move(
           fabs(x) > 0.1 ? x * 100 * deltaTime : 0.0,
           fabs(y) > 0.1 ? -y * 100 * deltaTime : 0.0,
@@ -550,7 +550,7 @@ int main(void) {
         );
         catModel->move(move);
         catModel->clampPosition(glm::vec3(8.0, 16, 0.0), glm::vec3(voxelSpaceDims) - glm::vec3(8.0, 0.0, 16.0));
-        
+
 
         if (fabs(x) > 0.1 || fabs(z) > 0.1) {
           float dir = atan2(-move.x, -move.z);
@@ -569,7 +569,7 @@ int main(void) {
           fabs(z) > 0.1 ? -z * 100 * deltaTime : 0
         );
         */
-        
+
       }
     }
 
@@ -591,7 +591,7 @@ int main(void) {
     glClearDepth(1.0);
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
+
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
     // Regenerate world
@@ -626,12 +626,12 @@ int main(void) {
       uint8_t *buf = (uint8_t *)voxelSpaceSSBO->beginMap(SSBO::MAP_WRITE_ONLY);
       catModel->paintInto(buf, voxelSpaceDims);
       voxelSpaceSSBO->endMap();
-      
+
 
       gl_error();
       glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
-    
+
     // Generate mipmaps
     if (true) {
       double mipStart = glfwGetTime();
@@ -657,9 +657,9 @@ int main(void) {
     }
 
     // Light space
-    { 
+    {
 	  {
-		glm::uvec3 dims = voxelSpaceDims / glm::uvec3(2) + glm::uvec3(2);
+		glm::uvec3 dims = voxelSpaceDims;// / glm::uvec3(2) + glm::uvec3(2);
 		// this appears to be .1ms faster on my 1080ti
 		lightSpaceClear_Compute
 		  ->use()
@@ -678,7 +678,7 @@ int main(void) {
 
 		  ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
 		  ->uniform1ui("time", time)
-		  ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(10.0))
+		  ->uniformVec3("lightPos", catModel->getPosition() + glm::vec3(0.0, 10.0, 0.0))
 		  ->uniformVec3("lightColor", glm::vec3(1.0))
 		  ->uniformFloat("samples", samples);
 
@@ -701,7 +701,7 @@ int main(void) {
 			dims.z,
 			1
 		  ));
-      
+
 		lightSpaceFill_Compute
 		  ->uniform1ui("axis", 1)
 		  ->uniform1ui("start", 0)
@@ -829,7 +829,7 @@ int main(void) {
 	  }
 
 	  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-	  
+
 	  lightSpaceBlurDown_Compute
 		->use()
 		->ssbo("lightSlabBuffer", lightSpaceSSBO)
@@ -848,7 +848,7 @@ int main(void) {
 	  glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
 
-    
+
     // Raytrace in compute
     if (true) {
       // Raytrace into `raytraceOutput`
@@ -870,7 +870,7 @@ int main(void) {
 
           ->uniformMat4("VP", VP)
           ->uniformFloat("debug", debug)
-          
+
           ->uniformVec2ui("resolution", res)
           ->uniform1ui("terminationBufferIdx", 0)
           ->timedCompute(
@@ -960,7 +960,7 @@ int main(void) {
     glfwSwapBuffers(window);
 
     time++;
-   
+
     uv_run(uv_default_loop(), UV_RUN_NOWAIT);
     glfwPollEvents();
   }

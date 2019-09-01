@@ -2,13 +2,15 @@ const fs = require('fs')
 const path = require('path')
 const glob = require('glob')
 const chokidar = require('chokidar')
+const mkdirp = require('mkdirp').sync
 const argv = require('yargs').argv
 
-const sourceGlob = path.join(__dirname, '*.{vert,frag,comp}')
+const sourceGlob = path.join(__dirname, '**/*.{vert,frag,comp}')
 const files = glob.sync(sourceGlob)
 const includeExp = /#include +['"<](.*)['">]/
 const splitExp = /\r?\n/
 const outBase = path.resolve(process.cwd(), argv.o)
+mkdirp(outBase)
 
 const types = {
   '.frag': 'GL_FRAGMENT_SHADER',
@@ -20,13 +22,11 @@ const dependencyMap = {
   // file: [dep, dep]
 }
 
-
 if (argv.w) {
-  chokidar.watch(
-    path.join(__dirname, '..'), {
-      ignored: path.join(__dirname, '..', 'build')
-    }
-  ).on('change', (p) => {
+  chokidar.watch([
+    __dirname,
+    path.join(__dirname, '../includes')
+  ]).on('change', (p) => {
     if (p.indexOf(".git") > -1) {
       return
     }
@@ -50,6 +50,9 @@ if (argv.w) {
   })
 }
 
+function outRelative(file) {
+  return path.relative(__dirname, file).replace(/\\/g, '/')
+}
 
 function outputLine(line) {
   if (Array.isArray(line)) {
@@ -59,8 +62,30 @@ function outputLine(line) {
   return (" ").repeat(8) + '"' + line.replace(/"/g,'\\"') + '\\n"'
 }
 
+function filterLines(lines) {
+  let inHost = false
+  return lines.filter((l) => {
+    var ret = true;
+
+    if (l.match(/#ifdef\W+GPU_HOST/)) {
+      inHost = true;
+    }
+
+    if (inHost) {
+      ret = false;
+    }
+
+    if (l.indexOf("#endif") > -1) {
+      inHost = false;
+    }
+
+    return ret
+  })
+}
+
 function processFile(file) {
-  const outFile = path.join(outBase, path.basename(file))
+  const outFile = path.join(outBase, outRelative(file))
+  mkdirp(path.dirname(outFile))
   dependencyMap[file] = []
   const lines = processIncludes(file, dependencyMap[file], fs.readFileSync(file, 'utf8').split(splitExp), 0)
   fs.writeFileSync(outFile, lines.join('\n'))
@@ -68,19 +93,21 @@ function processFile(file) {
 }
 
 function spath(p) {
-  return p.replace(/\\/g, '\\\\')
+  return path.normalize(p).replace(/\\/g, '\\\\')
 }
 
 const init = files.map((file) => {
   file = path.normalize(file);
-  const outFile = path.join(outBase, path.basename(file))
+  const outFile = path.join(outBase, path.relative(__dirname, file))
   const lines = processFile(file)
   const type = types[path.extname(file)]
   if (!type) {
     throw new Error(file + " could not be associated with a shader type")
   }
-  const relpath = path.relative(__dirname, file)
-  return `Shaders::instances["${relpath}"] = new Shader(\n` + lines.map(outputLine).join('\n') + `, "${spath(outFile)}", "${relpath}", ${type});\n`
+  const relpath = outRelative(file)
+  return `Shaders::instances["${relpath}"] = new Shader(\n` +
+    lines.map(outputLine).join('\n') +
+    `, "${spath(outFile)}", "${relpath}", ${type});\n`
 }).join('\n      ')
 
 const s = `
@@ -121,6 +148,7 @@ class Shaders {
 
     static Shader *get(const std::string file) {
       if (Shaders::instances.find(file) == Shaders::instances.end()) {
+        cout << "Shader::get('" <<  file << "') failed" << endl;
         return nullptr;
       }
       return Shaders::instances.at(file);
@@ -136,13 +164,27 @@ class Shaders {
 
 std::map<std::string, Shader *> Shaders::instances;
 
-static void on_change(uv_fs_event_t *handle, const char *path, int events, int status) {
+static void on_change(uv_fs_event_t *handle, const char *const_path, int events, int status) {
   if (events & UV_CHANGE) {
+    int i = 0;
+    size_t len = strlen(const_path) + 1;
+    char *path = (char *)malloc(len);
+    memset(path, 0, len);
+    memcpy(path, const_path, len - 1);
+
+    while(path[i] != '\\0') {
+      if(path[i] == '\\\\') {
+        path[i] = '/';
+      }
+      i++;
+    }
+
     Shader *shader = Shaders::get(path);
     if (shader != nullptr) {
       shader->reload();
     }
     printf("CHANGE: %s\\n", path);
+    free(path);
   }
 }
 #endif
@@ -150,6 +192,7 @@ static void on_change(uv_fs_event_t *handle, const char *path, int events, int s
 fs.writeFileSync(path.join(outBase, 'built.h'), s + '\n')
 
 function processIncludes(file, deps, lines) {
+  lines =  filterLines(lines)
   let out = []
   const baseDir = path.dirname(file)
   lines.unshift(`// start: ${path.basename(file)}`)
