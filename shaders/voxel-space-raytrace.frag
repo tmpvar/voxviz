@@ -6,8 +6,9 @@
 #include "dda-cursor.glsl"
 #include "palette.glsl"
 #include "cosine-direction.glsl"
+#include "voxel-space.glsl"
+#include "hsl.glsl"
 
-in vec3 in_ray_dir;
 layout(location = 0) out vec4 outColor;
 
 // main binds
@@ -15,201 +16,130 @@ uniform float debug;
 uniform int showHeat;
 uniform float maxDistance;
 uniform vec3 eye;
-uniform vec3 dims;
 uniform uint time;
-
+uniform mat4 VP;
 uniform uvec3 lightPos;
 uniform vec3 lightColor;
+uniform uvec2 resolution;
 
-#define ITERATIONS 1024
+#define ITERATIONS 512
 
 #include "voxel-space-mips.glsl"
 
-void bounce(in DDACursor cursor, vec3 normal) {
-  vec3 cd = cosine_direction(
-    cosine_hash(
-      dot(cursor.mapPos, cursor.rayPos) *
-      float(time) / 1000.0
-    ),
-    normal
-  );
 
-  vec3 new_ray_dir = normalize( (reflect(cursor.rayDir, normal)));
-  vec3 hd = dims * 0.5;
-  cursor = dda_cursor_create(
-    cursor.mapPos - hd + normal,// + new_ray_dir * 0.00001,
-    new_ray_dir
-  );
-  // new_ray_dir += cosine_direction(
-  //   cosine_hash(dot(new_ray_dir, normal)),// * float(time) / 1000.0),
-  //   new_ray_dir
-  // ) * 0.05;
+vec3 compute_ray_dir(vec2 uv, mat4 inv) {
+  vec4 far = inv * vec4(uv.x, uv.y, 1.0, 1.0);
+  far /= far.w;
+  vec4 near = inv * vec4(uv.x, uv.y, 0.5, 1.0);
+  near /= near.w;
 
-  // new_ray_dir = normalize(new_ray_dir);
-  //
-  // cursor = dda_cursor_create(
-  //   (cursor.mapPos - hd) + sign(new_ray_dir) * normalize(normal) + new_ray_dir,
-  //   new_ray_dir
-  // );
-}
-
-float trace_light(in DDACursor cursor) {
-  vec3 normal = vec3(cursor.mask);
-  float div = 2.0;
-  vec3 mapPos = cursor.mapPos / div;
-  vec3 hd = (dims * 0.5) / div;
-
-  vec3 cd = cosine_direction(
-    cosine_hash(
-      dot(cursor.mapPos, cursor.rayPos) *
-      float(time) / 1000.0
-    ),
-    normal
-  );
-
-  vec3 new_ray_dir = cd * vec3(
-    length(cd),
-    (55 + sin(float(time)/100.00) * 50) / div,
-    0.0
-  ) - mapPos / div;
-  new_ray_dir = normalize(new_ray_dir);
-
-  DDACursor c = dda_cursor_create(
-    (mapPos - hd + sign(new_ray_dir) * normal + new_ray_dir),
-    new_ray_dir
-  );
-
-  uint8_t noop;
-  vec3 found_normal;
-  for (int i=0; i<128; i++) {
-    if (voxel_mip_get(c.mapPos, 1, noop)) {
-      return -1.0;
-    }
-    dda_cursor_step(c, found_normal);
-  }
-  return 1.0;
-}
-
-float trace_sky(in DDACursor cursor) {
-  vec3 normal = vec3(cursor.mask);
-  float div = 2.0;
-  vec3 mapPos = cursor.mapPos / div;
-  vec3 hd = (dims * 0.5) / div;
-
-  vec3 cd = cosine_direction(
-    cosine_hash(
-      dot(cursor.mapPos, cursor.rayPos) *
-      float(time) / 1000.0
-    ),
-    normal
-  );
-
-  vec3 new_ray_dir = cd * vec3(
-    0.0,
-    1.0,
-    0.0
-  );
-  new_ray_dir = normalize(new_ray_dir);
-
-  DDACursor c = dda_cursor_create(
-    (mapPos - hd + sign(new_ray_dir) * normal + new_ray_dir * 2) + cd,
-    new_ray_dir
-  );
-
-  uint8_t noop;
-  vec3 found_normal;
-  for (int i=0; i<20; i++) {
-    if (voxel_mip_get(c.mapPos, 1, noop)) {
-      return -1.0;
-    }
-    dda_cursor_step(c, found_normal);
-  }
-  return 1.0;
-}
-
-vec3 trace_reflection(in DDACursor cursor) {
-  vec3 hd = (dims * 0.5) / 2;
-  vec3 normal = normalize(vec3(cursor.mask));
-
-  vec3 mapPos = cursor.mapPos / 2.0;
-  vec3 cd = cosine_direction(
-    cosine_hash(
-      dot(mapPos, cursor.rayPos) *
-      float(time) / 100.0
-    ),
-    normal
-  ) * 0.3;
-
-  vec3 new_ray_dir = reflect(normalize(cursor.rayDir) + cd, normal);
-  new_ray_dir = normalize(new_ray_dir);
-
-  DDACursor c = dda_cursor_create(
-    //(mapPos - hd + sign(new_ray_dir) * normal + new_ray_dir * 2)
-    (mapPos - hd) + sign(new_ray_dir) * normal + new_ray_dir,// + cd,
-    new_ray_dir
-  );
-
-  uint8_t noop;
-  vec3 found_normal;
-  for (int i=0; i<64; i++) {
-    if (voxel_mip_get(c.mapPos, 1, noop)) {
-      return c.mapPos * 2;
-    }
-    dda_cursor_step(c, found_normal);
-  }
-  return vec3(-1.0);
+  return normalize(far.xyz - near.xyz);
 }
 
 void main() {
+
+  vec2 uv = vec2(gl_FragCoord.xy) / vec2(resolution) * 2.0 - 1.0;
+  vec3 in_ray_dir = compute_ray_dir(uv, inverse(VP));
+
   float found_distance;
-  vec3 found_normal;
-  vec3 hd = dims * 0.5;
-  bool hit = ailaWaldHitAABox(
-    vec3(0.0),
-    hd,
-    eye,
-    in_ray_dir,
-    1.0 / in_ray_dir,
-    found_distance,
-    found_normal
-  );
+  vec3 found_normal = vec3(0.0);
+  vec3 hd = volumeSlabDims * 0.5;
+
+  bool hit;
+  if (all(greaterThanEqual(eye, vec3(0.0))) && all(lessThan(eye, volumeSlabDims))) {
+    hit = true;//pos = eye + in_ray_dir * 0.001;
+    found_distance = 0.0;
+  } else {
+    hit = ourIntersectBoxCommon(
+      hd,
+      hd,
+      eye,
+      in_ray_dir,
+      1.0 / in_ray_dir,
+      found_distance,
+      found_normal
+    );
+    found_distance += 0.1;
+  }
+  if (!hit) {
+    return;
+  }
 
   outColor = vec4(0.2);
 
-  if (hit) {
-    outColor = vec4(0.0, 0.0, 0.2, 1.0);
 
-    vec3 pos = eye + in_ray_dir * found_distance;
-    if (all(greaterThanEqual(eye, -hd)) && all(lessThanEqual(eye, hd))) {
-      pos = eye;
+  uint8_t palette_idx;
+  vec3 c = vec3(0.0);
+  int i;
+
+  vec3 d = in_ray_dir;
+  vec3 id = 1.0 / d;
+  vec3 p = eye + d * found_distance;
+  vec3 prevP = eye;// - d * 2.0;
+
+  float dt = 1.0 / length(volumeSlabDims);
+  float t = found_distance;
+  float opacityDiv = 1.0 / 8.0;
+
+  int minMip = 0;
+  int maxMip = MAX_MIPS;
+  int mip = maxMip;
+  float mipSize = (float(1<<(mip)));
+  float invMipSize = 1.0 / mipSize;
+  vec3 mask;
+  bool miss = true;
+  for (i=0; i<ITERATIONS; i++) {
+    if (
+      any(lessThan(p, vec3(0.0))) ||
+      any(greaterThanEqual(p, vec3(volumeSlabDims)))
+    ) {
+      break;
     }
 
-    //vec3 pos = (eye + in_ray_dir * found_distance) * dims;
-    DDACursor cursor = dda_cursor_create(
-      pos - in_ray_dir * 0.0001,
-      in_ray_dir
-    );
-    float bounced = 0.0;
-    vec3 agg;
-    uint8_t palette_idx;
+    if (voxel_mip_get(p, mip, palette_idx)) {
+      if (mip == minMip) {
+        c = palette_color(palette_idx);
 
-    bool lighting = false;
-    vec3 c = vec3(0.2);
-    float intensity = 0.0;//0.67;
-    vec3 reflectColor = vec3(0.0);
-    outColor = vec4(0.0, 0.0, 0.2, 1.0);
-    for (int i=0; i<ITERATIONS; i++) {
+        // if the ray have moved since we intersected the outer bounding box then
+        // we should recompute a normal.
+        if (found_distance != t) {
+          found_normal = -sign(d) *
+                          step(prevP.xyz, prevP.yzx) *
+                          step(prevP.xyz, prevP.zxy);
+        }
 
-      if (voxel_mip_get(cursor.mapPos, 0, palette_idx)) {
-        outColor = normalize(vec4(found_normal, 1.0));
-        //outColor = vec4(palette_color(palette_idx), 1.0);
-
+        miss = false;
         break;
       }
 
-      dda_cursor_step(cursor, found_normal);
+      mip = max(mip - 1, minMip);
+      t -= dt * 0.00125;
+
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      continue;
+    }
+    else if (mip < maxMip && !voxel_mip_get(p, min(mip + 1, maxMip), palette_idx)) {
+      mip = min(maxMip, mip+1);
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      t += dt * 0.00125;
     }
 
-    //outColor = vec4(c + reflectColor * 0.2 + intensity * 0.2 * lightColor, 1.0);
+    vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
+    dt = max(mincomp(deltas), 0.0001) * mipSize;
+    t += dt;
+    // FIXME: we get ~1ms back if this is enabled, but lose the ability to
+    //        compute good face normals. There is likely a better mechanism
+    //        for increasing marching speed at further distances (cone marching?)
+    //t += max(0.1,t/1024);
+    prevP = deltas;
+    p = eye + d * t;
   }
+
+    if (true || debug == 1.0) {
+      c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
+    }
+    outColor = vec4(c, 1.0);
+
 }

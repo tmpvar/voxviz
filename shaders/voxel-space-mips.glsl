@@ -40,3 +40,31 @@ bool voxel_mip_get(in vec3 pos, const in uint mip, out uint8_t palette_idx) {
 
   return palette_idx > uint8_t(0);
 }
+
+void voxel_mip_set(in vec3 pos, const in uint mip, const in uint8_t value) {
+  uvec3 p = uvec3(
+    uint(pos.x) >> mip,
+    uint(pos.y) >> mip,
+    uint(pos.z) >> mip
+  );
+
+  uvec3 d = uvec3(
+    uint(volumeSlabDims.x) >> mip,
+    uint(volumeSlabDims.y) >> mip,
+    uint(volumeSlabDims.z) >> mip
+  );
+
+  if (any(greaterThanEqual(p, d))) {
+    return;
+  }
+
+  float slots = volumeSlabDims.x * volumeSlabDims.y * volumeSlabDims.z;
+  vec2 lod = lod_defs[mip];
+  uint offset = uint(floor(slots * lod.x));
+
+  uint idx = offset + uint(
+    p.x + p.y * d.x + p.z * d.x * d.y
+  );
+
+  volumeSlab[idx] = value;
+}

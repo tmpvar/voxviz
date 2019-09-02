@@ -245,7 +245,7 @@ int main(void) {
 
   for (float x = 0; x < instances; x++) {
     for (float z = 0; z < instances; z++) {
-      Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox");
+      Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
       if (m == nullptr) {
         return 1;
       }
@@ -266,7 +266,9 @@ int main(void) {
     ->add(Shaders::get("voxel-space/build.comp"))
     ->link();
 
-
+  Program *mipmapVoxelGrid = Program::New()
+    ->add(Shaders::get("voxel-space/mipmap.comp"))
+    ->link();
 
   BlueNoise1x64x64x64 *blue_noise = new BlueNoise1x64x64x64();
   blue_noise->upload();
@@ -444,6 +446,29 @@ int main(void) {
           ->uniformMat4("model", m->matrix)
           ->compute(m->vox->dims);
       }
+
+      // Generate mipmaps
+      if (true) {
+        double mipStart = glfwGetTime();
+        // Generate mipmap for SSBO
+        for (unsigned int i = 1; i <= MAX_MIP_LEVELS; i++) {
+          glm::uvec3 mipDims = voxelSpaceDims / (glm::uvec3(1 << i));
+          glm::uvec3 lowerMipDims = voxelSpaceDims / (glm::uvec3(1 << (i - 1)));
+          ostringstream mipDebug;
+          mipDebug << "mip " << i << " dims: " << mipDims.x << "," << mipDims.y << "," << mipDims.z;
+
+          mipmapVoxelGrid
+            ->use()
+            ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+            ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+            ->uniformVec3ui("mipDims", mipDims)
+            ->uniformVec3ui("lowerMipDims", lowerMipDims)
+            ->uniform1ui("mipLevel", i)
+            ->timedCompute(mipDebug.str().c_str(), mipDims);
+          gl_error();
+          glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        }
+      }
     }
 
     if (!keys[GLFW_KEY_TAB]) {
@@ -459,9 +484,9 @@ int main(void) {
       voxelSpaceDebug->use()
         ->uniformMat4("VP", VP)
         ->uniformVec3("eye", currentEye)
-        ->uniformVec3("dims", vec3(voxelSpaceSSBO->dims()))
         ->uniformFloat("maxDistance", 10000)
         ->uniform1ui("time", 0)
+        ->uniformVec2ui("resolution", resolution)
         ->uniformVec3("volumeSlabDims", vec3(voxelSpaceSSBO->dims()))
         ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
 

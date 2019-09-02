@@ -339,9 +339,9 @@ public:
     this->bind();
     glClearBufferData(
       GL_SHADER_STORAGE_BUFFER,
-      GL_R32UI,
+      GL_R8,
       GL_RED,
-      GL_UNSIGNED_INT,
+      GL_UNSIGNED_BYTE,
       &v
     );
     return this;
