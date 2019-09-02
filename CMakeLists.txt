@@ -73,6 +73,7 @@ add_executable(
 
   include/collision/aabb-obb.h
   include/greedy-mesher.h
+  include/model.h
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h

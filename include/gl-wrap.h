@@ -158,14 +158,20 @@ public:
         size_t absoluteSourceLine = 1;
 
         size_t rawErrorLine = 0;
+
+        size_t startingParenLoc = errorLine.find("(");
+        if (startingParenLoc == string::npos) {
+          cout << "could not parse gl error line: " << errorLine << endl;
+          continue;
+        }
         // here we assume that errors are of the form 0(<line>) <message>
-        size_t endingParenLoc = errorLine.substr(2).find(")");
+        size_t endingParenLoc = errorLine.substr(startingParenLoc).find(")");
         if (endingParenLoc == string::npos) {
           cout << "could not parse gl error line: " << errorLine << endl;
           continue;
         }
 
-        rawErrorLine = stoul(errorLine.substr(2, endingParenLoc));
+        rawErrorLine = stoul(errorLine.substr(startingParenLoc+1, endingParenLoc));
 
         cout << "error line: " << rawErrorLine << endl;
         sourceStream.seekg(0);
@@ -198,7 +204,9 @@ public:
           if (sourceLine.find("// end: " + file_stack.back().file) != string::npos) {
             size_t skipLines = file_stack.back().lineCount + file_stack.back().skipLines;
             file_stack.pop_back();
-            file_stack.back().skipLines += skipLines;
+            if (file_stack.size() > 0) {
+              file_stack.back().skipLines += skipLines;
+            }
 
             if (absoluteSourceLine == rawErrorLine - 1) {
               fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines)
@@ -209,7 +217,10 @@ public:
           } else if (absoluteSourceLine == rawErrorLine - 1) {
             fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
           }
-          file_stack.back().lineCount++;
+
+          if (file_stack.size() > 0) {
+            file_stack.back().lineCount++;
+          }
         }
       }
       shaderLogs[this->name] = fileLog.str();
@@ -264,6 +275,10 @@ public:
   }
 
   SSBO *resize(uint64_t bytes) {
+    if (bytes == this->total_bytes) {
+      return this;
+    }
+
     if (this->_dims.x > 0) {
       std::cout << "creating SSBO with " << bytes << " bytes; dims:" << this->_dims.x << ", " << this->_dims.y << ", " << this->_dims.z << endl;
     } else {
@@ -294,7 +309,7 @@ public:
 
     this->bind();
     void *out = glMapBuffer(GL_SHADER_STORAGE_BUFFER, m); gl_error();
-    //this->unbind();
+
     this->mapped = true;
     return out;
   }
@@ -305,7 +320,7 @@ public:
     }
     this->bind();
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); gl_error();
-    //this->unbind();
+    this->unbind();
     this->mapped = false;
   }
 
@@ -318,6 +333,18 @@ public:
 
   void unbind(GLuint type = GL_SHADER_STORAGE_BUFFER) {
     glBindBuffer(type, 0); gl_error();
+  }
+
+  SSBO *fill(u32 v) {
+    this->bind();
+    glClearBufferData(
+      GL_SHADER_STORAGE_BUFFER,
+      GL_R32UI,
+      GL_RED,
+      GL_UNSIGNED_INT,
+      &v
+    );
+    return this;
   }
 
   size_t size() {
@@ -725,7 +752,7 @@ public:
     if (this->ssbos.find(name) == this->ssbos.end()) {
       idx = this->ssbos.size();
       this->ssbos[name] = idx;
-      // Rebind the buffer index to the order in which it was seen in.
+      // Rebind the buffer index to the order in which it was seen.
       glShaderStorageBlockBinding(this->handle, ri, idx);
     }
     else {

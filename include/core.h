@@ -73,4 +73,10 @@ struct DispatchIndirectCommand {
   uint  num_groups_z;
 };
 
+struct GBufferPixel {
+  vec4 position;
+  vec4 normal;
+  // TODO: material
+};
+
 #endif

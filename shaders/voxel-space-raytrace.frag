@@ -21,7 +21,7 @@ uniform uint time;
 uniform uvec3 lightPos;
 uniform vec3 lightColor;
 
-#define ITERATIONS 768
+#define ITERATIONS 1024
 
 #include "voxel-space-mips.glsl"
 
@@ -127,7 +127,6 @@ float trace_sky(in DDACursor cursor) {
   return 1.0;
 }
 
-
 vec3 trace_reflection(in DDACursor cursor) {
   vec3 hd = (dims * 0.5) / 2;
   vec3 normal = normalize(vec3(cursor.mask));
@@ -161,34 +160,6 @@ vec3 trace_reflection(in DDACursor cursor) {
   return vec3(-1.0);
 }
 
-// float sum(vec3 v) { return dot(v, vec3(1.0)); }
-// float vertex_ao(vec2 side, float corner) {
-// 	//if (side.x == 1.0 && side.y == 1.0) return 1.0;
-// 	return (side.x + side.y + max(corner, side.x * side.y)) / 3.0;
-// }
-//
-// vec4 voxel_ao(vec3 pos, vec3 d1, vec3 d2) {
-//   uint8_t noop;
-// 	vec4 side = vec4(
-//     float(voxel_get(pos + d1, noop)),
-//     float(voxel_get(pos + d2, noop)),
-//     float(voxel_get(pos - d1, noop)),
-//     float(voxel_get(pos - d2, noop))
-//   );
-// 	vec4 corner = vec4(
-//     float(voxel_get(pos + d1 + d2, noop)),
-//     float(voxel_get(pos - d1 + d2, noop)),
-//     float(voxel_get(pos - d1 - d2, noop)),
-//     float(voxel_get(pos + d1 - d2, noop))
-//   );
-// 	vec4 ao;
-// 	ao.x = vertex_ao(side.xy, corner.x);
-// 	ao.y = vertex_ao(side.yz, corner.y);
-// 	ao.z = vertex_ao(side.zw, corner.z);
-// 	ao.w = vertex_ao(side.wx, corner.w);
-// 	return 1.0 - ao;
-// }
-
 void main() {
   float found_distance;
   vec3 found_normal;
@@ -206,7 +177,8 @@ void main() {
   outColor = vec4(0.2);
 
   if (hit) {
-    // outColor = vec4(0.0, 0.0, 0.2, 1.0);
+    outColor = vec4(0.0, 0.0, 0.2, 1.0);
+
     vec3 pos = eye + in_ray_dir * found_distance;
     if (all(greaterThanEqual(eye, -hd)) && all(lessThanEqual(eye, hd))) {
       pos = eye;
@@ -225,24 +197,19 @@ void main() {
     vec3 c = vec3(0.2);
     float intensity = 0.0;//0.67;
     vec3 reflectColor = vec3(0.0);
+    outColor = vec4(0.0, 0.0, 0.2, 1.0);
     for (int i=0; i<ITERATIONS; i++) {
+
       if (voxel_mip_get(cursor.mapPos, 0, palette_idx)) {
-        // intensity += trace_light(cursor) * 0.55;
-        //intensity += trace_sky(cursor) * 0.75;
-        if (cursor.mapPos.y < 10) {
-          vec3 rpos = trace_reflection(cursor);
-          if (rpos.x >= 0.0 && voxel_mip_get(rpos, 0, palette_idx)) {
-            reflectColor = palette_color(palette_idx);// / 2.0;
-          }
-        } else {
-            c = palette_color(palette_idx);
-        }
+        outColor = normalize(vec4(found_normal, 1.0));
+        //outColor = vec4(palette_color(palette_idx), 1.0);
+
         break;
       }
 
       dda_cursor_step(cursor, found_normal);
     }
 
-    outColor = vec4(c + reflectColor * 0.2 + intensity * 0.2 * lightColor, 1.0);
+    //outColor = vec4(c + reflectColor * 0.2 + intensity * 0.2 * lightColor, 1.0);
   }
 }

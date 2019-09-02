@@ -8,8 +8,8 @@ layout( local_size_x = 64, local_size_y = 1, local_size_z = 1 ) in;
 layout (std430) buffer volumeSlabBuffer {
   uint8_t volume[];
 };
-uniform uvec3 volumeSlabDims;
 
+uniform uvec3 volumeSlabDims;
 uniform uint time;
 
 void main() {

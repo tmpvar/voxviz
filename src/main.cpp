@@ -25,6 +25,7 @@
 #include "blue-noise.h"
 #include "scene.h"
 #include "greedy-mesher.h"
+#include "model.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -40,7 +41,7 @@ bool fullscreen = 0;
 bool yes = true;
 const float fov = 45.0f;
 // int windowDimensions[2] = { 1024, 768 };
-int windowDimensions[2] = { 1440, 900 };
+ivec2 resolution(1440, 900);
 glm::mat4 viewMatrix, perspectiveMatrix, MVP;
 FBO *fbo = nullptr;
 
@@ -128,7 +129,7 @@ int main(void) {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifndef FULLSCREEN
-  window = glfwCreateWindow(windowDimensions[0], windowDimensions[1], "voxviz", NULL, NULL);
+  window = glfwCreateWindow(resolution[0], resolution[1], "voxviz", NULL, NULL);
 #else
   // fullscreen
   GLFWmonitor* primary = glfwGetPrimaryMonitor();
@@ -167,7 +168,7 @@ int main(void) {
 
   Shaders::init();
 
-  glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
+  glfwSetWindowSize(window, resolution[0], resolution[1]);
   window_resize(window);
 
   float max_distance = 10000.0f;
@@ -203,7 +204,7 @@ int main(void) {
   }
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
-  fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+  fbo = new FBO(resolution[0], resolution[1]);
 
 
   // Setup Dear ImGui binding
@@ -218,12 +219,13 @@ int main(void) {
   GLFWgamepadstate state;
 
   // Voxel space
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 128, 1024);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 256, 1024);
 
-  uint64_t voxelSpaceBytes =
+  uint64_t voxelSpaceBytes = (
     static_cast<uint64_t>(voxelSpaceDims.x) *
     static_cast<uint64_t>(voxelSpaceDims.y) *
-    static_cast<uint64_t>(voxelSpaceDims.z);
+    static_cast<uint64_t>(voxelSpaceDims.z)
+  );
 
   uint64_t total_voxel_slab_slots = 0;
   for (unsigned int i = 0; i <= MAX_MIP_LEVELS; i++) {
@@ -236,18 +238,35 @@ int main(void) {
     voxelSpaceDims
   );
 
+  vector <Model *>scene;
 
-  VOXModel *cyl = VOXParser::parse("E:\\gfx\\voxviz\\img\\models\\car.vox");
-  Mesh *cylMesh = new Mesh();
+  float instances = 8.0;
+  float spacing = 50.0;
 
-  if (cyl == nullptr) {
-    cout << "cannot find cyl.vox" << endl;
-    return 1;
+  for (float x = 0; x < instances; x++) {
+    for (float z = 0; z < instances; z++) {
+      Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox");
+      if (m == nullptr) {
+        return 1;
+      }
+
+      m->matrix = translate(
+        m->matrix,
+        vec3(
+          x*(m->dims.x * 1.5),
+          0.0,
+          z*(m->dims.z * 1.5)
+        )
+      );
+      scene.push_back(m);
+    }
   }
-  std::vector<uvec3> vertices;
-  std::vector<uvec4> faces;
-  greedy(cyl->buffer, ivec3(cyl->dims), cylMesh);
-  cylMesh->upload();
+
+  Program *buildVoxelGrid = Program::New()
+    ->add(Shaders::get("voxel-space/build.comp"))
+    ->link();
+
+
 
   BlueNoise1x64x64x64 *blue_noise = new BlueNoise1x64x64x64();
   blue_noise->upload();
@@ -263,15 +282,15 @@ int main(void) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
+    glfwGetFramebufferSize(window, &resolution[0], &resolution[1]);
 
     if (!shaderLogs.empty()) {
-      ImGui::SetNextWindowPos(ImVec2(20, windowDimensions[1] / 2 + 20));
-      ImGui::SetNextWindowSize(ImVec2(300, windowDimensions[1] / 2 + 20));
+      ImGui::SetNextWindowPos(ImVec2(20, resolution[1] / 2 + 20));
+      ImGui::SetNextWindowSize(ImVec2(300, resolution[1] / 2 + 20));
     }
     else {
       ImGui::SetNextWindowPos(ImVec2(20, 20));
-      ImGui::SetNextWindowSize(ImVec2(300, windowDimensions[1] - 40));
+      ImGui::SetNextWindowSize(ImVec2(300, resolution[1] - 40));
     }
 
     ImGui::Begin("stats");
@@ -319,17 +338,17 @@ int main(void) {
           fullscreen = true;
         }
         else {
-          glfwSetWindowSize(window, windowDimensions[0], windowDimensions[1]);
+          glfwSetWindowSize(window, resolution[0], resolution[1]);
           glfwSetWindowPos(window, 100, 100);
-          glfwSetWindowMonitor(window, NULL, 100, 100, windowDimensions[0], windowDimensions[1], GLFW_DONT_CARE);
-          glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
+          glfwSetWindowMonitor(window, NULL, 100, 100, resolution[0], resolution[1], GLFW_DONT_CARE);
+          glViewport(0, 0, resolution[0], resolution[1]);
           fullscreen = false;
         }
         prevKeys[GLFW_KEY_ENTER] = false;
 
         delete fbo;
-        glfwGetWindowSize(window, &windowDimensions[0], &windowDimensions[1]);
-        fbo = new FBO(windowDimensions[0], windowDimensions[1]);
+        glfwGetWindowSize(window, &resolution[0], &resolution[1]);
+        fbo = new FBO(resolution[0], resolution[1]);
 
       }
 
@@ -374,7 +393,7 @@ int main(void) {
     glm::mat4 invertedView = glm::inverse(viewMatrix);
     glm::vec3 currentEye(invertedView[3][0], invertedView[3][1], invertedView[3][2]);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, windowDimensions[0], windowDimensions[1]);
+    glViewport(0, 0, resolution[0], resolution[1]);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glDepthMask(GL_TRUE);
@@ -394,16 +413,60 @@ int main(void) {
       ->output("outColor")
       ->link();
 
+    static Program *voxelSpaceDebug = Program::New()
+      ->add(Shaders::get("voxel-space-raytrace.vert"))
+      ->add(Shaders::get("voxel-space-raytrace.frag"))
+      ->output("outColor")
+      ->link();
 
-    voxelProgram->use()
-      ->uniformMat4("mvp", VP)
-      ->uniform1ui("totalTriangles", cylMesh->faces.size())
-      ->uniform1ui("totalVerts", cylMesh->verts.size());
+    static SSBO *gbuffer = new SSBO(0);
+    gbuffer->resize(
+      resolution.x * resolution.y * sizeof(GBufferPixel),
+      uvec3(resolution, 0)
+    );
 
-    cylMesh->render(voxelProgram, "position");
+    // Fill Voxel Space
+    {
+      // reset the grid to 0
+      voxelSpaceSSBO->fill(0);
+
+      buildVoxelGrid->use()
+        ->ssbo("worldSpaceVoxelBuffer", voxelSpaceSSBO)
+        ->uniformVec3ui("worldSpaceDims", voxelSpaceSSBO->dims());
+
+      for (auto &m : scene) {
+        m->matrix = glm::rotate(m->matrix, 0.001f, vec3(0.0f, 1.0f, 0.0f));
 
 
+        buildVoxelGrid
+          ->ssbo("modelSpaceVoxelBuffer", m->data)
+          ->uniformVec3ui("modelSpaceDims", m->data->dims())
+          ->uniformMat4("model", m->matrix)
+          ->compute(m->vox->dims);
+      }
+    }
 
+    if (!keys[GLFW_KEY_TAB]) {
+      voxelProgram->use()
+        ->uniformMat4("viewProjection", VP)
+        ->ssbo("gbuffer", gbuffer);
+
+      for (auto &m:scene) {
+        m->render(voxelProgram, VP);
+      }
+    }
+    else {
+      voxelSpaceDebug->use()
+        ->uniformMat4("VP", VP)
+        ->uniformVec3("eye", currentEye)
+        ->uniformVec3("dims", vec3(voxelSpaceSSBO->dims()))
+        ->uniformFloat("maxDistance", 10000)
+        ->uniform1ui("time", 0)
+        ->uniformVec3("volumeSlabDims", vec3(voxelSpaceSSBO->dims()))
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
+
+      fullscreen_surface->render(voxelSpaceDebug);
+    }
     // Stats
     {
       static float f = 0.0f;
@@ -414,7 +477,7 @@ int main(void) {
 
       if (!shaderLogs.empty()) {
         ImGui::SetNextWindowPos(ImVec2(0, 0));
-        ImGui::SetNextWindowSize(ImVec2(windowDimensions[0], windowDimensions[1] / 2));
+        ImGui::SetNextWindowSize(ImVec2(resolution[0], resolution[1] / 2));
         ImGui::Begin(
           "Shader Errors",
           &yes,
