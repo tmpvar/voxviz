@@ -24,7 +24,7 @@ class VOXModel {
   glm::uvec3 dims;
   size_t bytes = 0;
   uint8_t *buffer = nullptr;
-  
+
   ~VOXModel() {
     if (this->buffer != nullptr) {
       free(this->buffer);
@@ -38,6 +38,9 @@ public:
 	static VOXModel *parse(string filename) {
     cout << "Loading VOX file: " << filename.c_str() << endl;
     ifstream ifs(filename, ios::binary | ios::ate);
+    if (!ifs.is_open()) {
+      return nullptr;
+    }
     ifs.seekg(0, ios::beg);
 
     //cout << "  VOX Header" << endl;
@@ -77,7 +80,7 @@ public:
         ifs.read((char *)&vox->dims.x, 4);
         ifs.read((char *)&vox->dims.y, 4);
         ifs.read((char *)&vox->dims.z, 4);
-        
+
         const uint64_t bytes = vox->dims.x*vox->dims.y*vox->dims.z;
         vox->buffer = (uint8_t *)malloc(bytes);
         memset(vox->buffer, 0, bytes);
@@ -113,7 +116,7 @@ public:
         // skip prop values
         uint32_t tmp = material_property_bits - ((material_property_bits >> 1) & 0x55555555);
         tmp = (tmp & 0x33333333) + ((tmp >> 2) & 0x33333333);
-        uint32_t cnt = ((tmp + (tmp >> 4) & 0xF0F0F0F) * 0x1010101) >> 24; 
+        uint32_t cnt = ((tmp + (tmp >> 4) & 0xF0F0F0F) * 0x1010101) >> 24;
         ifs.seekg(4 * cnt);
       }
       else if (cmp(chunk_id, "XYZI")) {
@@ -128,6 +131,7 @@ public:
           if (glm::any(glm::greaterThanEqual(pos, vox->dims))) {
             continue;
           }
+          // TODO: use morton order
           uint64_t idx = (
             pos.x +
             pos.y * vox->dims.x +

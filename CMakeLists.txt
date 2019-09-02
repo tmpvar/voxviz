@@ -72,6 +72,7 @@ add_executable(
   include/parser/magicavoxel/vox.h
 
   include/collision/aabb-obb.h
+  include/greedy-mesher.h
 
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
