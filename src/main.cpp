@@ -184,7 +184,8 @@ int main(void) {
 
   unsigned int time = 0;
 
-  { // query up the workgroups
+  // query up the workgroups
+  {
     int work_grp_size[3], work_grp_inv;
     // maximum global work group (total work in a dispatch)
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_size[0]);
@@ -240,7 +241,7 @@ int main(void) {
 
   vector <Model *>scene;
 
-  float instances = 8.0;
+  float instances = 16.0;
   float spacing = 50.0;
 
   for (float x = 0; x < instances; x++) {
@@ -409,10 +410,10 @@ int main(void) {
 
     glm::mat4 VP = perspectiveMatrix * viewMatrix;
 
-    static Program *voxelProgram = Program::New()
+    static Program *voxelMeshProgram = Program::New()
       ->add(Shaders::get("mesh.vert"))
       ->add(Shaders::get("mesh.frag"))
-      ->output("outColor")
+      ->output("gBufferColor")
       ->link();
 
     static Program *voxelSpaceDebug = Program::New()
@@ -421,11 +422,13 @@ int main(void) {
       ->output("outColor")
       ->link();
 
-    static SSBO *gbuffer = new SSBO(0);
-    gbuffer->resize(
-      resolution.x * resolution.y * sizeof(GBufferPixel),
-      uvec3(resolution, 0)
-    );
+    static Program *voxelSpaceLighting = Program::New()
+      ->add(Shaders::get("voxel-space/lights.vert"))
+      ->add(Shaders::get("voxel-space/lights.frag"))
+      ->output("outColor")
+      ->link();
+
+    static GBuffer *gbuffer = new GBuffer();
 
     // Fill Voxel Space
     {
@@ -438,7 +441,6 @@ int main(void) {
 
       for (auto &m : scene) {
         m->matrix = glm::rotate(m->matrix, 0.001f, vec3(0.0f, 1.0f, 0.0f));
-
 
         buildVoxelGrid
           ->ssbo("modelSpaceVoxelBuffer", m->data)
@@ -472,22 +474,62 @@ int main(void) {
     }
 
     if (!keys[GLFW_KEY_TAB]) {
-      voxelProgram->use()
-        ->uniformMat4("viewProjection", VP)
-        ->ssbo("gbuffer", gbuffer);
 
-      for (auto &m:scene) {
-        m->render(voxelProgram, VP);
+      gbuffer->resize(resolution)->bind();
+      glEnable(GL_DEPTH_TEST);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      // Render voxel meshes
+      {
+        voxelMeshProgram->use()
+          ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
+          ->uniformMat4("viewProjection", VP)
+          ->uniformVec3("eye", currentEye)
+          ->uniformVec2ui("resolution", resolution);
+
+        for (auto &m:scene) {
+          m->render(voxelMeshProgram, VP);
+        }
       }
-    }
-    else {
+
+      gbuffer->unbind();
+
+      glDisable(GL_DEPTH_TEST);
       voxelSpaceDebug->use()
         ->uniformMat4("VP", VP)
         ->uniformVec3("eye", currentEye)
         ->uniformFloat("maxDistance", 10000)
         ->uniform1ui("time", 0)
         ->uniformVec2ui("resolution", resolution)
-        ->uniformVec3("volumeSlabDims", vec3(voxelSpaceSSBO->dims()))
+        ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
+
+      fullscreen_surface->render(voxelSpaceDebug);
+
+      // Lighting
+      if (true) {
+        voxelSpaceLighting->use()
+          ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
+          ->uniformVec2ui("resolution", resolution)
+          ->texture2d("gBufferPosition", gbuffer->gPosition)
+          ->texture2d("gBufferColor", gbuffer->gColor)
+          ->texture2d("gBufferDepth", gbuffer->gDepth)
+          ->uniformVec3("eye", currentEye)
+          ->uniformMat4("VP", VP)
+          ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
+
+        fullscreen_surface->render(voxelSpaceLighting);
+      }
+
+
+    } else {
+      voxelSpaceDebug->use()
+        ->uniformMat4("VP", VP)
+        ->uniformVec3("eye", currentEye)
+        ->uniformFloat("maxDistance", 10000)
+        ->uniform1ui("time", 0)
+        ->uniformVec2ui("resolution", resolution)
+        ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
         ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
 
       fullscreen_surface->render(voxelSpaceDebug);

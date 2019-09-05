@@ -339,9 +339,9 @@ public:
     this->bind();
     glClearBufferData(
       GL_SHADER_STORAGE_BUFFER,
-      GL_R8,
+      GL_R32UI,
       GL_RED,
-      GL_UNSIGNED_BYTE,
+      GL_UNSIGNED_INT,
       &v
     );
     return this;
@@ -692,13 +692,13 @@ public:
     return this;
   }
 
-  Program *texture2d(string name, GLuint  texture_id) {
+  Program *texture2d(string name, GLuint texture_id) {
     if (!this->valid) {
       return this;
     }
 
-    glActiveTexture(GL_TEXTURE0 + this->texture_index);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glActiveTexture(GL_TEXTURE0 + this->texture_index); gl_error();
+    glBindTexture(GL_TEXTURE_2D, texture_id); gl_error();
     this->uniform1i(name, texture_index);
     this->texture_index++;
     return this;
@@ -1089,6 +1089,18 @@ public:
     return this;
   }
 
+  FBO* resize(const uvec2 &res) {
+    if (this->width == res.x && this->height == res.y) {
+      return this;
+    }
+
+    this->destroy();
+    this->width = res.x;
+    this->height = res.y;
+    this->create();
+    return this;
+  }
+
   void destroy() {
     glDeleteTextures(1, &texture_color);
     glDeleteTextures(1, &texture_position);
@@ -1186,7 +1198,7 @@ public:
     glTexImage2D(
       GL_TEXTURE_2D,
       0,
-      GL_RGB16F,
+      GL_RGB32F,
       this->width,
       this->height,
       0,
@@ -1229,7 +1241,7 @@ public:
     return this;
   }
 
-  void debugRender(int dimensions[2]) {
+  void debugRender(uvec2 dimensions) {
     glBindFramebuffer(GL_READ_FRAMEBUFFER, this->fb);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBlitFramebuffer(
