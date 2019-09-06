@@ -18,8 +18,177 @@ inline void vert(Mesh *mesh, const i32 x, const i32 y, const i32 z) {
   );
 }
 
+
+void stupid_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
+  u32 voxel_idx = 0;
+
+  for (uint x = 0; x < dims.x; x++) {
+    for (uint y = 0; y < dims.y; y++) {
+      for (uint z = 0; z < dims.z; z++) {
+
+        // the current voxel is set
+        if (volume[x + y * dims.x + z * dims.x*dims.y]) {
+          uint c = static_cast<GLuint>(mesh->verts.size() / 3);
+          mesh
+            ->face(c + 0, c + 1, c + 2)
+            ->face(c + 0, c + 2, c + 3)
+
+            ->face(c + 4, c + 6, c + 5)
+            ->face(c + 4, c + 7, c + 6)
+
+            ->face(c + 8, c + 10, c + 9)
+            ->face(c + 8, c + 11, c + 10)
+
+            ->face(c + 12, c + 13, c + 14)
+            ->face(c + 12, c + 14, c + 15)
+
+            ->face(c + 16, c + 18, c + 17)
+            ->face(c + 16, c + 18, c + 19)
+
+            ->face(c + 20, c + 21, c + 22)
+            ->face(c + 20, c + 22, c + 23);
+
+          mesh
+            ->vert(x + 0, y + 0, z + 1)
+            ->vert(x + 1, y + 0, z + 1)
+            ->vert(x + 1, y + 1, z + 1)
+            ->vert(x + 0, y + 1, z + 1)
+            ->vert(x + 1, y + 1, z + 1)
+            ->vert(x + 1, y + 1, z + 0)
+            ->vert(x + 1, y + 0, z + 0)
+            ->vert(x + 1, y + 0, z + 1)
+            ->vert(x + 0, y + 0, z + 0)
+            ->vert(x + 1, y + 0, z + 0)
+            ->vert(x + 1, y + 1, z + 0)
+            ->vert(x + 0, y + 1, z + 0)
+            ->vert(x + 0, y + 0, z + 0)
+            ->vert(x + 0, y + 0, z + 1)
+            ->vert(x + 0, y + 1, z + 1)
+            ->vert(x + 0, y + 1, z + 0)
+            ->vert(x + 1, y + 1, z + 1)
+            ->vert(x + 0, y + 1, z + 1)
+            ->vert(x + 0, y + 1, z + 0)
+            ->vert(x + 1, y + 1, z + 0)
+            ->vert(x + 0, y + 0, z + 0)
+            ->vert(x + 1, y + 0, z + 0)
+            ->vert(x + 1, y + 0, z + 1)
+            ->vert(x + 0, y + 0, z + 1);
+        }
+      }
+    }
+  }
+}
+
+
+static bool isset(ivec3 p, const u8 *volume, const ivec3 &dims) {
+  if (glm::any(glm::lessThan(p, ivec3(0))) || glm::any(glm::greaterThanEqual(p, dims))) {
+    return false;
+  }
+  return volume[p.x + p.y * dims.x+p.z*dims.x*dims.y] > 0;
+}
+
+void culled_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
+
+  u32 voxel_idx = 0;
+  uvec3 pos;
+
+  for (pos.z = 0; pos.z < dims.z; pos.z++) {
+    for (pos.y = 0; pos.y < dims.y; pos.y++) {
+      for (pos.x = 0; pos.x < dims.x; pos.x++) {
+
+        // the current voxel is set
+        if (isset(pos, volume, dims)) {
+
+          // loop over the cardinal directions
+          // with the intent of generating a quad for every face
+          // X (0), Y (1), Z (2)
+          for (int d = 0; d < 3; d++) {
+            uvec3 corner = pos;
+
+            uvec3 u(0, 0, 0);
+            uvec3 v(0, 0, 0);
+
+            u[(d + 1) % 3] = 1;
+            v[(d + 2) % 3] = 1;
+
+            for (int side = 0; side < 2; side++) {
+              if (side == 0) {
+                ivec3 o = pos;
+                o[d]-=1;
+                if (isset(o, volume, dims)) {
+                  continue;
+                }
+              } else {
+                uvec3 o = pos;
+                o[d] += 1;
+                if (isset(o, volume, dims)) {
+                  continue;
+                }
+              }
+
+              corner[d] = pos[d] + side;
+
+              u32 start = static_cast<GLuint>(mesh->verts.size() / 3);
+              mesh->vert(
+                corner.x,
+                corner.y,
+                corner.z
+              );
+
+              mesh->vert(
+                corner.x + u.x,
+                corner.y + u.y,
+                corner.z + u.z
+              );
+
+              mesh->vert(
+                corner.x + u.x + v.x,
+                corner.y + u.y + v.y,
+                corner.z + u.z + v.z
+              );
+
+              mesh->vert(
+                corner.x + v.x,
+                corner.y + v.y,
+                corner.z + v.z
+              );
+
+              // compute side normal
+              {
+                vec3 normal(0.0);
+                normal[d] = (side == 0) ? 1.0 : -1.0;
+                mesh->normal(normal.x, normal.y, normal.z);
+                // TODO: ummm.. there's some weirdness that I don't have the
+                // brain power to solve right now with glVertexAttribDivisor
+                // in the model render method that needs addressing to avoid
+                // duplicating this data.
+                mesh->normal(normal.x, normal.y, normal.z);
+                mesh->normal(normal.x, normal.y, normal.z);
+                mesh->normal(normal.x, normal.y, normal.z);
+              }
+
+              if (side == 1) {
+                mesh->face(start, start + 1, start + 2)
+                    ->face(start, start + 2, start + 3);
+              }
+              else {
+                mesh->face(start + 2, start + 1, start)
+                    ->face(start + 3, start + 2, start);
+              }
+              // TODO: can this work with backface culling??
+            }
+          }
+        }
+
+        voxel_idx++;
+      }
+    }
+  }
+
+}
+
 // taken from https://github.com/mikolalysenko/mikolalysenko.github.com/blob/master/MinecraftMeshes/js/greedy.js
-void greedy(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
+void greedy_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
   for (i32 d = 0; d < 3; ++d) {
     i32 i = 0, j = 0, k = 0, l = 0, w = 0, h = 0
       , u = (d + 1) % 3
@@ -98,8 +267,8 @@ void greedy(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
             mesh->face(vertex_count, vertex_count + 1, vertex_count + 2)
                 ->face(vertex_count, vertex_count + 2, vertex_count + 3);
             // TODO: can this work with backface culling??
-            mesh->face(vertex_count + 2, vertex_count + 1, vertex_count)
-              ->face(vertex_count+3, vertex_count + 2, vertex_count);
+            //mesh->face(vertex_count + 2, vertex_count + 1, vertex_count)
+            //  ->face(vertex_count+3, vertex_count + 2, vertex_count);
 
             //Zero-out mask
             for (l = 0; l < h; ++l) {

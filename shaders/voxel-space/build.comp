@@ -29,6 +29,30 @@ layout (std430) buffer lightBuffer {
 uniform uvec3 worldSpaceDims;
 uniform uvec3 modelSpaceDims;
 uniform mat4 model;
+
+void fill(vec3 pos) {
+  vec4 hpos = model * vec4(pos + vec3(0.5), 1.0);
+  vec3 write_pos = hpos.xyz / hpos.w;
+
+  if (
+    any(lessThan(write_pos, vec3(0.0))) ||
+    any(greaterThanEqual(write_pos, vec3(worldSpaceDims)))
+  ) {
+    return;
+  }
+
+  uvec3 wp = uvec3(write_pos);
+
+  uint write_idx = (
+    wp.x +
+    wp.y * worldSpaceDims.x +
+    wp.z * worldSpaceDims.x * worldSpaceDims.y
+  );
+
+  world_voxels[write_idx] = uint8_t(1);
+
+}
+
 void main() {
   uvec3 pos = gl_GlobalInvocationID.xyz;
 
@@ -47,30 +71,26 @@ void main() {
     return;
   }
 
-  vec4 hpos = model * vec4(pos + vec3(0.5), 1.0);
-  vec3 write_pos = hpos.xyz / hpos.w;
 
   if (model_value == uint8_t(8)) {
     uint light_idx = atomicAdd(current_light_index, 1);
+    vec4 hpos = model * vec4(pos + vec3(0.5), 1.0);
+    vec3 write_pos = hpos.xyz / hpos.w;
+
     lights[light_idx].position = vec4(write_pos, 1.0);
     lights[light_idx].color = vec4(1.0);
-    return;
   }
 
-  if (
-    any(lessThan(write_pos, vec3(0.0))) ||
-    any(greaterThanEqual(write_pos, vec3(worldSpaceDims)))
-  ) {
-    return;
-  }
+  vec3 fpos = vec3(pos);
+  fill(fpos);
+  float f = 0.25;
+  fill(fpos + vec3(  -f, 0.0, -f));
+  fill(fpos + vec3(   f, 0.0, -f));
+  fill(fpos + vec3( 0.0,  -f, -f));
+  fill(fpos + vec3(   f,   f, -f));
 
-  uvec3 wp = uvec3(write_pos);
-
-  uint write_idx = (
-    wp.x +
-    wp.y * worldSpaceDims.x +
-    wp.z * worldSpaceDims.x * worldSpaceDims.y
-  );
-
-  world_voxels[write_idx] = model_value;
+  fill(fpos + vec3(  -f, 0.0, f));
+  fill(fpos + vec3(   f, 0.0, f));
+  fill(fpos + vec3( 0.0,  -f, f));
+  fill(fpos + vec3(   f,   f, f));
 }

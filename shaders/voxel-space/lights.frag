@@ -34,6 +34,7 @@ uniform uvec2 resolution;
 uniform sampler2D gBufferPosition;
 uniform sampler2D gBufferColor;
 uniform sampler2D gBufferDepth;
+uniform sampler2D gBufferNormal;
 
 uniform mat4 VP;
 

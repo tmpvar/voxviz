@@ -40,19 +40,24 @@ uniform uvec2 resolution;
 uniform sampler2D gBufferPosition;
 uniform sampler2D gBufferColor;
 uniform sampler2D gBufferDepth;
+uniform sampler2D gBufferNormal;
 
 uniform mat4 VP;
 
-#define ITERATIONS 128
+#define ITERATIONS 256
 
-uint traceLight(vec3 pos, Light light, inout vec3 acc) {
+uint traceLight(vec3 pos, Light light, inout vec3 acc, vec3 normal) {
   vec3 light_pos = light.position.xyz;
   vec3 light_col = light.color.rgb;
 
   uint8_t palette_idx;
 
+  // TODO: now that we have the normal we can do a blank dda step out past the
+  // model transformed normal to the next integer location.. to avoid stepping
+  // through the course voxelization and immediately terminating.
+
   vec3 d = normalize(light_pos - pos);
-  float found_distance = 1.1;
+  float found_distance = 5.0;
   vec3 id = 1.0 / d;
   vec3 p = pos + d * found_distance;
   // vec3 prevP = pos;// - d * 2.0;
@@ -70,8 +75,8 @@ uint traceLight(vec3 pos, Light light, inout vec3 acc) {
 
   for (int i=0; i<ITERATIONS; i++) {
     float distance_to_light = distance(p, light_pos);
-    if (distance_to_light < 2.0) {
-      acc += light_col * distance_to_light / 3.0;// * (1.0 - float(mipSize)/float(1<<MAX_MIPS));
+    if (distance_to_light < 4.0) {
+      acc += light_col * distance_to_light / 4.0;// * (1.0 - float(mipSize)/float(1<<MAX_MIPS));
       return 1;
     }
 
@@ -81,8 +86,7 @@ uint traceLight(vec3 pos, Light light, inout vec3 acc) {
 
     vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
     dt = max(mincomp(deltas), .0001) * mipSize;
-    t += dt;
-
+    t += dt;// * 2.0;
     p = pos + d * t;
   }
   return 0;
@@ -96,13 +100,10 @@ void main() {
   );
 
   colors[color_idx] = vec4(0.0);
-
-  // if (tx.x % 2 > 0 || tx.y % 2 > 0) {
-  //   discard;
-  // }
   float depth = texelFetch(gBufferDepth, tx, 0).x;
+  vec3 normal = texelFetch(gBufferNormal, tx, 0).xyz;
+  vec4 color = texelFetch(gBufferNormal, tx, 0);
   vec3 pos = texelFetch(gBufferPosition, tx, 0).xyz * vec3(volumeSlabDims);
-  //vec4 color = texelFetch(gBufferColor, tx, 0);
 
   if (depth >= 1.0) {
     return;
@@ -112,7 +113,23 @@ void main() {
   uint total_lights = min(current_light_index, 64);
   uint contribs = 1;
   for (uint i=0; i<total_lights; i++) {
-    contribs += traceLight(pos, lights[i], acc);
+
+    if (distance(pos, lights[i].position.xyz) < 1) {
+      colors[color_idx] = vec4(1.0);
+      return;
+    }
+
+
+    if (dot((lights[i].position.xyz - pos), normal) >= 0) {
+      continue;
+    }
+
+    if (distance(pos, lights[i].position.xyz) < 2) {
+      colors[color_idx] = vec4(1.0);
+      return;
+    }
+
+    contribs += traceLight(pos, lights[i], acc, normal);
   }
 
   acc /= float(contribs);

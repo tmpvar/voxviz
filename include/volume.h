@@ -113,7 +113,7 @@ public:
   size_t activeBricks;
 
   Mesh *mesh;
-   
+
   q3Body* physicsBody;
   Volume(glm::vec3 pos, q3Scene *scene = nullptr, q3BodyDef *bodyDef = nullptr) {
     this->position = pos;
@@ -143,22 +143,27 @@ public:
       ->vert(1, 0, 1)
       ->vert(1, 1, 1)
       ->vert(0, 1, 1)
+
       ->vert(1, 1, 1)
       ->vert(1, 1, 0)
       ->vert(1, 0, 0)
       ->vert(1, 0, 1)
+
       ->vert(0, 0, 0)
       ->vert(1, 0, 0)
       ->vert(1, 1, 0)
       ->vert(0, 1, 0)
+
       ->vert(0, 0, 0)
       ->vert(0, 0, 1)
       ->vert(0, 1, 1)
       ->vert(0, 1, 0)
+
       ->vert(1, 1, 1)
       ->vert(0, 1, 1)
       ->vert(0, 1, 0)
       ->vert(1, 1, 0)
+
       ->vert(0, 0, 0)
       ->vert(1, 0, 0)
       ->vert(1, 0, 1)

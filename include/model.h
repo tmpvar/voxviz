@@ -11,13 +11,30 @@ using namespace std;
 using namespace glm;
 
 class Model {
+  u32 normalVBO;
 
   Model(VOXModel *m) {
     this->vox = m;
     this->mesh = new Mesh();
 
-    greedy(this->vox->buffer, ivec3(this->vox->dims), this->mesh);
+    //greedy(this->vox->buffer, ivec3(this->vox->dims), this->mesh);
+    culled_mesher(this->vox->buffer, ivec3(this->vox->dims), this->mesh);
+
     this->mesh->upload();
+
+    glGenBuffers(1, &this->normalVBO); gl_error();
+    glEnableVertexAttribArray(1); gl_error();
+    glBindBuffer(GL_ARRAY_BUFFER, this->normalVBO); gl_error();
+    glBufferData(
+      GL_ARRAY_BUFFER,
+      this->mesh->normals.size() * sizeof(GLfloat),
+      (GLfloat *)this->mesh->normals.data(),
+      GL_STATIC_DRAW
+    );
+    gl_error();
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0); gl_error();
+    glVertexAttribDivisor(1, 0); gl_error();
+
     this->matrix = mat4(1.0);
     u32 total_bytes = this->vox->dims.x * this->vox->dims.y * this->vox->dims.z;
 
@@ -67,10 +84,20 @@ public:
 
   void render(Program *program, mat4 VP) {
     program
-      ->uniform1ui("totalTriangles", this->mesh->faces.size() / 6)
+      ->uniform1ui("totalTriangles", this->mesh->faces.size())
       ->uniformMat4("model", this->matrix);
 
-    this->mesh->render(program, "position");
+    glBindVertexArray(this->mesh->vao);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glDrawElements(
+      GL_TRIANGLES,
+      (GLsizei)this->mesh->faces.size(),
+      GL_UNSIGNED_INT,
+      0
+    );
+
+    //this->mesh->render(program);
   }
 };
 
@@ -100,6 +127,7 @@ class GBuffer {
       if (this->gBuffer != 0xFFFFFFFF) {
         glDeleteFramebuffers(1, &this->gBuffer);
         glDeleteTextures(1, &this->gPosition);
+        glDeleteTextures(1, &this->gNormal);
         glDeleteTextures(1, &this->gColor);
         glDeleteTextures(1, &this->gBuffer);
       }
@@ -108,7 +136,17 @@ class GBuffer {
       glBindFramebuffer(GL_FRAMEBUFFER, this->gBuffer);
 
       gl_error();
-      // - position color buffer
+
+      // - color buffer
+      glGenTextures(1, &gColor);
+      glBindTexture(GL_TEXTURE_2D, this->gColor);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, this->res.x, this->res.y, 0, GL_RGB, GL_FLOAT, NULL);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this->gColor, 0);
+      gl_error();
+
+      // - position buffer
       glGenTextures(1, &this->gPosition);
       glBindTexture(GL_TEXTURE_2D, this->gPosition);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, this->res.x, this->res.y, 0, GL_RGB, GL_FLOAT, NULL);
@@ -116,16 +154,20 @@ class GBuffer {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this->gPosition, 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, this->gPosition, 0);
       gl_error();
-      // - color buffer
-      glGenTextures(1, &gColor);
-      glBindTexture(GL_TEXTURE_2D, this->gColor);
+
+      // - normal buffer
+      glGenTextures(1, &this->gNormal);
+      glBindTexture(GL_TEXTURE_2D, this->gNormal);
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, this->res.x, this->res.y, 0, GL_RGB, GL_FLOAT, NULL);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, this->gColor, 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, this->gNormal, 0);
       gl_error();
+
       // - depth buffer
       glGenTextures(1, &this->gDepth);
       glBindTexture(GL_TEXTURE_2D, this->gDepth);
@@ -138,9 +180,14 @@ class GBuffer {
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, this->gDepth, 0/*mipmap level*/);
       gl_error();
+
       // - tell OpenGL which color attachments we'll use (of this framebuffer) for rendering
-      unsigned int attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-      glDrawBuffers(2, attachments);
+      unsigned int attachments[3] = {
+        GL_COLOR_ATTACHMENT0,
+        GL_COLOR_ATTACHMENT1,
+        GL_COLOR_ATTACHMENT2
+      };
+      glDrawBuffers(3, attachments);
       gl_error();
       return this;
     }

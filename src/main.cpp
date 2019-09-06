@@ -24,7 +24,6 @@
 #include "parser/magicavoxel/vox.h"
 #include "blue-noise.h"
 #include "scene.h"
-#include "greedy-mesher.h"
 #include "model.h"
 
 #define _USE_MATH_DEFINES
@@ -245,7 +244,7 @@ int main(void) {
 
   vector <Model *>scene;
 
-  float instances = 8.0;
+  float instances = 4.0;
   float spacing = 50.0;
 
   for (float x = 0; x < instances; x++) {
@@ -258,9 +257,9 @@ int main(void) {
       m->matrix = translate(
         m->matrix,
         vec3(
-          x*(m->dims.x * 1.1),
+          x*(m->dims.x * 1.5),
           0.0,
-          z*(m->dims.z * 1.1)
+          z*(m->dims.z * 1.5)
         )
       );
       scene.push_back(m);
@@ -417,7 +416,7 @@ int main(void) {
     static Program *voxelMeshProgram = Program::New()
       ->add(Shaders::get("mesh.vert"))
       ->add(Shaders::get("mesh.frag"))
-      ->output("gBufferColor")
+      ->output("gColor")
       ->link();
 
     static Program *voxelSpaceDebug = Program::New()
@@ -516,46 +515,49 @@ int main(void) {
       gbuffer->unbind();
 
       // Lighting
-      if (keys[GLFW_KEY_C]) {
-        voxelSpaceLighting->use()
-          ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
-          ->uniformVec2ui("resolution", resolution)
-          ->texture2d("gBufferPosition", gbuffer->gPosition)
-          ->texture2d("gBufferColor", gbuffer->gColor)
-          ->texture2d("gBufferDepth", gbuffer->gDepth)
-          ->uniformVec3("eye", currentEye)
-          ->uniformMat4("VP", VP)
-          ->ssbo("lightIndexBuffer", lightIndexSSBO)
-          ->ssbo("lightBuffer", lightSSBO)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
-          ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
+      if (1) {
+        if (keys[GLFW_KEY_C]) {
+          voxelSpaceLighting->use()
+            ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
+            ->uniformVec2ui("resolution", resolution)
+            ->texture2d("gBufferPosition", gbuffer->gPosition)
+            ->texture2d("gBufferColor", gbuffer->gColor)
+            ->texture2d("gBufferDepth", gbuffer->gDepth)
+            ->texture2d("gBufferNormal", gbuffer->gNormal)
+            ->uniformVec3("eye", currentEye)
+            ->uniformMat4("VP", VP)
+            ->ssbo("lightIndexBuffer", lightIndexSSBO)
+            ->ssbo("lightBuffer", lightSSBO)
+            ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+            ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
 
-        fullscreen_surface->render(voxelSpaceLighting);
+          fullscreen_surface->render(voxelSpaceLighting);
+        }
+        else {
+          voxelSpaceLightingCompute->use()
+            ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
+            ->uniformVec2ui("resolution", resolution)
+            ->texture2d("gBufferPosition", gbuffer->gPosition)
+            ->texture2d("gBufferColor", gbuffer->gColor)
+            ->texture2d("gBufferDepth", gbuffer->gDepth)
+            ->texture2d("gBufferNormal", gbuffer->gNormal)
+            ->uniformVec3("eye", currentEye)
+            ->uniformMat4("VP", VP)
+            ->ssbo("lightIndexBuffer", lightIndexSSBO)
+            ->ssbo("lightBuffer", lightSSBO)
+            ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
+            ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+            ->ssbo("colorBuffer", colorSSBO)
+            ->timedCompute("lighting", uvec3(resolution, 1.0));
+
+          debugProgram->use()
+            ->uniformVec2ui("resolution", resolution)
+            ->ssbo("colorBuffer", colorSSBO);
+
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          fullscreen_surface->render(debugProgram);
+        }
       }
-      else {
-        voxelSpaceLightingCompute->use()
-          ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
-          ->uniformVec2ui("resolution", resolution)
-          ->texture2d("gBufferPosition", gbuffer->gPosition)
-          ->texture2d("gBufferColor", gbuffer->gColor)
-          ->texture2d("gBufferDepth", gbuffer->gDepth)
-          ->uniformVec3("eye", currentEye)
-          ->uniformMat4("VP", VP)
-          ->ssbo("lightIndexBuffer", lightIndexSSBO)
-          ->ssbo("lightBuffer", lightSSBO)
-          ->ssbo("blueNoiseBuffer", blue_noise->ssbo)
-          ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
-          ->ssbo("colorBuffer", colorSSBO)
-          ->timedCompute("lighting", uvec3(resolution, 1.0));
-
-        debugProgram->use()
-          ->uniformVec2ui("resolution", resolution)
-          ->ssbo("colorBuffer", colorSSBO);
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        fullscreen_surface->render(debugProgram);
-      }
-
 
     } else {
       voxelSpaceDebug->use()

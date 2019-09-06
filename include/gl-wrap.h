@@ -461,6 +461,10 @@ public:
     return this;
   }
 
+  bool isValid() {
+    return this->valid;
+  }
+
   Program *link() {
     if (!this->valid) {
       return this;
@@ -956,6 +960,7 @@ public:
   GLuint ebo;
   std::vector<GLfloat> verts;
   std::vector<GLuint> faces;
+  std::vector<GLfloat> normals;
 
   Mesh() {}
 
@@ -1002,15 +1007,6 @@ public:
 
 
     std::cout << "buffering " << this->faces.size() / 3 << " faces" << std::endl;
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(
-      1,
-      3,
-      GL_FLOAT,
-      GL_FALSE,
-      3 * sizeof(GLfloat),
-      0
-    );
     glBufferData(
       GL_ELEMENT_ARRAY_BUFFER,
       this->faces.size() * sizeof(GLuint),
@@ -1030,6 +1026,13 @@ public:
     return this;
   }
 
+  Mesh* normal(float x, float y, float z) {
+    this->normals.push_back(x);
+    this->normals.push_back(y);
+    this->normals.push_back(z);
+    return this;
+  }
+
   Mesh* face(GLuint a, GLuint b, GLuint c) {
     this->faces.push_back(a);
     this->faces.push_back(b);
@@ -1043,13 +1046,17 @@ public:
     return this;
   }
 
-  void render(Program *program, const char* attribute) {
-    program->attribute(attribute);
-    gl_error();
-    glEnableVertexAttribArray(0);
-    gl_error();
+  void render(Program *program, const char* attribute = nullptr) {
+    if (!program->isValid()) {
+      return;
+    }
+
     glBindVertexArray(this->vao);
-    gl_error();
+
+    if (attribute != nullptr) {
+      program->attribute(attribute);
+    }
+
     glDrawElements(
       GL_TRIANGLES,
       (GLsizei)this->faces.size(),
