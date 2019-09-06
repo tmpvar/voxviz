@@ -13,6 +13,19 @@ layout (std430) buffer modelSpaceVoxelBuffer {
   uint8_t model_voxels[];
 };
 
+layout (std430) buffer lightIndexBuffer {
+  uint current_light_index;
+};
+
+struct Light {
+  vec4 position;
+  vec4 color;
+};
+
+layout (std430) buffer lightBuffer {
+  Light lights[];
+};
+
 uniform uvec3 worldSpaceDims;
 uniform uvec3 modelSpaceDims;
 uniform mat4 model;
@@ -35,7 +48,14 @@ void main() {
   }
 
   vec4 hpos = model * vec4(pos + vec3(0.5), 1.0);
-  vec3 write_pos = floor(hpos.xyz / hpos.w);
+  vec3 write_pos = hpos.xyz / hpos.w;
+
+  if (model_value == uint8_t(8)) {
+    uint light_idx = atomicAdd(current_light_index, 1);
+    lights[light_idx].position = vec4(write_pos, 1.0);
+    lights[light_idx].color = vec4(1.0);
+    return;
+  }
 
   if (
     any(lessThan(write_pos, vec3(0.0))) ||

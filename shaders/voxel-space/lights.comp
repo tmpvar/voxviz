@@ -1,12 +1,14 @@
-#version 450 core
-#extension GL_NV_gpu_shader5: require
+#version 430 core
+#extension GL_NV_shader_buffer_load: enable
+#extension GL_ARB_compute_shader: enable
+#extension GL_NV_gpu_shader5: enable
+
+layout( local_size_x = 8, local_size_y = 4 ) in;
 
 #include "../ray-aabb.glsl"
 #include "../voxel-space.glsl"
 #include "../hsl.glsl"
 #include "../voxel-space-mips.glsl"
-
-layout(location = 0) out vec4 outColor;
 
 layout (std430) buffer lightIndexBuffer {
   uint current_light_index;
@@ -25,6 +27,10 @@ layout (std430) buffer blueNoiseBuffer {
   vec4 blueNoise[];
 };
 
+layout (std430) buffer colorBuffer {
+  vec4 colors[];
+};
+
 uniform uint time;
 
 #include "../cdir.glsl"
@@ -37,7 +43,7 @@ uniform sampler2D gBufferDepth;
 
 uniform mat4 VP;
 
-#define ITERATIONS 64
+#define ITERATIONS 128
 
 uint traceLight(vec3 pos, Light light, inout vec3 acc) {
   vec3 light_pos = light.position.xyz;
@@ -46,7 +52,7 @@ uint traceLight(vec3 pos, Light light, inout vec3 acc) {
   uint8_t palette_idx;
 
   vec3 d = normalize(light_pos - pos);
-  float found_distance = 1.9;
+  float found_distance = 1.1;
   vec3 id = 1.0 / d;
   vec3 p = pos + d * found_distance;
   // vec3 prevP = pos;// - d * 2.0;
@@ -64,7 +70,7 @@ uint traceLight(vec3 pos, Light light, inout vec3 acc) {
 
   for (int i=0; i<ITERATIONS; i++) {
     float distance_to_light = distance(p, light_pos);
-    if (distance_to_light < 3.0) {
+    if (distance_to_light < 2.0) {
       acc += light_col * distance_to_light / 3.0;// * (1.0 - float(mipSize)/float(1<<MAX_MIPS));
       return 1;
     }
@@ -74,15 +80,23 @@ uint traceLight(vec3 pos, Light light, inout vec3 acc) {
     }
 
     vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
-    dt = max(mincomp(deltas), .007) * mipSize;
-    t += dt * 2.0;
+    dt = max(mincomp(deltas), .0001) * mipSize;
+    t += dt;
+
     p = pos + d * t;
   }
   return 0;
 }
 
 void main() {
-  ivec2 tx = ivec2(gl_FragCoord.xy);
+  ivec2 tx = ivec2(gl_GlobalInvocationID.xy);
+  uint color_idx = (
+    uint(tx.x) +
+    uint(tx.y) * resolution.x
+  );
+
+  colors[color_idx] = vec4(0.0);
+
   // if (tx.x % 2 > 0 || tx.y % 2 > 0) {
   //   discard;
   // }
@@ -91,7 +105,7 @@ void main() {
   //vec4 color = texelFetch(gBufferColor, tx, 0);
 
   if (depth >= 1.0) {
-    discard;
+    return;
   }
 
   vec3 acc = vec3(0.0);
@@ -103,15 +117,5 @@ void main() {
 
   acc /= float(contribs);
 
-  // outColor = vec4(pos, 0);// * vec4(acc, 1.0);
-  // outColor = vec4(depth / 10.0);
-
-  // outColor = texelFetch(
-  //   gBufferPosition,
-  //   ivec2(gl_FragCoord.xy),
-  //   0
-  // );
-  //
-  //outColor = color * vec4(acc, 1.0);
-  outColor = vec4(acc, 1.0);
+  colors[color_idx] = vec4(acc, 1.0);
 }

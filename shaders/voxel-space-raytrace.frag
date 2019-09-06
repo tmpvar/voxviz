@@ -137,9 +137,10 @@ void main() {
     p = eye + d * t;
   }
 
-    if (true || debug == 1.0) {
+    if (debug == 1.0) {
       c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
     }
     outColor = vec4(c, 1.0);
+    outColor = vec4(p/vec3(volumeSlabDims), 1.0);
 
 }

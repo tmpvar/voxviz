@@ -13,7 +13,7 @@ out vec3 vert_pos;
 
 void main() {
   vec4 hpos = vec4(position, 1.0);
-  vec4 tpos = hpos * model;
+  vec4 tpos = model * hpos;
   vert_pos = tpos.xyz / tpos.w;
   mat4 mvp = viewProjection * model;
   gl_Position = mvp * hpos;
