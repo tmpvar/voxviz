@@ -3,7 +3,7 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-layout( local_size_x = 4, local_size_y = 4, local_size_z = 4 ) in;
+layout( local_size_x = 8, local_size_y = 4, local_size_z = 1 ) in;
 
 layout (std430) buffer worldSpaceVoxelBuffer {
   uint8_t world_voxels[];
@@ -31,7 +31,7 @@ uniform uvec3 modelSpaceDims;
 uniform mat4 model;
 
 void fill(vec3 pos) {
-  vec4 hpos = model * vec4(pos + vec3(0.5), 1.0);
+  vec4 hpos = model * vec4(pos, 1.0);
   vec3 write_pos = hpos.xyz / hpos.w;
 
   if (
@@ -49,28 +49,35 @@ void fill(vec3 pos) {
     wp.z * worldSpaceDims.x * worldSpaceDims.y
   );
 
-  world_voxels[write_idx] = uint8_t(1);
+  world_voxels[write_idx] = uint8_t(255);
 
 }
 
 void main() {
   uvec3 pos = gl_GlobalInvocationID.xyz;
-
-  uint read_idx = (
-    pos.x +
-    pos.y * modelSpaceDims.x +
-    pos.z * modelSpaceDims.x * modelSpaceDims.y
-  );
-
-  uint8_t model_value = model_voxels[read_idx];
-
-  if (
-    any(greaterThanEqual(pos, modelSpaceDims)) ||
-    model_value == uint8_t(0)
-  ) {
+  uvec3 d = modelSpaceDims;
+  if (any(greaterThanEqual(pos, d))) {
     return;
   }
 
+  uint read_idx = (
+    pos.x +
+    pos.y * d.x +
+    pos.z * d.x * d.y
+  );
+
+
+  uint8_t model_value = model_voxels[read_idx];
+  //
+  // if (
+  //   any(greaterThanEqual(pos, d)) || model_value == uint8_t(0)
+  // ) {
+  //   return;
+  // }
+
+  if (model_value == uint8_t(0)) {
+    return;
+  }
 
   if (model_value == uint8_t(8)) {
     uint light_idx = atomicAdd(current_light_index, 1);
@@ -79,18 +86,20 @@ void main() {
 
     lights[light_idx].position = vec4(write_pos, 1.0);
     lights[light_idx].color = vec4(1.0);
+    return;
   }
 
-  vec3 fpos = vec3(pos);
+  vec3 fpos = vec3(pos);// + 0.5;
+  float f = 0.70;
   fill(fpos);
-  float f = 0.25;
-  fill(fpos + vec3(  -f, 0.0, -f));
-  fill(fpos + vec3(   f, 0.0, -f));
-  fill(fpos + vec3( 0.0,  -f, -f));
-  fill(fpos + vec3(   f,   f, -f));
 
-  fill(fpos + vec3(  -f, 0.0, f));
-  fill(fpos + vec3(   f, 0.0, f));
-  fill(fpos + vec3( 0.0,  -f, f));
-  fill(fpos + vec3(   f,   f, f));
+  fill(fpos + vec3( -f, -f, -f));
+  fill(fpos + vec3(  f, -f, -f));
+  fill(fpos + vec3( -f, -f, -f));
+  fill(fpos + vec3(  f,  f, -f));
+
+  fill(fpos + vec3( -f, -f, f));
+  fill(fpos + vec3(  f, -f, f));
+  fill(fpos + vec3( -f, -f, f));
+  fill(fpos + vec3(  f,  f, f));
 }

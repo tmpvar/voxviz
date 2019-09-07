@@ -23,7 +23,7 @@ void main() {
     1.0
   );
 
-  gNormal = vert_normal;
+  gNormal = 0.5 * vert_normal + 0.5;
   // gColor = vec4(vert_pos / volumeSlabDims, 1.0);
 
   uint pixel_idx = (

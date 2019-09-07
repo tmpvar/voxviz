@@ -244,11 +244,13 @@ int main(void) {
 
   vector <Model *>scene;
 
-  float instances = 4.0;
+  float instances = 8.0;
   float spacing = 50.0;
-
+  uint i = 0;
   for (float x = 0; x < instances; x++) {
     for (float z = 0; z < instances; z++) {
+
+      //Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
       Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
       if (m == nullptr) {
         return 1;
@@ -257,9 +259,9 @@ int main(void) {
       m->matrix = translate(
         m->matrix,
         vec3(
-          x*(m->dims.x * 1.5),
+          m->dims.x + x*(m->dims.x),
           0.0,
-          z*(m->dims.z * 1.5)
+          m->dims.z + z*(m->dims.z)
         )
       );
       scene.push_back(m);
@@ -458,13 +460,15 @@ int main(void) {
         ->uniformVec3ui("worldSpaceDims", voxelSpaceSSBO->dims());
 
       for (auto &m : scene) {
-        m->matrix = glm::rotate(m->matrix, 0.001f, vec3(0.0f, 1.0f, 0.0f));
+        if (keys[GLFW_KEY_SPACE]) {
+          m->matrix = glm::rotate(m->matrix, 0.005f, vec3(0.0f, 1.0f, 0.0f));
+        }
 
         buildVoxelGrid
           ->ssbo("lightIndexBuffer", lightIndexSSBO)
           ->ssbo("lightBuffer", lightSSBO)
           ->ssbo("modelSpaceVoxelBuffer", m->data)
-          ->uniformVec3ui("modelSpaceDims", m->data->dims())
+          ->uniformVec3ui("modelSpaceDims", m->vox->dims)
           ->uniformMat4("model", m->matrix)
           ->compute(m->vox->dims);
       }
@@ -537,6 +541,7 @@ int main(void) {
           voxelSpaceLightingCompute->use()
             ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
             ->uniformVec2ui("resolution", resolution)
+            ->uniform1ui("time", time)
             ->texture2d("gBufferPosition", gbuffer->gPosition)
             ->texture2d("gBufferColor", gbuffer->gColor)
             ->texture2d("gBufferDepth", gbuffer->gDepth)
@@ -564,7 +569,7 @@ int main(void) {
         ->uniformMat4("VP", VP)
         ->uniformVec3("eye", currentEye)
         ->uniformFloat("maxDistance", 10000)
-        ->uniform1ui("time", 0)
+        ->uniform1ui("time", time)
         ->uniformVec2ui("resolution", resolution)
         ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
         ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);

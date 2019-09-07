@@ -3,7 +3,7 @@
 #extension GL_ARB_compute_shader: enable
 #extension GL_NV_gpu_shader5: enable
 
-layout( local_size_x = 8, local_size_y = 4 ) in;
+layout( local_size_x = 32, local_size_y = 8 ) in;
 
 #include "../ray-aabb.glsl"
 #include "../voxel-space.glsl"
@@ -44,49 +44,194 @@ uniform sampler2D gBufferNormal;
 
 uniform mat4 VP;
 
-#define ITERATIONS 256
+#define ITERATIONS 128
 
-uint traceLight(vec3 pos, Light light, inout vec3 acc, vec3 normal) {
-  vec3 light_pos = light.position.xyz;
-  vec3 light_col = light.color.rgb;
+bool oob(vec3 p) {
+  if (
+    any(lessThan(p, vec3(0.0))) ||
+    any(greaterThanEqual(p, vec3(volumeSlabDims)))
+  ) {
+    return true;
+  }
+  return false;
+}
 
+uint traceLight(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 normal) {
+	float occ = 0;
+	float t = 0.0;
+  bool foundSafe = false;
+  vec3 d = normalize(light_pos - pos);
+  vec3 p = pos;
+  uint8_t val;
+  const float STOP = ITERATIONS;
+  float distance_to_light = distance(pos, light_pos);
+  d = normalize(light_pos - p);
+	while(t < STOP && occ < 1.0){
+    if (oob(p)) {
+      return 0;
+    }
+
+    uint mip = min(MAX_MIPS, uint(floor(t/1024.0 * MAX_MIPS)));
+    float mipSize = float(1<<(mip));
+
+    //t += 0.9 * (1 + 0.05 * l);
+		t += mipSize;//0.9 * (1 + 0.05 * l);
+    p = pos + d * t;
+
+    float current_distance_to_light = distance(p, light_pos);
+    if (current_distance_to_light < 3.0) {
+      acc += light_col * (1 - pow(smoothstep(0, 1, occ * 1.4), 1.0 / 1.4));
+      return 1;
+    }
+
+		float l = pow(t, 2); // Experimenting with inverse square falloff for shadows.
+    if (voxel_mip_get(p, mip, val)) {
+      occ += float(val)/255.0 * (1.0 - float(mip)/MAX_MIPS);;
+    }
+
+    // if (current_distance_to_light > distance_to_light) {
+    //     acc += light_col;// * (1 - pow(smoothstep(0, 1, occ * 1.4), 1.0 / 1.4));
+    //     return 1;
+    // }
+    // distance_to_light = current_distance_to_light;
+	}
+
+  return 0;
+}
+
+uint traceLight1(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 normal) {
+  vec3 d = normalize(light_pos - pos);
+  vec3 id = 1.0 / d;
+  vec3 p = pos;// + d * found_distance;
+
+  float dt = 1.0 / length(volumeSlabDims);
+  float t = 4.0;
+  float opacityDiv = 1.0 / 8.0;
+
+  int minMip = 0;
+  int maxMip = MAX_MIPS;
+  int mip = 0;
+  float mipSize = (float(1<<(mip)));
+  float invMipSize = 1.0 / mipSize;
+  vec3 mask;
+  bool miss = true;
+  bool isOut = false;
+  uint8_t palette_idx;
+  p = pos + d * t;
+  int i;
+  // for (i=0; !isOut && i<10; i++) {
+  //   if (
+  //     any(lessThan(p, vec3(0.0))) ||
+  //     any(greaterThanEqual(p, vec3(volumeSlabDims)))
+  //   ) {
+  //     break;
+  //   }
+  //
+  //   if (!isOut && !voxel_mip_get(p, 0, palette_idx)) {
+  //     isOut = true;
+  //   }
+  //
+  //   vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
+  //   dt = max(mincomp(deltas), 0.0001) * mipSize;
+  //   t += dt;
+  //   p = pos + d * t;
+  // }
+
+
+  for (i=0; i<ITERATIONS; i++) {
+    if (
+      any(lessThan(p, vec3(0.0))) ||
+      any(greaterThanEqual(p, vec3(volumeSlabDims)))
+    ) {
+      break;
+    }
+
+    float distance_to_light = distance(p, light_pos);
+    if (distance_to_light < 4) {
+      acc += light_col * distance_to_light / 4.0;// * (1.0 - float(mipSize)/float(1<<MAX_MIPS));
+      return 1;
+    }
+
+    if (voxel_mip_get(p, mip, palette_idx)) {
+      if (mip == minMip) {
+        return 0;
+      }
+      // } else {
+      //   light_col -= float(mip)/float(MAX_MIPS);
+      // }
+
+      mip = max(mip - 1, minMip);
+      t -= dt * 0.00125;
+
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      continue;
+    } else if (mip < maxMip && !voxel_mip_get(p, min(mip + 1, maxMip), palette_idx)) {
+      mip = min(maxMip, mip+1);
+      mipSize = (float(1<<(mip)));
+      invMipSize = 1.0 / mipSize;
+      t += dt * 0.00125;
+    }
+    vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
+    dt = max(mincomp(deltas), 0.0001) * mipSize;
+    t += dt;
+    // FIXME: we get ~1ms back if this is enabled, but lose the ability to
+    //        compute good face normals. There is likely a better mechanism
+    //        for increasing marching speed at further distances (cone marching?)
+    //t += max(0.1,t/1024);
+    p = pos + d * t;
+  }
+
+  return 0;
+}
+
+uint traceLight2(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 normal) {
   uint8_t palette_idx;
 
   // TODO: now that we have the normal we can do a blank dda step out past the
   // model transformed normal to the next integer location.. to avoid stepping
   // through the course voxelization and immediately terminating.
-
+  //pos += normal * 2.0;
   vec3 d = normalize(light_pos - pos);
-  float found_distance = 5.0;
   vec3 id = 1.0 / d;
-  vec3 p = pos + d * found_distance;
-  // vec3 prevP = pos;// - d * 2.0;
+  vec3 p = pos;
 
   float dt = 1.0 / length(volumeSlabDims);
-  float t = found_distance;
+  float t = 0.0;
 
   int minMip = 0;
   int maxMip = 0;
   int mip = minMip;
   float mipSize = (float(1<<(mip)));
   float invMipSize = 1.0 / mipSize;
+
+  vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
+  // dt = max(mincomp(deltas), 0.1) * mipSize;
+  // t += dt;
+
+
   // vec3 mask;
   // bool miss = true;
-
-  for (int i=0; i<ITERATIONS; i++) {
+  uint hit_count = 0;
+  for (int i=0; i<ITERATIONS && hit_count < 1 ; i++) {
     float distance_to_light = distance(p, light_pos);
     if (distance_to_light < 4.0) {
-      acc += light_col * distance_to_light / 4.0;// * (1.0 - float(mipSize)/float(1<<MAX_MIPS));
+      acc += light_col;// * distance_to_light / 4.0;// * (1.0 - float(mipSize)/float(1<<MAX_MIPS));
       return 1;
     }
 
     if (voxel_mip_get(p, mip, palette_idx)) {
-      return 0;
+      hit_count++;
+    } else {
+      hit_count = 0;
     }
 
-    vec3 deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
-    dt = max(mincomp(deltas), .0001) * mipSize;
-    t += dt;// * 2.0;
+    deltas = (step(0.0, d) - fract(p * invMipSize)) * id;
+    dt = max(mincomp(deltas), 0.01) * mipSize;
+    //t += dt;// * 1.1;
+    //t += max(0.2, t * 0.1);
+    t+=dt * 2.0;
+
     p = pos + d * t;
   }
   return 0;
@@ -101,35 +246,63 @@ void main() {
 
   colors[color_idx] = vec4(0.0);
   float depth = texelFetch(gBufferDepth, tx, 0).x;
-  vec3 normal = texelFetch(gBufferNormal, tx, 0).xyz;
-  vec4 color = texelFetch(gBufferNormal, tx, 0);
+  vec3 normal = (texelFetch(gBufferNormal, tx, 0).xyz - 0.5) * 2.0;
+  vec4 color = texelFetch(gBufferColor, tx, 0);
   vec3 pos = texelFetch(gBufferPosition, tx, 0).xyz * vec3(volumeSlabDims);
+
+  if (oob(pos)) {
+    return;
+  }
 
   if (depth >= 1.0) {
     return;
   }
 
   vec3 acc = vec3(0.0);
-  uint total_lights = min(current_light_index, 64);
+  uint total_lights = min(current_light_index, 32);
   uint contribs = 1;
   for (uint i=0; i<total_lights; i++) {
 
-    if (distance(pos, lights[i].position.xyz) < 1) {
-      colors[color_idx] = vec4(1.0);
+    vec3 light_pos = lights[i].position.xyz;
+    vec3 light_col = hsl(vec3(0.7 - (float(i)/float(total_lights) * 0.9), 0.9, 0.5)); //light.color.rgb;
+
+    if (distance(pos, light_pos) < 2) {
+      colors[color_idx] = vec4(light_col, 0.0);
       return;
     }
 
-
-    if (dot((lights[i].position.xyz - pos), normal) >= 0) {
+    if (distance(pos, light_pos) > ITERATIONS) {
       continue;
     }
 
-    if (distance(pos, lights[i].position.xyz) < 2) {
-      colors[color_idx] = vec4(1.0);
-      return;
+    if (dot((light_pos - pos), normal) >= 0) {
+      continue;
     }
 
-    contribs += traceLight(pos, lights[i], acc, normal);
+    vec3 d = normalize(light_pos - pos);
+    vec3 p = pos;
+    uint8_t val;
+    float t;
+    bool safe = false;
+    for (t=0; t<50; t+=0.01) {
+      if (oob(p)) {
+        break;
+      }
+
+      if (!voxel_mip_get(p, 0, val)) {
+        safe = true;
+        break;
+      }
+      p = pos + d * t;
+    }
+
+    if (!safe) {
+      continue;
+    }
+
+    vec3 pp = (blueNoise[(uint(t+1)*(i+1) * color_idx + time * 1000) % (4096 * 64) ].xyz * 2.0 - 1);
+    vec3 pp2 = (blueNoise[((i+2) * color_idx + time * 1000) % (4096 * 64) ].xyz * 2.0 - 1);
+    contribs += traceLight(p, light_pos + pp * pp2 * 2.0 , light_col, acc, normal);
   }
 
   acc /= float(contribs);

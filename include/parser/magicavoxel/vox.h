@@ -122,9 +122,9 @@ public:
       else if (cmp(chunk_id, "XYZI")) {
         uint32_t num_voxels;
         ifs.read((char *)&num_voxels, 4);
-        //cout << "    num voxels: " << num_voxels << endl;
+        cout << "    num voxels: " << num_voxels << endl;
+        uint8_t val[4];
         for (uint32_t i = 0; i < num_voxels; i++) {
-          uint8_t val[4];
           ifs.read((char *)&val[0], 4);
           glm::uvec3 pos = glm::uvec3(val[0], val[2], val[1]);
 

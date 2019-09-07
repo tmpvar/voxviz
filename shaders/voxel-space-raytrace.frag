@@ -22,7 +22,7 @@ uniform uvec3 lightPos;
 uniform vec3 lightColor;
 uniform uvec2 resolution;
 
-#define ITERATIONS 512
+#define ITERATIONS 128
 
 #include "voxel-space-mips.glsl"
 
@@ -139,8 +139,9 @@ void main() {
 
     if (debug == 1.0) {
       c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
+      outColor = vec4(c, 1.0);
     }
-    outColor = vec4(c, 1.0);
-    outColor = vec4(p/vec3(volumeSlabDims), 1.0);
+    outColor = vec4(normalize(found_normal) * 0.5 + 0.5, 1.0);
+    //outColor = vec4(p/vec3(volumeSlabDims), 1.0);
 
 }
