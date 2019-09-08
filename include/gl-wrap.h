@@ -361,6 +361,78 @@ struct SSBOBinding {
 };
 
 
+class Texture {
+public:
+  GLuint handle = 0;
+  uvec3 resolution;
+  u32 dims = 0;
+  u8 levels = 0;
+
+  Texture(uvec3 dims) {
+    this->resolution = uvec3(0);
+    this->resize(dims);
+  }
+
+  Texture *resize(uvec3 dims) {
+    if (all(equal(dims, this->resolution))) {
+      return this;
+    }
+
+    this->resolution = dims;
+    this->dims = u32(dims.x > 0) + u32(dims.y > 0) + u32(dims.z > 0);
+
+    // compute the max number of mips allowed bfore it doesn't make sense
+    bool ok = true;
+    for (this->levels = 0; ok; this->levels++) {
+      for (int d = 0; d < this->dims; d++) {
+        if (this->resolution[d] >> this->levels <= 1) {
+          ok = false;
+          break;
+        }
+      }
+    }
+
+    if (this->handle) {
+      glDeleteTextures(1, &this->handle);
+    }
+
+    assert(this->dims > 0 && this->dims < 4);
+
+    switch (this->dims) {
+    case 1: glCreateTextures(GL_TEXTURE_1D, 1, &this->handle); break;
+    case 2: glCreateTextures(GL_TEXTURE_2D, 1, &this->handle); break;
+    case 3: glCreateTextures(GL_TEXTURE_3D, 1, &this->handle); break;
+    }
+
+    glTextureParameteri(this->handle, GL_TEXTURE_MAX_LEVEL, this->levels);
+
+    // TODO: figure out a nice way to change these and the GL_R8 below
+    glTextureParameteri(this->handle, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTextureParameteri(this->handle, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glTextureParameteri(this->handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTextureParameteri(this->handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+
+    switch (this->dims) {
+    case 1:
+      glTextureStorage1D(this->handle, this->levels, GL_R8, dims.x);
+    case 2:
+      glTextureStorage2D(this->handle, this->levels, GL_R8, dims.x, dims.y);
+    case 3:
+      glTextureStorage3D(this->handle, this->levels, GL_R8, dims.x, dims.y, dims.z);
+      break;
+    }
+
+    gl_error();
+    return this;
+  }
+
+  Texture *mipmap() {
+    glGenerateTextureMipmap(this->handle);
+    return this;
+  }
+};
+
 class Program {
   map<string, GLint> uniforms;
   map<string, GLint> attributes;
@@ -701,8 +773,7 @@ public:
       return this;
     }
 
-    glActiveTexture(GL_TEXTURE0 + this->texture_index); gl_error();
-    glBindTexture(GL_TEXTURE_2D, texture_id); gl_error();
+    glBindTextureUnit(this->texture_index, texture_id); gl_error();
     this->uniform1i(name, texture_index);
     this->texture_index++;
     return this;
@@ -713,8 +784,38 @@ public:
       return this;
     }
 
-    glActiveTexture(GL_TEXTURE0 + this->texture_index);
-    glBindTexture(GL_TEXTURE_3D, texture_id);
+    glBindTextureUnit(this->texture_index, texture_id); gl_error();
+    this->uniform1i(name, texture_index);
+    this->texture_index++;
+    return this;
+  }
+
+  Program *texture(string name, const Texture *texture) {
+    if (!this->valid) {
+      return this;
+    }
+
+    glBindTextureUnit(this->texture_index, texture->handle); gl_error();
+    this->uniform1i(name, texture_index);
+    this->texture_index++;
+    return this;
+  }
+
+  Program *textureImage(string name, const Texture *texture, i32 level = 0) {
+    if (!this->valid) {
+      return this;
+    }
+
+    // TODO: I'm assuming that image and texture indices are shared.. maybe I'm wrong?
+    glBindImageTexture(
+      this->texture_index,
+      texture->handle,
+      level,
+      false,
+      0,
+      GL_READ_WRITE,
+      GL_R8
+    );
     this->uniform1i(name, texture_index);
     this->texture_index++;
     return this;

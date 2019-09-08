@@ -17,6 +17,8 @@ layout (std430) buffer lightIndexBuffer {
   uint current_light_index;
 };
 
+uniform layout(r8) image3D worldSpaceVoxelImage;
+
 struct Light {
   vec4 position;
   vec4 color;
@@ -42,6 +44,8 @@ void fill(vec3 pos) {
   }
 
   uvec3 wp = uvec3(write_pos);
+
+  imageStore(worldSpaceVoxelImage, ivec3(wp), vec4(1.0));
 
   uint write_idx = (
     wp.x +

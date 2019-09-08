@@ -22,6 +22,8 @@ uniform uvec3 lightPos;
 uniform vec3 lightColor;
 uniform uvec2 resolution;
 
+uniform sampler3D worldSpaceVoxelTexture;
+
 #define ITERATIONS 128
 
 #include "voxel-space-mips.glsl"
@@ -34,6 +36,17 @@ vec3 compute_ray_dir(vec2 uv, mat4 inv) {
   near /= near.w;
 
   return normalize(far.xyz - near.xyz);
+}
+
+bool read(vec3 pos, uint mip) {
+  float value = textureLod(
+    worldSpaceVoxelTexture,
+    // sample from the voxel center to avoid glitches in debug rendering
+    (floor(pos) + 0.5)/vec3(volumeSlabDims),
+    mip
+  ).x;
+
+  return value > 0.0;
 }
 
 void main() {
@@ -83,7 +96,7 @@ void main() {
 
   int minMip = 0;
   int maxMip = MAX_MIPS;
-  int mip = maxMip;
+  int mip = 0;
   float mipSize = (float(1<<(mip)));
   float invMipSize = 1.0 / mipSize;
   vec3 mask;
@@ -96,9 +109,10 @@ void main() {
       break;
     }
 
-    if (voxel_mip_get(p, mip, palette_idx)) {
+    // if (voxel_mip_get(p, mip, palette_idx)) {
+    if (read(p, mip)) {
       if (mip == minMip) {
-        c = palette_color(palette_idx);
+        //c = palette_color(palette_idx);
 
         // if the ray have moved since we intersected the outer bounding box then
         // we should recompute a normal.
@@ -119,7 +133,7 @@ void main() {
       invMipSize = 1.0 / mipSize;
       continue;
     }
-    else if (mip < maxMip && !voxel_mip_get(p, min(mip + 1, maxMip), palette_idx)) {
+    else if (mip < maxMip && !read(p, min(mip + 1, maxMip))) {
       mip = min(maxMip, mip+1);
       mipSize = (float(1<<(mip)));
       invMipSize = 1.0 / mipSize;
@@ -137,11 +151,12 @@ void main() {
     p = eye + d * t;
   }
 
-    if (debug == 1.0) {
-      c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
-      outColor = vec4(c, 1.0);
-    }
+
+  if (miss || debug == 1.0) {
+    c = hsl(vec3(0.7 - (float(i)/float(ITERATIONS) * 0.9), 0.9, 0.5));
+    outColor = vec4(c, 1.0);
+  } else {
     outColor = vec4(normalize(found_normal) * 0.5 + 0.5, 1.0);
     //outColor = vec4(p/vec3(volumeSlabDims), 1.0);
-
+  }
 }

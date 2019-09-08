@@ -10,41 +10,18 @@ uniform uvec3 lowerMipDims;
 uniform uint mipLevel;
 
 #include "../voxel-space-mips.glsl"
-uint read(uvec3 pos, uint offset) {
+
+uniform layout(r8) image3D worldSpaceVoxelImage;
+uniform layout(r8) image3D worldSpaceVoxelImageLower;
+
+float read(uvec3 pos) {
   uvec3 p = pos << 1;
 
   if (any(greaterThanEqual(p, lowerMipDims))) {
     return 0;
   }
 
-  uint idx = offset + uint(
-    p.x +
-    p.y * lowerMipDims.x +
-    p.z * lowerMipDims.x * lowerMipDims.y
-  );
-
-  if (mipLevel > 1) {
-    idx = offset + EncodeMorton3(p);
-  }
-
-  return uint(volumeSlab[idx]) > 0 ? 1 : 0;
-}
-
-void write(uvec3 p, uint val) {
-  vec2 lod = lod_defs[mipLevel];
-  float slots = volumeSlabDims.x * volumeSlabDims.y * volumeSlabDims.z;
-  uint offset = uint(slots * lod.x);
-
-  uint idx = offset + uint(
-    p.x +
-    p.y * mipDims.x +
-    p.z * mipDims.x * mipDims.y
-  );
-  if (mipLevel > 0) {
-    idx = offset + EncodeMorton3(p);
-  }
-
-  volumeSlab[idx] = uint8_t(val);
+  return imageLoad(worldSpaceVoxelImageLower, ivec3(p)).x;
 }
 
 void main() {
@@ -53,19 +30,19 @@ void main() {
     return;
   }
 
-  uint density = 0;
+  float density = 0.0;
   float slots = volumeSlabDims.x * volumeSlabDims.y * volumeSlabDims.z;
   vec2 lod = lod_defs[mipLevel-1];
   uint offset = uint(slots * lod.x);
 
-  density |= read(pos + uvec3(0, 0, 0), offset) != 0 ? 1<<0 : 0;
-  density |= read(pos + uvec3(1, 0, 0), offset) != 0 ? 1<<1 : 0;
-  density |= read(pos + uvec3(1, 1, 0), offset) != 0 ? 1<<2 : 0;
-  density |= read(pos + uvec3(0, 1, 0), offset) != 0 ? 1<<3 : 0;
-  density |= read(pos + uvec3(0, 0, 1), offset) != 0 ? 1<<4 : 0;
-  density |= read(pos + uvec3(1, 0, 1), offset) != 0 ? 1<<5 : 0;
-  density |= read(pos + uvec3(1, 1, 1), offset) != 0 ? 1<<6 : 0;
-  density |= read(pos + uvec3(0, 1, 1), offset) != 0 ? 1<<7 : 0;
+  density += read(pos + uvec3(0, 0, 0));
+  density += read(pos + uvec3(1, 0, 0));
+  density += read(pos + uvec3(1, 1, 0));
+  density += read(pos + uvec3(0, 1, 0));
+  density += read(pos + uvec3(0, 0, 1));
+  density += read(pos + uvec3(1, 0, 1));
+  density += read(pos + uvec3(1, 1, 1));
+  density += read(pos + uvec3(0, 1, 1));
 
-  write(pos, density);
+  imageStore(worldSpaceVoxelImage, ivec3(pos), vec4(density / 8.0)).x;
 }

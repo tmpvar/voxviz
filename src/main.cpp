@@ -201,6 +201,10 @@ int main(void) {
     // maximum compute shader invocations (x * y * z)
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     printf("max computer shader invocations %i\n", work_grp_inv);
+
+    GLint texture_size;
+    glGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, &texture_size);
+    printf("max texture width %i\n", texture_size);
   }
 
   FullscreenSurface *fullscreen_surface = new FullscreenSurface();
@@ -220,6 +224,8 @@ int main(void) {
 
   // Voxel space
   const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 256, 1024);
+
+  Texture *voxelSpaceTexture = new Texture(voxelSpaceDims);
 
   uint64_t voxelSpaceBytes = (
     static_cast<uint64_t>(voxelSpaceDims.x) *
@@ -251,7 +257,7 @@ int main(void) {
     for (float z = 0; z < instances; z++) {
 
       //Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
-      Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
+      Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\hollow-cube.vox");
       if (m == nullptr) {
         return 1;
       }
@@ -449,14 +455,18 @@ int main(void) {
     colorSSBO->resize(resolution.x * resolution.y * 16);
 
     // Fill Voxel Space
-    if (time == 0 || keys[GLFW_KEY_SPACE]) {
+    if (true || keys[GLFW_KEY_SPACE]) {
       // reset the grid to 0
       voxelSpaceSSBO->fill(0);
       // reset the lights counter to 0
       lightIndexSSBO->fill(0);
+      uint zero = 0;
+      glClearTexImage(voxelSpaceTexture->handle, 0, GL_RED, GL_UNSIGNED_BYTE, &zero);
+
 
       buildVoxelGrid->use()
         ->ssbo("worldSpaceVoxelBuffer", voxelSpaceSSBO)
+        ->textureImage("worldSpaceVoxelTexture", voxelSpaceTexture)
         ->uniformVec3ui("worldSpaceDims", voxelSpaceSSBO->dims());
 
       for (auto &m : scene) {
@@ -476,7 +486,13 @@ int main(void) {
       // Generate mipmaps
       if (true) {
         double mipStart = glfwGetTime();
-        // Generate mipmap for SSBO
+        // Generate mipmap2 for SSBO
+        mipmapVoxelGrid
+          ->use()
+          ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+          ->uniformVec3("volumeSlabDims", voxelSpaceDims);
+
+
         for (unsigned int i = 1; i <= MAX_MIP_LEVELS; i++) {
           glm::uvec3 mipDims = voxelSpaceDims / (glm::uvec3(1 << i));
           glm::uvec3 lowerMipDims = voxelSpaceDims / (glm::uvec3(1 << (i - 1)));
@@ -484,21 +500,25 @@ int main(void) {
           mipDebug << "mip " << i << " dims: " << mipDims.x << "," << mipDims.y << "," << mipDims.z;
 
           mipmapVoxelGrid
-            ->use()
-            ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
-            ->uniformVec3("volumeSlabDims", voxelSpaceDims)
+            ->textureImage("worldSpaceVoxelImageLower", voxelSpaceTexture, i-1)
+            ->textureImage("worldSpaceVoxelImage", voxelSpaceTexture, i)
             ->uniformVec3ui("mipDims", mipDims)
             ->uniformVec3ui("lowerMipDims", lowerMipDims)
             ->uniform1ui("mipLevel", i)
             ->uniform1ui("time", time)
             ->timedCompute(mipDebug.str().c_str(), mipDims);
+
           gl_error();
           glMemoryBarrier(GL_ALL_BARRIER_BITS);
         }
       }
+      else {
+        // TODO: this is extremely slow..
+        voxelSpaceTexture->mipmap();
+      }
     }
 
-    if (!keys[GLFW_KEY_TAB]) {
+    if (keys[GLFW_KEY_TAB]) {
       gbuffer->resize(resolution)->bind();
       glEnable(GL_DEPTH_TEST);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -546,6 +566,7 @@ int main(void) {
             ->texture2d("gBufferColor", gbuffer->gColor)
             ->texture2d("gBufferDepth", gbuffer->gDepth)
             ->texture2d("gBufferNormal", gbuffer->gNormal)
+            ->texture("worldSpaceVoxelTexture", voxelSpaceTexture)
             ->uniformVec3("eye", currentEye)
             ->uniformMat4("VP", VP)
             ->ssbo("lightIndexBuffer", lightIndexSSBO)
@@ -572,7 +593,8 @@ int main(void) {
         ->uniform1ui("time", time)
         ->uniformVec2ui("resolution", resolution)
         ->uniformVec3("volumeSlabDims", vec3(voxelSpaceDims))
-        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO);
+        ->ssbo("volumeSlabBuffer", voxelSpaceSSBO)
+        ->texture("worldSpaceVoxelTexture", voxelSpaceTexture);
 
       fullscreen_surface->render(voxelSpaceDebug);
     }
