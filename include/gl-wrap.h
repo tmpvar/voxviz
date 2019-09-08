@@ -410,7 +410,7 @@ public:
     glTextureParameteri(this->handle, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTextureParameteri(this->handle, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glTextureParameteri(this->handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTextureParameteri(this->handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTextureParameteri(this->handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 
     switch (this->dims) {

@@ -223,7 +223,7 @@ int main(void) {
   GLFWgamepadstate state;
 
   // Voxel space
-  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 256, 1024);
+  const glm::uvec3 voxelSpaceDims = glm::uvec3(1024, 128, 1024);
 
   Texture *voxelSpaceTexture = new Texture(voxelSpaceDims);
 
@@ -250,30 +250,44 @@ int main(void) {
 
   vector <Model *>scene;
 
-  float instances = 8.0;
-  float spacing = 50.0;
-  uint i = 0;
-  for (float x = 0; x < instances; x++) {
-    for (float z = 0; z < instances; z++) {
+  if (false) {
+    float instances = 8.0;
+    float spacing = 50.0;
+    uint i = 0;
+    for (float x = 0; x < instances; x++) {
+      for (float z = 0; z < instances; z++) {
 
-      //Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
-      Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\hollow-cube.vox");
-      if (m == nullptr) {
-        return 1;
+        //Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
+        Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\monu10.vox");
+        if (m == nullptr) {
+          return 1;
+        }
+
+        m->matrix = translate(
+          m->matrix,
+          vec3(
+            m->dims.x + x*(m->dims.x),
+            0.0,
+            m->dims.z + z*(m->dims.z)
+          )
+        );
+        scene.push_back(m);
       }
-
-      m->matrix = translate(
-        m->matrix,
-        vec3(
-          m->dims.x + x*(m->dims.x),
-          0.0,
-          m->dims.z + z*(m->dims.z)
-        )
-      );
-      scene.push_back(m);
     }
-  }
+  } else {
+    Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\track-questionmark.vox");
+    if (m == nullptr) {
+      return 1;
+    }
 
+    m->matrix = translate(
+      m->matrix,
+      vec3(
+        50, 0, 50
+      )
+    );
+    scene.push_back(m);
+  }
   Program *buildVoxelGrid = Program::New()
     ->add(Shaders::get("voxel-space/build.comp"))
     ->link();
@@ -455,7 +469,7 @@ int main(void) {
     colorSSBO->resize(resolution.x * resolution.y * 16);
 
     // Fill Voxel Space
-    if (true || keys[GLFW_KEY_SPACE]) {
+    if (time == 0 || keys[GLFW_KEY_SPACE]) {
       // reset the grid to 0
       voxelSpaceSSBO->fill(0);
       // reset the lights counter to 0
@@ -500,7 +514,7 @@ int main(void) {
           mipDebug << "mip " << i << " dims: " << mipDims.x << "," << mipDims.y << "," << mipDims.z;
 
           mipmapVoxelGrid
-            ->textureImage("worldSpaceVoxelImageLower", voxelSpaceTexture, i-1)
+            ->texture("worldSpaceVoxelTextureLower", voxelSpaceTexture)
             ->textureImage("worldSpaceVoxelImage", voxelSpaceTexture, i)
             ->uniformVec3ui("mipDims", mipDims)
             ->uniformVec3ui("lowerMipDims", lowerMipDims)
@@ -518,7 +532,7 @@ int main(void) {
       }
     }
 
-    if (keys[GLFW_KEY_TAB]) {
+    if (!keys[GLFW_KEY_TAB]) {
       gbuffer->resize(resolution)->bind();
       glEnable(GL_DEPTH_TEST);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

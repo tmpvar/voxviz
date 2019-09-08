@@ -84,7 +84,7 @@ static bool isset(ivec3 p, const u8 *volume, const ivec3 &dims) {
   if (glm::any(glm::lessThan(p, ivec3(0))) || glm::any(glm::greaterThanEqual(p, dims))) {
     return false;
   }
-  return volume[p.x + p.y * dims.x+p.z*dims.x*dims.y] > 0;
+  return volume[p.x + p.y * dims.x + p.z * dims.x * dims.y] > 0;
 }
 
 void culled_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
@@ -175,7 +175,6 @@ void culled_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
                 mesh->face(start + 2, start + 1, start)
                     ->face(start + 3, start + 2, start);
               }
-              // TODO: can this work with backface culling??
             }
           }
         }

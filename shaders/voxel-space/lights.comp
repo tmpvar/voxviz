@@ -66,58 +66,70 @@ float read(vec3 pos, float mip) {
 
   return value;
 }
+
 #define VOXEL_SIZE 1
+#include "trace.glsl"
+
+
 // lifted from https://github.com/armory3d/armory/blob/master/Shaders/std/conetrace.glsl
-// float traceLight(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 normal) {
-//   vec3 d = normalize(light_pos - pos);
-//   float aperture = tan(45);
-//
-//   float sampleCol = 0.0;
-//   float dist = 0.0;
-//   float diam = dist * aperture;
-//   vec3 samplePos = d * dist + pos;
-//   float maxDist = distance(light_pos, pos);
-//   float occ = 0.0;
-//   while (sampleCol < 1.0 && dist < maxDist) {
-//     float mip = max(log2(diam/2), 0);
-//     // float mipSample = read(samplePos * 0.5 + vec3(0.5), mip).r;
-//     float mipSample = read(samplePos, mip).r * 0.5 ;
-//     occ += (mipSample) / (1.0 + 0.3 * diam);
-//     sampleCol += (1 - sampleCol) * mipSample;
-//     dist += max(diam / 2, VOXEL_SIZE);
-//     //diam = dist * aperture;
-//     diam = max(1, 2.0 * aperture * dist);
-//     samplePos = d * dist + pos;
-//   }
-//   //acc += (light_col * 1.0/sampleCol);//* (1.0 - sampleCol);
-//   //acc += light_col * (1.0 - sampleCol);
-//   return 1.0 - occ;
-// }
+uint traceLight(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 normal) {
+   vec3 d = normalize(light_pos - pos);
+
+
+  float sampleCol = 0.0;
+  float dist = 0.0;
+  float aperture = 2.0 / tan(45 / 3.1459);
+  float diam = dist * aperture;
+  vec3 samplePos = d * dist + pos;
+  float maxDist = distance(light_pos, pos);
+  float occ = 0.0;
+  while (occ < 1.0 && dist < maxDist) {
+    float mip = max(log2(diam/2), 0);
+    // float mipSample = read(samplePos * 0.5 + vec3(0.5), mip).r;
+    float mipSample = read(samplePos, mip).r * 0.5 ;
+    occ += (mipSample) / (1.0 + 0.3 * diam);
+    sampleCol += (1 - sampleCol) * mipSample;
+    dist += max(diam / 2, VOXEL_SIZE);
+    //diam = dist * aperture;
+    diam = max(1, 2.0 * aperture * dist);
+    samplePos = d * dist + pos;
+  }
+  //acc += (light_col * 1.0/sampleCol);//* (1.0 - sampleCol);
+  acc += light_col * occ;
+  // acc += vec3(1.0 - occ);
+  return 1;//1.0 - occ;
+}
 
 uint traceLight0(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 normal) {
 	float occ = 0;
-	float t = 4.0;
-  bool foundSafe = false;
+  // if (abs(dot(light_pos - pos, -normal)) < 0.5) {
+    pos -= normal * 4.0;
+  // }
   vec3 d = normalize(light_pos - pos);
+  float t = -1.0;//5.0+dot(-d, normal);
+  bool foundSafe = false;
+
+  float aperture = 2.0 / tan(45 / 3.1459);
+  float diam = t * aperture;
+
   vec3 p = pos;
   uint8_t val;
-  const float STOP = 256;
+  const float STOP = 128;
   float distance_to_light = distance(pos, light_pos);
   d = normalize(light_pos - p);
   float mip = 0.0;
-	while(t < STOP && occ < 1.0){
+	while(t < distance_to_light && occ < 1.0) {
     if (oob(p)) {
       return 0;
     }
 
-     //min(MAX_MIPS, uint(floor(t/ITERATIONS * MAX_MIPS)));
-    mip += 0.01;
-    //float mipSize = float(1<<(mip));
-
     float l = pow(t, 2); // Experimenting with inverse square falloff for shadows.
-    //t += 0.9 * (1 + 0.05 * l);
-		t += max(0.2, t*0.0125);//0.9 * (1 + 0.05 * l);
-    mip = t*0.005;//min(MAX_MIPS, uint(floor(t/ITERATIONS * MAX_MIPS)));
+    // t += 0.9 * (1 + 0.05 * l);
+    t += max(diam / 2, VOXEL_SIZE);
+    //diam = dist * aperture;
+    diam = max(1, aperture * t);
+		//t += max(0.1, t*0.0125);//0.9 * (1 + 0.05 * l);
+    //mip = min(4, t/120);// 2/tan(45/3.1459);//min(MAX_MIPS, uint(floor(t/ITERATIONS * MAX_MIPS)));
     p = pos + d * t;
 
     float current_distance_to_light = distance(p, light_pos);
@@ -126,7 +138,8 @@ uint traceLight0(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 
       return 1;
     }
 
-    occ = occ + (1.0 - occ) * read(p, mip);
+    mip = max(log2(diam/2), 0);
+    occ += (1.0 - occ) * read(p, diam);
 	}
 
   return 0;
@@ -218,6 +231,9 @@ uint traceLight1(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 
   return 0;
 }
 
+//vec4 trace_mine(vec3 pos, vec3 dir) {
+
+
 uint traceLight2(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 normal) {
   uint8_t palette_idx;
 
@@ -292,7 +308,7 @@ void main() {
   }
 
   vec3 acc = vec3(0.0);
-  uint total_lights = min(current_light_index, 64);
+  uint total_lights = min(current_light_index, 128);
   uint contribs = 1;
   for (uint i=0; i<total_lights; i++) {
 
@@ -317,31 +333,32 @@ void main() {
 
     vec3 pp = (blueNoise[((i+1) * color_idx + time * 1000) % (4096 * 64) ].xyz * 2.0 - 1);
     vec3 pp2 = (blueNoise[((i+2) * color_idx + time * 1000) % (4096 * 64) ].xyz);
-    //light_pos += pp * 4.0 * pp2 * 4.0;
+    light_pos += pp2 * 2.0;
 
     float t;
-    bool safe = false;
-    for (t=0; t<18; t+=1) {
-      if (oob(p)) {
-        break;
-      }
+    // bool safe = false;
+    // for (t=0; t<8; t+=0.01) {
+    //   if (oob(p)) {
+    //     break;
+    //   }
+    //
+    //   if (read(p, 0) == 0.0) {
+    //     safe = true;
+    //     break;
+    //   }
+    //   p = pos + d * t;
+    // }
+    //
+    // if (!safe) {
+    //   continue;
+    // }
 
-      if (read(p, 0) == 0.0) {
-        safe = true;
-        break;
-      }
-      p = pos + d * t;
-    }
-
-    if (!safe) {
-      continue;
-    }
-
-    contribs += traceLight0(p + d, light_pos, light_col, acc, normal);
-    contribs++;
+    // contribs += traceLight0(p, light_pos, light_col, acc, normal);
+    float intensity = traceMine(p + normal * pp * 2.0, light_pos);
+    acc += intensity * light_col;
   }
 
   acc /= float(contribs);
 
-  colors[color_idx] = vec4(acc, 1.0);
+  colors[color_idx] = vec4(acc, 1.0);// * color;
 }

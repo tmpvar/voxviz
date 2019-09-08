@@ -12,37 +12,73 @@ uniform uint mipLevel;
 #include "../voxel-space-mips.glsl"
 
 uniform layout(r8) image3D worldSpaceVoxelImage;
-uniform layout(r8) image3D worldSpaceVoxelImageLower;
+uniform sampler3D worldSpaceVoxelTextureLower;
 
-float read(uvec3 pos) {
+float read(ivec3 pos) {
   uvec3 p = pos << 1;
 
-  if (any(greaterThanEqual(p, lowerMipDims))) {
+  if (any(lessThan(p, ivec3(0))) || any(greaterThanEqual(p, lowerMipDims))) {
     return 0;
   }
 
-  return imageLoad(worldSpaceVoxelImageLower, ivec3(p)).x;
+  return textureLod(
+    worldSpaceVoxelTextureLower,
+    vec3(p) / vec3(lowerMipDims),
+    float(mipLevel-1)
+  ).x;
 }
 
 void main() {
-  uvec3 pos = gl_GlobalInvocationID.xyz;
+  ivec3 pos = ivec3(gl_GlobalInvocationID.xyz);
   if (any(greaterThanEqual(pos, mipDims))) {
     return;
   }
 
-  float density = 0.0;
-  float slots = volumeSlabDims.x * volumeSlabDims.y * volumeSlabDims.z;
-  vec2 lod = lod_defs[mipLevel-1];
-  uint offset = uint(slots * lod.x);
+  float width = 3;
+  float l = floor(width/2.0);
+  float sigma = 2.1;
 
-  density += read(pos + uvec3(0, 0, 0));
-  density += read(pos + uvec3(1, 0, 0));
-  density += read(pos + uvec3(1, 1, 0));
-  density += read(pos + uvec3(0, 1, 0));
-  density += read(pos + uvec3(0, 0, 1));
-  density += read(pos + uvec3(1, 0, 1));
-  density += read(pos + uvec3(1, 1, 1));
-  density += read(pos + uvec3(0, 1, 1));
 
-  imageStore(worldSpaceVoxelImage, ivec3(pos), vec4(density / 8.0)).x;
+  float pi = 3.1459;
+
+
+  float density = 0.0;//read(pos);
+  float count = 1;
+  if (false) {
+    density += read(pos + ivec3(0, 0, 0));
+    density += read(pos + ivec3(1, 0, 0));
+    density += read(pos + ivec3(1, 1, 0));
+    density += read(pos + ivec3(0, 1, 0));
+    density += read(pos + ivec3(0, 0, 1));
+    density += read(pos + ivec3(1, 0, 1));
+    density += read(pos + ivec3(1, 1, 1));
+    density += read(pos + ivec3(0, 1, 1));
+    count = 8.0;
+  } else {
+    //
+    count = 20;
+    for (float x = -l; x <= l; x++) {
+      for (float y = -l; y <= l; y++) {
+        for (float z = -l; z <= l; z++) {
+          //density += read(pos + ivec3(x,y,z));
+
+          //float c = (sigma - length(vec3(x, y, z))) / 17.173030;
+          // sigma = 2.75;
+          // float c = exp(
+          //   -2 * pi * pi *
+          //   (pow(x,2) * sigma + pow(y, 2) * sigma + pow(z, 2) * sigma)
+          // );
+          // density += read(pos + ivec3(x, y, z)) * c;
+          density += read(pos + ivec3(x, y, z));
+
+        }
+      }
+    }
+  }
+
+  imageStore(
+    worldSpaceVoxelImage,
+    ivec3(pos),
+    vec4(density / count)
+  ).x;
 }
