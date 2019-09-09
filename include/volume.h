@@ -4,8 +4,6 @@
 #include "gl-wrap.h"
 #include "collision/aabb-obb.h"
 
-#include <q3.h>
-
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/integer.hpp"
 #include "glm/gtx/hash.hpp"
@@ -114,8 +112,8 @@ public:
 
   Mesh *mesh;
 
-  q3Body* physicsBody;
-  Volume(glm::vec3 pos, q3Scene *scene = nullptr, q3BodyDef *bodyDef = nullptr) {
+
+  Volume(glm::vec3 pos) {
     this->position = pos;
     this->rotation = glm::vec3(0.0);
     this->scale = glm::vec3(1.0);
@@ -172,11 +170,6 @@ public:
     #ifndef TESTING
       mesh->upload();
     #endif
-
-    if (bodyDef != nullptr && scene != nullptr) {
-      bodyDef->position.Set(pos.x, pos.y, pos.z);
-      this->physicsBody = scene->CreateBody(*bodyDef);
-    }
   }
 
   ~Volume() {
@@ -190,7 +183,7 @@ public:
   }
 
   // TODO: consider denoting this as relative
-  Brick *AddBrick(glm::ivec3 index, q3BoxDef *boxDef = nullptr) {
+  Brick *AddBrick(glm::ivec3 index) {
     Brick *brick = new Brick(index);
     this->bricks.emplace(index, brick);
 

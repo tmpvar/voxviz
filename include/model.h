@@ -56,6 +56,7 @@ class Model {
     unsigned int gPosition, gNormal, gColorSpec;
 
 
+
   }
 
 public:

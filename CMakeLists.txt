@@ -22,9 +22,6 @@ add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/libuv)
 
-SET(qu3e_build_demo OFF CACHE BOOL "" FORCE)
-add_subdirectory(deps/qu3e)
-
 add_subdirectory(shaders)
 
 include_directories(
@@ -34,12 +31,13 @@ include_directories(
   ${OpenCL_INCLUDE_DIRS}
   ${CMAKE_CURRENT_BINARY_DIR}
   deps/glm/
-	deps/qu3e/src
   deps/libuv/include
   deps/imgui
   deps/imgui/examples
   deps/stb
 )
+
+
 
 ENABLE_TESTING()
 ADD_SUBDIRECTORY( test )
@@ -104,7 +102,6 @@ target_link_libraries(
   voxviz
   glfw
   uv_a
-	qu3e
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
  )

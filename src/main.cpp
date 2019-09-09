@@ -18,7 +18,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-#include <q3.h>
+
 #include <glm/glm.hpp>
 #include "parser/vzd/vzd.h"
 #include "parser/magicavoxel/vox.h"
@@ -257,8 +257,8 @@ int main(void) {
     for (float x = 0; x < instances; x++) {
       for (float z = 0; z < instances; z++) {
 
-        //Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
-        Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\monu10.vox");
+        Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
+        //Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox");
         if (m == nullptr) {
           return 1;
         }
@@ -331,6 +331,20 @@ int main(void) {
       vec3(100, 6, 21)
     );
     scene.push_back(car);
+
+    for (float x = 50 + 63; x < 554; x+=126) {
+
+      Model *light = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\street-light.vox");
+      if (light == nullptr) {
+        return 1;
+      }
+
+      light->matrix = translate(
+        light->matrix,
+        vec3(x, 4, 15)
+      );
+      scene.push_back(light);
+    }
 
 
   }
@@ -515,7 +529,7 @@ int main(void) {
     colorSSBO->resize(resolution.x * resolution.y * 16);
 
     // Fill Voxel Space
-    if (time) {
+    if (time == 0 || keys[GLFW_KEY_SPACE]) {
       // reset the grid to 0
       voxelSpaceSSBO->fill(0);
       // reset the lights counter to 0

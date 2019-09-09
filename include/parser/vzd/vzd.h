@@ -31,7 +31,7 @@ repeat VOLUME
 class VZDParser {
 
 public:
-	static void parse(string filename, VolumeManager *volumeManager, q3Scene *scene, q3BodyDef bodyDef) {
+	static void parse(string filename, VolumeManager *volumeManager) {
     cout << "Loading VZD file: " << filename.c_str() << endl;
     ifstream ifs(filename, ios::binary | ios::ate);
     ifs.seekg(0, ios::beg);
@@ -65,12 +65,12 @@ public:
       uint32_t materialSize;
       ifs.read((char *)&materialSize, 4);
       cout << "Material Size: " << materialSize << endl;
-      
+
       // TODO: material could be any number of things
       uint8_t color[3];
       ifs.read((char*)&color, 3);
       cout << "Material Color: r:" << unsigned(color[0]) << " g:" << unsigned(color[1]) << " b:" << unsigned(color[2]) << endl;
-      
+
       volume->material.r = color[0] / 255.0f;
       volume->material.g = color[1] / 255.0f;
       volume->material.b = color[2] / 255.0f;
@@ -87,10 +87,8 @@ public:
       uint32_t totalBricks;
       ifs.read((char *)&totalBricks, 4);
       cout << "Total Bricks: " << totalBricks << endl;
-      
-      uint8_t *brickData = (uint8_t *)malloc(BRICK_VOXEL_COUNT);
 
-      q3BoxDef boxDef;
+      uint8_t *brickData = (uint8_t *)malloc(BRICK_VOXEL_COUNT);
 
       // Collect brick data
       for (uint32_t i = 0; i < totalBricks; i++) {
@@ -100,7 +98,7 @@ public:
         ifs.read((char *)brickData, BRICK_VOXEL_COUNT);
         //cout << "brick index: " << i << " of " << totalBricks << endl;
         Brick *brick = volume->AddBrick(brickIndex);
-        
+
         for (uint32_t j = 0; j < BRICK_VOXEL_COUNT; j++) {
           brick->data[j] = float(brickData[j]);
         }
