@@ -275,18 +275,64 @@ int main(void) {
       }
     }
   } else {
-    Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\track-questionmark.vox");
+    Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
     if (m == nullptr) {
       return 1;
     }
 
     m->matrix = translate(
       m->matrix,
-      vec3(
-        50, 0, 50
-      )
+      vec3(50, 0, 0)
     );
     scene.push_back(m);
+
+    m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
+    if (m == nullptr) {
+      return 1;
+    }
+
+    m->matrix = translate(
+      m->matrix,
+      vec3(176, 0, 0)
+    );
+    scene.push_back(m);
+
+
+    m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
+    if (m == nullptr) {
+      return 1;
+    }
+
+    m->matrix = translate(
+      m->matrix,
+      vec3(302, 0, 0)
+    );
+    scene.push_back(m);
+
+    m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
+    if (m == nullptr) {
+      return 1;
+    }
+
+    m->matrix = translate(
+      m->matrix,
+      vec3(428, 0, 0)
+    );
+    scene.push_back(m);
+
+
+    Model *car = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
+    if (car == nullptr) {
+      return 1;
+    }
+
+    car->matrix = translate(
+      car->matrix,
+      vec3(100, 6, 21)
+    );
+    scene.push_back(car);
+
+
   }
   Program *buildVoxelGrid = Program::New()
     ->add(Shaders::get("voxel-space/build.comp"))
@@ -469,7 +515,7 @@ int main(void) {
     colorSSBO->resize(resolution.x * resolution.y * 16);
 
     // Fill Voxel Space
-    if (time == 0 || keys[GLFW_KEY_SPACE]) {
+    if (time) {
       // reset the grid to 0
       voxelSpaceSSBO->fill(0);
       // reset the lights counter to 0
@@ -494,7 +540,7 @@ int main(void) {
           ->ssbo("modelSpaceVoxelBuffer", m->data)
           ->uniformVec3ui("modelSpaceDims", m->vox->dims)
           ->uniformMat4("model", m->matrix)
-          ->compute(m->vox->dims);
+          ->timedCompute("build", m->vox->dims);
       }
 
       // Generate mipmaps

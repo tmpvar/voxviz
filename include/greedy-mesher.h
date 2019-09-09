@@ -95,10 +95,8 @@ void culled_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
   for (pos.z = 0; pos.z < dims.z; pos.z++) {
     for (pos.y = 0; pos.y < dims.y; pos.y++) {
       for (pos.x = 0; pos.x < dims.x; pos.x++) {
-
         // the current voxel is set
         if (isset(pos, volume, dims)) {
-
           // loop over the cardinal directions
           // with the intent of generating a quad for every face
           // X (0), Y (1), Z (2)

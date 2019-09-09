@@ -78,8 +78,9 @@ public:
       }
       else if (cmp(chunk_id, "SIZE")) {
         ifs.read((char *)&vox->dims.x, 4);
-        ifs.read((char *)&vox->dims.y, 4);
+        // swap y and z axes
         ifs.read((char *)&vox->dims.z, 4);
+        ifs.read((char *)&vox->dims.y, 4);
 
         const uint64_t bytes = vox->dims.x*vox->dims.y*vox->dims.z;
         vox->buffer = (uint8_t *)malloc(bytes);
@@ -126,6 +127,7 @@ public:
         uint8_t val[4];
         for (uint32_t i = 0; i < num_voxels; i++) {
           ifs.read((char *)&val[0], 4);
+          // swap y and z axes
           glm::uvec3 pos = glm::uvec3(val[0], val[2], val[1]);
 
           if (glm::any(glm::greaterThanEqual(pos, vox->dims))) {

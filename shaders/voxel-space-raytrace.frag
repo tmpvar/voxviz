@@ -145,7 +145,7 @@ vec4 trace_mine(vec3 pos, vec3 dir) {
   return vec4(occ);
 }
 
-void main() {
+void main2() {
   vec2 uv = vec2(gl_FragCoord.xy) / vec2(resolution) * 2.0 - 1.0;
   vec3 in_ray_dir = compute_ray_dir(uv, inverse(VP));
 
@@ -195,7 +195,7 @@ void main() {
 }
 
 
-void main2() {
+void main() {
 
   vec2 uv = vec2(gl_FragCoord.xy) / vec2(resolution) * 2.0 - 1.0;
   vec3 in_ray_dir = compute_ray_dir(uv, inverse(VP));
