@@ -1,4 +1,4 @@
-#include "aabb.h"
+#include "voxviz/aabb.h"
 #include <iostream>
 
 using namespace std;
@@ -49,7 +49,7 @@ bool aabb_isect(const aabb_t *a, const aabb_t *b, aabb_t *out) {
   out->lower.x = fmax(a->lower.x, b->lower.x);
   out->lower.y = fmax(a->lower.y, b->lower.y);
   out->lower.z = fmax(a->lower.z, b->lower.z);
-  
+
   return true;
 }
 
