@@ -60,14 +60,14 @@ static bool collisionAABBvOBB(const glm::vec3 aabb[8], const glm::vec3 obb[8]) {
     glm::vec3 axis = axes[axisIdx];
 
     for (int cornerIdx = 0; cornerIdx < 8; cornerIdx++) {
-      auto aabbProjection = glm::dot(axis, aabb[cornerIdx]);
-      auto obbProjection = glm::dot(axis, obb[cornerIdx]);
+      float aabbProjection = glm::dot(axis, aabb[cornerIdx]);
+      float obbProjection = glm::dot(axis, obb[cornerIdx]);
 
-      resultIntervals[0].x = min(resultIntervals[0].x, aabbProjection);
-      resultIntervals[0].y = max(resultIntervals[0].y, aabbProjection);
+      resultIntervals[0].x = fmin(resultIntervals[0].x, aabbProjection);
+      resultIntervals[0].y = fmax(resultIntervals[0].y, aabbProjection);
 
-      resultIntervals[1].x = min(resultIntervals[1].x, obbProjection);
-      resultIntervals[1].y = max(resultIntervals[1].y, obbProjection);
+      resultIntervals[1].x = fmin(resultIntervals[1].x, obbProjection);
+      resultIntervals[1].y = fmax(resultIntervals[1].y, obbProjection);
     }
 
     if (
@@ -82,17 +82,17 @@ static bool collisionAABBvOBB(const glm::vec3 aabb[8], const glm::vec3 obb[8]) {
 
 static glm::vec3 vmin(glm::vec3 a, glm::vec3 b) {
   return glm::vec3(
-    min(a.x, b.x),
-    min(a.y, b.y),
-    min(a.z, b.z)
+    fmin(a.x, b.x),
+    fmin(a.y, b.y),
+    fmin(a.z, b.z)
   );
 }
 
 static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
   return glm::vec3(
-    max(a.x, b.x),
-    max(a.y, b.y),
-    max(a.z, b.z)
+    fmax(a.x, b.x),
+    fmax(a.y, b.y),
+    fmax(a.z, b.z)
   );
 }
 
@@ -419,12 +419,12 @@ public:
         toolVerts[vertIdx] = txPoint(toolToStock, glm::vec3(toolBrick->index) + offsets[vertIdx]);
 
         // maintain the extents of the transformed verts in volume space
-        lower.x = min(lower.x, toolVerts[vertIdx].x);
-        lower.y = min(lower.y, toolVerts[vertIdx].y);
-        lower.z = min(lower.z, toolVerts[vertIdx].z);
-        upper.x = max(upper.x, toolVerts[vertIdx].x);
-        upper.y = max(upper.y, toolVerts[vertIdx].y);
-        upper.z = max(upper.z, toolVerts[vertIdx].z);
+        lower.x = fmin(lower.x, toolVerts[vertIdx].x);
+        lower.y = fmin(lower.y, toolVerts[vertIdx].y);
+        lower.z = fmin(lower.z, toolVerts[vertIdx].z);
+        upper.x = fmax(upper.x, toolVerts[vertIdx].x);
+        upper.y = fmax(upper.y, toolVerts[vertIdx].y);
+        upper.z = fmax(upper.z, toolVerts[vertIdx].z);
       }
 
 
