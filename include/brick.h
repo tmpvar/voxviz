@@ -2,9 +2,9 @@
 #define _VOLUME_H_
 
 #include <glm/glm.hpp>
-#include "aabb.h"
+#include "voxviz/aabb.h"
 #include "gl-wrap.h"
-  
+
 #define BRICK_MEM_TYPE GL_SHADER_STORAGE_BUFFER
 
   class Program;

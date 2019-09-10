@@ -1,5 +1,4 @@
-#ifndef __AABB_H__
-#define __AABB_H__
+#pragma once
 
 #include <glm/glm.hpp>
 
@@ -18,5 +17,3 @@ bool aabb_isect(const aabb_t *a, const aabb_t *b, aabb_t *out);
 bool aabb_contains(const aabb_t * box, const glm::vec3 v);
 
 bool aabb_overlaps(const aabb_t * a, const aabb_t * b);
-
-#endif

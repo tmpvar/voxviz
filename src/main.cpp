@@ -25,6 +25,7 @@
 #include "blue-noise.h"
 #include "scene.h"
 #include "model.h"
+#include "voxviz/physics.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -32,6 +33,7 @@
 #include <string.h>
 #include <queue>
 #include <map>
+
 
 bool keys[1024];
 bool prevKeys[1024];
@@ -108,6 +110,9 @@ void window_resize(GLFWwindow* window, int a = 0, int b = 0) {
 }
 
 int main(void) {
+
+  voxviz::Physics *physics = new voxviz::Physics();
+
   memset(keys, 0, sizeof(keys));
 
   int d = BRICK_DIAMETER;

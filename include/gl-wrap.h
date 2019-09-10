@@ -23,10 +23,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#ifndef max
-#define max(a,b)            (((a) > (b)) ? (a) : (b))
-#endif
-
 using namespace std;
 
 #ifndef DISABLE_GL_ERROR
@@ -889,11 +885,10 @@ public:
       glm::ceil(glm::vec3(dims) / local)
     );
 
-
     glDispatchCompute(
-      max(d.x, 1),
-      max(d.y, 1),
-      max(d.z, 1)
+      glm::max(d.x, 1U),
+      glm::max(d.y, 1U),
+      glm::max(d.z, 1U)
     );
 
     gl_error();
