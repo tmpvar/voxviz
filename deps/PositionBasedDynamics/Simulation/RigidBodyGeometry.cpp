@@ -4,7 +4,7 @@ using namespace PBD;
 
 RigidBodyGeometry::RigidBodyGeometry() :
 	m_mesh()
-{	
+{
 }
 
 RigidBodyGeometry::~RigidBodyGeometry(void)
@@ -50,7 +50,7 @@ void RigidBodyGeometry::updateMeshTransformation(const Vector3r &x, const Matrix
 	{
 		m_vertexData.getPosition(i) = R * m_vertexData_local.getPosition(i) + x;
 	}
-	updateMeshNormals(m_vertexData);
+	//updateMeshNormals(m_vertexData);
 }
 
 VertexData & RigidBodyGeometry::getVertexData()

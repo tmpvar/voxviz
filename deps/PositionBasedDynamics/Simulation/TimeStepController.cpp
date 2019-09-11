@@ -19,14 +19,14 @@ int TimeStepController::ENUM_VUPDATE_FIRST_ORDER = -1;
 int TimeStepController::ENUM_VUPDATE_SECOND_ORDER = -1;
 
 
-TimeStepController::TimeStepController() 
+TimeStepController::TimeStepController()
 {
 	m_velocityUpdateMethod = 0;
 	m_iterations = 0;
 	m_iterationsV = 0;
 	m_maxIterations = 5;
 	m_maxIterationsV = 5;
-	m_collisionDetection = NULL;	
+	m_collisionDetection = NULL;
 }
 
 TimeStepController::~TimeStepController(void)
@@ -70,7 +70,7 @@ void TimeStepController::step(SimulationModel &model)
 	START_TIMING("simulation step");
 	TimeManager *tm = TimeManager::getCurrent ();
 	const Real h = tm->getTimeStepSize();
- 
+
 	//////////////////////////////////////////////////////////////////////////
 	// rigid body model
 	//////////////////////////////////////////////////////////////////////////
@@ -84,7 +84,7 @@ void TimeStepController::step(SimulationModel &model)
 	{
 		#pragma omp for schedule(static) nowait
 		for (int i = 0; i < numBodies; i++)
-		{ 
+		{
 			rb[i]->getLastPosition() = rb[i]->getOldPosition();
 			rb[i]->getOldPosition() = rb[i]->getPosition();
 			TimeIntegration::semiImplicitEuler(h, rb[i]->getMass(), rb[i]->getPosition(), rb[i]->getVelocity(), rb[i]->getAcceleration());
@@ -97,7 +97,7 @@ void TimeStepController::step(SimulationModel &model)
 		//////////////////////////////////////////////////////////////////////////
 		// particle model
 		//////////////////////////////////////////////////////////////////////////
-		#pragma omp for schedule(static) 
+		#pragma omp for schedule(static)
 		for (int i = 0; i < (int) pd.size(); i++)
 		{
 			pd.getLastPosition(i) = pd.getOldPosition(i);
@@ -108,7 +108,7 @@ void TimeStepController::step(SimulationModel &model)
 		//////////////////////////////////////////////////////////////////////////
 		// orientation model
 		//////////////////////////////////////////////////////////////////////////
-		#pragma omp for schedule(static) 
+		#pragma omp for schedule(static)
 		for (int i = 0; i < (int)od.size(); i++)
 		{
 			od.getLastQuaternion(i) = od.getOldQuaternion(i);
@@ -123,7 +123,7 @@ void TimeStepController::step(SimulationModel &model)
 
 	#pragma omp parallel if(numBodies > MIN_PARALLEL_SIZE) default(shared)
 	{
-		// Update velocities	
+		// Update velocities
 		#pragma omp for schedule(static) nowait
 		for (int i = 0; i < numBodies; i++)
 		{
@@ -138,12 +138,16 @@ void TimeStepController::step(SimulationModel &model)
 				TimeIntegration::angularVelocityUpdateSecondOrder(h, rb[i]->getMass(), rb[i]->getRotation(), rb[i]->getOldRotation(), rb[i]->getLastRotation(), rb[i]->getAngularVelocity());
 			}
 			// update geometry
+            // FIXME: updating the positions of the mesh every frame is probably great for
+            //        meshes that you throw into this and don't care about later. For voxviz
+            //        this usecase is not super important. Unless I'm misunderstanding and the
+            //        underlying particles are recomputed from the transformed verts? seems unlikely
 			if (rb[i]->getMass() != 0.0)
 				rb[i]->getGeometry().updateMeshTransformation(rb[i]->getPosition(), rb[i]->getRotationMatrix());
 		}
 
-		// Update velocities	
-		#pragma omp for schedule(static) 
+		// Update velocities
+		#pragma omp for schedule(static)
 		for (int i = 0; i < (int) pd.size(); i++)
 		{
 			if (m_velocityUpdateMethod == 0)
@@ -153,7 +157,7 @@ void TimeStepController::step(SimulationModel &model)
 		}
 
 		// Update velocites of orientations
-		#pragma omp for schedule(static) 
+		#pragma omp for schedule(static)
 		for (int i = 0; i < (int)od.size(); i++)
 		{
 			if (m_velocityUpdateMethod == 0)
@@ -211,8 +215,8 @@ void TimeStepController::step(SimulationModel &model)
 			}
 		}
 	}
-	
-	// compute new time	
+
+	// compute new time
 	tm->setTime (tm->getTime () + h);
 	STOP_TIMING_AVG;
 }
@@ -251,7 +255,7 @@ void TimeStepController::positionConstraintProjection(SimulationModel &model)
 			const int groupSize = (int)groups[group].size();
 			#pragma omp parallel if(groupSize > MIN_PARALLEL_SIZE) default(shared)
 			{
-				#pragma omp for schedule(static) 
+				#pragma omp for schedule(static)
 				for (int i = 0; i < groupSize; i++)
 				{
 					const unsigned int constraintIndex = groups[group][i];
@@ -291,7 +295,7 @@ void TimeStepController::velocityConstraintProjection(SimulationModel &model)
 		const int groupSize = (int)groups[group].size();
 		#pragma omp parallel if(groupSize > MIN_PARALLEL_SIZE) default(shared)
 		{
-			#pragma omp for schedule(static) 
+			#pragma omp for schedule(static)
 			for (int i = 0; i < groupSize; i++)
 			{
 				const unsigned int constraintIndex = groups[group][i];
@@ -307,7 +311,7 @@ void TimeStepController::velocityConstraintProjection(SimulationModel &model)
 			const int groupSize = (int)groups[group].size();
 			#pragma omp parallel if(groupSize > MIN_PARALLEL_SIZE) default(shared)
 			{
-				#pragma omp for schedule(static) 
+				#pragma omp for schedule(static)
 				for (int i = 0; i < groupSize; i++)
 				{
 					const unsigned int constraintIndex = groups[group][i];

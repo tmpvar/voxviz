@@ -2,7 +2,7 @@
 #define __CORE_H
 
 // Production toggles to improve perf
-//#define DISABLE_DEBUG_GL_TIMED_COMPUTE
+#define DISABLE_DEBUG_GL_TIMED_COMPUTE
 //#define DISABLE_GL_ERROR
 
 

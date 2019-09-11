@@ -254,7 +254,7 @@ int main(void) {
   );
 
   vector <Model *>scene;
-
+  u64 total_triangles = 0;
   if (true) {
     float instances = 1.0;
     float spacing = 50.0;
@@ -262,23 +262,52 @@ int main(void) {
     for (float x = 0; x < instances; x++) {
       for (float z = 0; z < instances; z++) {
 
-        Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
-        //Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox");
+        //Model *m = ((i++) % 2 == 0) ? Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox") : Model::New("E:\\gfx\\voxviz\\img\\models\\plane32cubed.vox");
+        Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\rh2house.vox");
         if (m == nullptr) {
           return 1;
         }
-
+        total_triangles += m->mesh->verts.size() / 3;
         m->matrix = translate(
           m->matrix,
           vec3(
             m->dims.x + x*(m->dims.x),
-            0.0,
+            64.0,
             m->dims.z + z*(m->dims.z)
           )
         );
+        physics->addModel(m);
         scene.push_back(m);
       }
     }
+
+    // Generate the floor
+    {
+      float tiles = 1;
+      for (float x = 0; x <= tiles; x++) {
+        for (float z = 0; z <= tiles; z++) {
+
+          Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\debug\\64x64-plane-pyr.vox");
+          if (m == nullptr) {
+            return 1;
+          }
+
+          m->matrix = translate(
+            m->matrix,
+            vec3(
+              m->dims.x + x * (m->dims.x) - 64,
+              32.0,
+              m->dims.z + z * (m->dims.z) - 64.0
+            )
+          );
+          physics->addModel(m, true);
+          total_triangles += m->mesh->verts.size() / 3;
+          scene.push_back(m);
+        }
+      }
+    }
+
+
   } else {
     Model *m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
     if (m == nullptr) {
@@ -387,12 +416,15 @@ int main(void) {
     }
 
     ImGui::Begin("stats");
-
+    ImGui::Text("triangle count: %lu", total_triangles);
     double nowTime = glfwGetTime();
     deltaTime = nowTime - lastTime;
     lastTime = nowTime;
 
-    physics->step();
+    if (keys[GLFW_KEY_1]) {
+      physics->step();
+    }
+
 
     // Handle inputs
     {
@@ -536,7 +568,7 @@ int main(void) {
     colorSSBO->resize(resolution.x * resolution.y * 16);
 
     // Fill Voxel Space
-    if (time == 0 || keys[GLFW_KEY_SPACE]) {
+    if (false || keys[GLFW_KEY_SPACE]) {
       // reset the grid to 0
       voxelSpaceSSBO->fill(0);
       // reset the lights counter to 0

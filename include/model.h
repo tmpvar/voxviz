@@ -55,9 +55,6 @@ class Model {
     glGenFramebuffers(1, &gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
     unsigned int gPosition, gNormal, gColorSpec;
-
-
-
   }
 
 public:
@@ -82,6 +79,16 @@ public:
       return nullptr;
     }
     return new Model(vox);
+  }
+
+  vec3 getPosition() {
+    return this->matrix[3];
+  }
+
+  void setPosition(float x, float y, float z) {
+    this->matrix[3].x = x;
+    this->matrix[3].y = y;
+    this->matrix[3].z = z;
   }
 
   void render(Program *program, mat4 VP) {

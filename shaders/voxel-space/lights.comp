@@ -360,5 +360,5 @@ void main() {
 
   acc /= float(contribs);
 
-  colors[color_idx] = vec4(acc, 1.0);// * color;
+  colors[color_idx] = vec4(max(vec3(0.1), acc), 1.0);// * color;
 }

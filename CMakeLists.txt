@@ -64,7 +64,12 @@ set(POSITION_BASED_DYNAMICS_INCLUDE_DIRS
 	${ExternalInstallDir}/Discregrid/include
 	)
 
-set(POSITION_BASED_DYNAMICS_LIBS PositionBasedDynamics Simulation PBD_Utilities)
+set(POSITION_BASED_DYNAMICS_LIBS
+  PositionBasedDynamics Simulation PBD_Utilities
+  optimized Discregrid
+	debug Discregrid_d
+)
+link_directories(${ExternalInstallDir}/Discregrid/lib)
 
 include_directories(
   include
