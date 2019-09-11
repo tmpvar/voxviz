@@ -2,3 +2,4 @@ build
 xcode
 node_modules
 ./lib
+extern

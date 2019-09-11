@@ -1,4 +1,5 @@
-add_library(Simulation
+include_directories(${CMAKE_CURRENT_LIST_DIR}/..)
+add_library(Simulation STATIC
 		AABB.h
 		CollisionDetection.cpp
 		CollisionDetection.h
@@ -32,7 +33,7 @@ add_library(Simulation
 		TimeStepController.h
 		TriangleModel.cpp
 		TriangleModel.h
-		
+
 		BoundingSphere.h
 		BoundingSphereHierarchy.cpp
 		BoundingSphereHierarchy.h
@@ -46,7 +47,7 @@ add_library(Simulation
 # Discregrid
 ############################################################
 include_directories(${ExternalInstallDir}/Discregrid/include)
-set(SIMULATION_DEPENDENCIES ${SIMULATION_DEPENDENCIES} Ext_Discregrid)
+set(SIMULATION_DEPENDENCIES ${SIMULATION_DEPENDENCIES} Ext_Discregrid PBD_Utilities)
 
 ############################################################
 # GenericParameters
@@ -58,16 +59,15 @@ add_dependencies(Simulation ${SIMULATION_DEPENDENCIES})
 
 find_package( Eigen3 REQUIRED )
 include_directories( ${EIGEN3_INCLUDE_DIR} )
-include_directories(${PROJECT_PATH}/extern/Miniball)
+include_directories(${CMAKE_CURRENT_LIST_DIR}/../extern/Miniball)
 
-target_link_libraries(Simulation PositionBasedDynamics)
+target_link_libraries(Simulation PositionBasedDynamics PBD_Utilities)
 
-
-install(TARGETS Simulation
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
-
-install(DIRECTORY .
-DESTINATION include/Simulation
-FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
+# install(TARGETS Simulation
+#         RUNTIME DESTINATION bin
+#         LIBRARY DESTINATION lib
+#         ARCHIVE DESTINATION lib)
+#
+# install(DIRECTORY .
+# DESTINATION include/Simulation
+# FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")

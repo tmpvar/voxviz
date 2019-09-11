@@ -255,8 +255,8 @@ int main(void) {
 
   vector <Model *>scene;
 
-  if (false) {
-    float instances = 8.0;
+  if (true) {
+    float instances = 1.0;
     float spacing = 50.0;
     uint i = 0;
     for (float x = 0; x < instances; x++) {
@@ -391,6 +391,8 @@ int main(void) {
     double nowTime = glfwGetTime();
     deltaTime = nowTime - lastTime;
     lastTime = nowTime;
+
+    physics->step();
 
     // Handle inputs
     {
