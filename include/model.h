@@ -101,6 +101,20 @@ public:
 
     //this->mesh->render(program);
   }
+
+  bool isset(ivec3 p) {
+    if (
+      glm::any(glm::lessThan(p, ivec3(0))) ||
+      glm::any(glm::greaterThanEqual(p, ivec3(this->dims)))
+    ) {
+      return false;
+    }
+    return this->vox->buffer[
+      p.x +
+      p.y * this->dims.x +
+      p.z * this->dims.x * this->dims.y
+    ] > 0;
+  }
 };
 
 class GBuffer {
