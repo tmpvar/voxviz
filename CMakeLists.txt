@@ -21,6 +21,7 @@ add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1 NOMINMAX=1)
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/libuv)
+add_subdirectory(deps/qu3e)
 
 add_subdirectory(shaders)
 
@@ -35,6 +36,7 @@ include_directories(
   deps/imgui
   deps/imgui/examples
   deps/stb
+	deps/qu3e/src
 )
 
 
@@ -57,7 +59,7 @@ add_executable(
   include/camera-free.h
   include/core.h
   include/brick.h
-  include/aabb.h
+  include/voxviz/aabb.h
   include/shadowmap.h
 	include/volume.h
   include/volume-manager.h
@@ -104,6 +106,7 @@ target_link_libraries(
   uv_a
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
+	qu3e
  )
 
 file(COPY img DESTINATION ${CMAKE_BINARY_DIR})
