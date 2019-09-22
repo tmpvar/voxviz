@@ -92,6 +92,7 @@ void culled_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
   u32 voxel_idx = 0;
   uvec3 pos;
 
+  vec3 halfDims = vec3(dims) * vec3(0.5);
   for (pos.z = 0; pos.z < dims.z; pos.z++) {
     for (pos.y = 0; pos.y < dims.y; pos.y++) {
       for (pos.x = 0; pos.x < dims.x; pos.x++) {
@@ -124,31 +125,33 @@ void culled_mesher(const u8 *volume, const ivec3 &dims, Mesh *mesh) {
                 }
               }
 
-              corner[d] = pos[d] + side;
+              corner[d] = (pos[d] + side);
+
+              vec3 c = vec3(corner) - halfDims;
 
               u32 start = static_cast<GLuint>(mesh->verts.size() / 3);
               mesh->vert(
-                corner.x,
-                corner.y,
-                corner.z
+                c.x,
+                c.y,
+                c.z
               );
 
               mesh->vert(
-                corner.x + u.x,
-                corner.y + u.y,
-                corner.z + u.z
+                c.x + u.x,
+                c.y + u.y,
+                c.z + u.z
               );
 
               mesh->vert(
-                corner.x + u.x + v.x,
-                corner.y + u.y + v.y,
-                corner.z + u.z + v.z
+                c.x + u.x + v.x,
+                c.y + u.y + v.y,
+                c.z + u.z + v.z
               );
 
               mesh->vert(
-                corner.x + v.x,
-                corner.y + v.y,
-                corner.z + v.z
+                c.x + v.x,
+                c.y + v.y,
+                c.z + v.z
               );
 
               // compute side normal

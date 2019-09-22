@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include "glm/glm.hpp"
+#include <vector>
 
 using namespace std;
 
@@ -24,6 +25,7 @@ class VOXModel {
   glm::uvec3 dims;
   size_t bytes = 0;
   uint8_t *buffer = nullptr;
+  vector<glm::uvec3> activeVoxelPositions;
 
   ~VOXModel() {
     if (this->buffer != nullptr) {
@@ -35,7 +37,8 @@ class VOXModel {
 class VOXParser {
 
 public:
-	static VOXModel *parse(string filename) {
+
+static VOXModel *parse(string filename) {
     cout << "Loading VOX file: " << filename.c_str() << endl;
     ifstream ifs(filename, ios::binary | ios::ate);
     if (!ifs.is_open()) {
@@ -139,6 +142,8 @@ public:
             pos.y * vox->dims.x +
             pos.z * vox->dims.x * vox->dims.y
           );
+
+          vox->activeVoxelPositions.push_back(pos);
 
           vox->buffer[idx] = val[3];
         }

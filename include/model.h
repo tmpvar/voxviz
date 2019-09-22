@@ -115,6 +115,16 @@ public:
       p.z * this->dims.x * this->dims.y
     ] > 0;
   }
+
+  vec3 getPosition() {
+    return vec3(this->matrix[3]);
+  }
+
+  void setPosition(vec3 pos) {
+    mat4 newModel(1.0);
+    vec3 d = vec3(this->dims) / vec3(2.0);
+    this->matrix = glm::translate(newModel, pos + d);
+  }
 };
 
 class GBuffer {

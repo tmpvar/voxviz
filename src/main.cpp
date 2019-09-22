@@ -254,11 +254,12 @@ int main(void) {
   );
 
   vector <Model *>scene;
-
+  Model *car;
   if (false) {
-    float instances = 8.0;
+    float instances = 2.0;
     float spacing = 50.0;
     uint i = 0;
+
     for (float x = 0; x < instances; x++) {
       for (float z = 0; z < instances; z++) {
 
@@ -277,6 +278,7 @@ int main(void) {
           )
         );
         scene.push_back(m);
+        physics->addModel(m);
       }
     }
   } else {
@@ -285,22 +287,18 @@ int main(void) {
       return 1;
     }
 
-    m->matrix = translate(
-      m->matrix,
-      vec3(50, 0, 0)
-    );
+    m->setPosition(vec3(50, 0, 0));
     scene.push_back(m);
+    physics->addModel(m, true);
 
     m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
     if (m == nullptr) {
       return 1;
     }
 
-    m->matrix = translate(
-      m->matrix,
-      vec3(176, 0, 0)
-    );
+    m->setPosition(vec3(176, 0, 0));
     scene.push_back(m);
+    physics->addModel(m, true);
 
 
     m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
@@ -308,47 +306,37 @@ int main(void) {
       return 1;
     }
 
-    m->matrix = translate(
-      m->matrix,
-      vec3(302, 0, 0)
-    );
+    m->setPosition(vec3(302, 0, 0));
     scene.push_back(m);
+    physics->addModel(m, true);
 
     m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
     if (m == nullptr) {
       return 1;
     }
 
-    m->matrix = translate(
-      m->matrix,
-      vec3(428, 0, 0)
-    );
+    m->setPosition(vec3(428, 0, 0));
     scene.push_back(m);
+    physics->addModel(m, true);
 
 
-    Model *car = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
+    car = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
     if (car == nullptr) {
       return 1;
     }
 
-    car->matrix = translate(
-      car->matrix,
-      vec3(100, 6, 21)
-    );
+    car->setPosition(vec3(100, 128, 16));
     scene.push_back(car);
+    physics->addModel(car, false, "car");
 
     for (float x = 50 + 63; x < 554; x+=126) {
-
       Model *light = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\street-light.vox");
       if (light == nullptr) {
         return 1;
       }
-
-      light->matrix = translate(
-        light->matrix,
-        vec3(x, 4, 15)
-      );
+      light->setPosition(vec3(x, 4, 15));
       scene.push_back(light);
+      physics->addModel(light, true);
     }
 
 
@@ -375,6 +363,8 @@ int main(void) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+
+
     glfwGetFramebufferSize(window, &resolution[0], &resolution[1]);
 
     if (!shaderLogs.empty()) {
@@ -387,6 +377,13 @@ int main(void) {
     }
 
     ImGui::Begin("stats");
+    physics->step();
+
+    ImGui::Text("car pos(%.3f, %.3f, %.3f)",
+      car->getPosition().x,
+      car->getPosition().y,
+      car->getPosition().z
+    );
 
     double nowTime = glfwGetTime();
     deltaTime = nowTime - lastTime;
@@ -420,6 +417,21 @@ int main(void) {
       }
 
       float debug = keys[GLFW_KEY_1] ? 1.0f : 0.0f;
+
+      if (keys[GLFW_KEY_2]) {
+        Model *car2 = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
+        if (car2 == nullptr) {
+          return 1;
+        }
+
+        car2->matrix = translate(
+          car2->matrix,
+          vec3(100, 128, 21)
+        );
+        scene.push_back(car2);
+        physics->addModel(car2, false, "car");
+      }
+
 
       if (!keys[GLFW_KEY_ENTER] && prevKeys[GLFW_KEY_ENTER]) {
         if (!fullscreen) {
