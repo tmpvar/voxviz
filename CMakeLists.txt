@@ -57,7 +57,7 @@ add_executable(
   include/camera-free.h
   include/core.h
   include/brick.h
-  include/aabb.h
+  include/voxviz/aabb.h
   include/shadowmap.h
 	include/volume.h
   include/volume-manager.h
