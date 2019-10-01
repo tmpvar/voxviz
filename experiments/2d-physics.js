@@ -14,7 +14,7 @@ const objectNormals = [
 ]
 const objects = []
 const mouse = [0, 100];
-const CELL_RADIUS = 10
+const CELL_RADIUS = 3
 const moveable = createObject([0, 0], 0.0, [50, 50], CELL_RADIUS)
 moveable.rot = Math.PI/4
 objects.push(moveable)
@@ -228,8 +228,8 @@ function createObject(pos, rot, dims, cellRadius) {
       //   }
       // }
 
-      // ctx.strokeStyle = isect ? "red" : "#aaa"
-      ctx.strokeStyle = "#aaa"
+      ctx.strokeStyle = isect ? "red" : "#aaa"
+      // ctx.strokeStyle = "#aaa"
       ctx.beginPath()
         ctx.moveTo(this.points[0][0], this.points[0][1])
         ctx.lineTo(this.points[1][0], this.points[1][1])
@@ -349,139 +349,101 @@ function render() {
     ctx.scale(2.0, -2.0)
     ctx.pointToWorld(moveable.pos, camera.mouse.pos)
     moveable.rot += 0.01
+    objects[2].rot += Math.sin(Date.now() / 10000) / 100.0
 
-    objects.forEach(o => o.tick())
+    objects.forEach((objectA, i) => {
+      objectA.tick()
 
-    const isect = SAT(
-      objects[1].points,
-      objects[0].points
-    )
+      // pairwise test between every object
+      // TODO: this problem size can be reduced!!!
+      var anyIsect = false
+      for (var j = i+1; j<objects.length; j++) {
+        var objectB = objects[j]
+        var isect = SAT(
+          objectA.points,
+          objectB.points
+        )
+        anyIsect = anyIsect || isect
 
-    objects.forEach((o, i) => {
-      o.render(ctx, false)
-
-    })
-
-    if (isect) {
-      const regionAABB = [[Infinity, Infinity], [-Infinity, -Infinity]]
-      const aabb = aabbIntersection(objects[0].aabb(), objects[1].aabb())
-      const aabbCenter = [aabb[1][0] - aabb[0][0], aabb[1][1] - aabb[0][1]]
-
-      ctx.strokeStyle = "purple"
-      const lx = Math.floor(aabb[0][0] / CELL_RADIUS) * CELL_RADIUS
-      const ly = Math.floor(aabb[0][1] / CELL_RADIUS) * CELL_RADIUS
-      const ux = Math.ceil(aabb[1][0] / CELL_RADIUS) * CELL_RADIUS
-      const uy = Math.ceil(aabb[1][1] / CELL_RADIUS) * CELL_RADIUS
-
-      const aabbPoints = [
-        [lx, ly],
-        [ux, ly],
-        [ux, uy],
-        [lx, uy]
-      ]
-
-      ctx.strokeRect(
-        lx,
-        ly,
-        ux - lx,
-        uy - ly
-      )
-
-      ctx.strokeStyle = "white"
-      for (var x=lx; x<ux; x+=CELL_RADIUS) {
-        for (var y=ly; y<uy; y+=CELL_RADIUS) {
-
-          objects.forEach((o, i) => {
-
-            // TODO: this check should only be done on pairs so for now we
-            // reduce the problem set by only dealing with object[0]
-            if (i > 0) return
-
-            const region = []
-
-
-            o.points.forEach((cp, pi) => {
-              const cn = o.points[(pi+1) % o.points.length]
-
-              if (cp[0] >= lx && cp[0] <= ux &&
-                  cp[1] >= ly && cp[1] <= uy)
-              {
-                region.push([cp[0], cp[1]])
-              }
-
-              aabbPoints.forEach((ap, ai) => {
-                const an = aabbPoints[(ai+1) % aabbPoints.length]
-
-                const r = segseg(
-                  cp[0], cp[1], cn[0], cn[1],
-                  ap[0], ap[1], an[0], an[1]
-                )
-
-                if (r && r !== true) {
-                  region.push(r)
-                }
-              })
-            })
-
-            region.forEach(r => {
-              regionAABB[0][0] = Math.min(regionAABB[0][0], r[0])
-              regionAABB[0][1] = Math.min(regionAABB[0][1], r[1])
-              regionAABB[1][0] = Math.max(regionAABB[1][0], r[0])
-              regionAABB[1][1] = Math.max(regionAABB[1][1], r[1])
-            })
-
-            // inflate the regionAABB to cover full grid cells (world space)
-            regionAABB[0][0] = Math.floor(regionAABB[0][0] / CELL_RADIUS) * CELL_RADIUS
-            regionAABB[0][1] = Math.floor(regionAABB[0][1] / CELL_RADIUS) * CELL_RADIUS
-            regionAABB[1][0] = Math.ceil(regionAABB[1][0] / CELL_RADIUS) * CELL_RADIUS
-            regionAABB[1][1] = Math.ceil(regionAABB[1][1] / CELL_RADIUS) * CELL_RADIUS
-
-            // // render the region
-            // ctx.beginPath()
-            //   ctx.strokeStyle = "#f0f"
-            //   ctx.moveTo(region[0][0], region[0][1])
-            //   for (var i=1; i<region.length; i++) {
-            //     ctx.lineTo(region[i][0], region[i][1])
-            //   }
-            //   ctx.lineTo(region[0][0], region[0][1])
-            //   ctx.stroke()
-
-
-            const sx = o.points[0][0]
-            const sy = o.points[0][1]
-
-            var oxx = o.normals[2][0] * CELL_RADIUS
-            var oxy = o.normals[2][1] * CELL_RADIUS
-            var oyx = o.normals[3][0] * CELL_RADIUS
-            var oyy = o.normals[3][1] * CELL_RADIUS
-
-            ctx.strokeStyle = "green"
-            ctx.strokeRect(
-              regionAABB[0][0],
-              regionAABB[0][1],
-              regionAABB[1][0] - regionAABB[0][0],
-              regionAABB[1][1] - regionAABB[0][1]
-            )
-
-          })
-
-          // ctx.strokeRect(
-          //   x + 4,
-          //   y + 4,
-          //   CELL_RADIUS - 8,
-          //   CELL_RADIUS - 8
-          // )
-
+        if (isect) {
+          var aabb = computeIsectAABB(objectA, objectB)
+          objectA.renderIsect(ctx, aabb)
+          objectB.renderIsect(ctx, aabb)
         }
       }
 
-      // objects.forEach((o) => {
-      //   o.renderIsect(ctx, regionAABB)
-      // })
-      objects[0].renderIsect(ctx, regionAABB)
+      objectA.render(ctx, anyIsect)
+
+    })
+  camera.end();
+}
+
+function growAABBByPoint(aabb, x, y) {
+  aabb[0][0] = Math.min(aabb[0][0], x)
+  aabb[0][1] = Math.min(aabb[0][1], y)
+  aabb[1][0] = Math.max(aabb[1][0], x)
+  aabb[1][1] = Math.max(aabb[1][1], y)
+}
+
+function computeIsectAABB(a, b) {
+  const regionAABB = [[Infinity, Infinity], [-Infinity, -Infinity]]
+  const aabb = aabbIntersection(a.aabb(), b.aabb())
+  const aabbCenter = [aabb[1][0] - aabb[0][0], aabb[1][1] - aabb[0][1]]
+
+  const lx = Math.floor(aabb[0][0] / CELL_RADIUS) * CELL_RADIUS
+  const ly = Math.floor(aabb[0][1] / CELL_RADIUS) * CELL_RADIUS
+  const ux = Math.ceil(aabb[1][0] / CELL_RADIUS) * CELL_RADIUS
+  const uy = Math.ceil(aabb[1][1] / CELL_RADIUS) * CELL_RADIUS
+
+  const aabbPoints = [
+    [lx, ly],
+    [ux, ly],
+    [ux, uy],
+    [lx, uy]
+  ]
+
+  const region = []
+
+
+  a.points.forEach((cp, pi) => {
+    const cn = a.points[(pi+1) % a.points.length]
+
+    if (cp[0] >= lx && cp[0] <= ux &&
+        cp[1] >= ly && cp[1] <= uy)
+    {
+      growAABBByPoint(regionAABB, cp[0], cp[1])
     }
 
-  camera.end();
+    aabbPoints.forEach((ap, ai) => {
+      const an = aabbPoints[(ai+1) % aabbPoints.length]
+
+      const r = segseg(
+        cp[0], cp[1], cn[0], cn[1],
+        ap[0], ap[1], an[0], an[1]
+      )
+
+      if (r && r !== true) {
+        growAABBByPoint(regionAABB, r[0], r[1])
+      }
+    })
+  })
+
+
+  // inflate the regionAABB to cover full grid cells (world space)
+  regionAABB[0][0] = Math.floor(regionAABB[0][0] / CELL_RADIUS) * CELL_RADIUS
+  regionAABB[0][1] = Math.floor(regionAABB[0][1] / CELL_RADIUS) * CELL_RADIUS
+  regionAABB[1][0] = Math.round(regionAABB[1][0] / CELL_RADIUS) * CELL_RADIUS
+  regionAABB[1][1] = Math.round(regionAABB[1][1] / CELL_RADIUS) * CELL_RADIUS
+
+  ctx.strokeStyle = "green"
+  ctx.strokeRect(
+    regionAABB[0][0],
+    regionAABB[0][1],
+    regionAABB[1][0] - regionAABB[0][0],
+    regionAABB[1][1] - regionAABB[0][1]
+  )
+
+  return regionAABB
 }
 
 function hsl(p, a) {
