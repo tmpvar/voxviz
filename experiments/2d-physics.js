@@ -1,3 +1,5 @@
+const ndarray = require('ndarray')
+const fill = require('ndarray-fill')
 const glmatrix = require('gl-matrix')
 const vec2 = glmatrix.vec2
 const mat3 = glmatrix.mat3
@@ -12,16 +14,18 @@ const objectNormals = [
 ]
 const objects = []
 const mouse = [0, 100];
-const moveable = createObject(mouse, 0.0, [50, 50], () => 0)
+const CELL_RADIUS = 10
+const moveable = createObject([0, 0], 0.0, [50, 50], CELL_RADIUS)
+moveable.rot = Math.PI/4
 objects.push(moveable)
-objects.push(createObject([0, 0], 0.0, [800, 20], () => 0))
+objects.push(createObject([0, 0], 0.0, [800, 20], CELL_RADIUS))
+objects.push(createObject([-20, 90], 0.0, [80, 80], CELL_RADIUS))
 
 const ctx = require('fc')(render, 1)
 const center = require('ctx-translate-center')
 const renderGrid = require('ctx-render-grid-lines')
 
 const segseg = require('segseg')
-const ndarray = require('ndarray')
 const raySlab = require('ray-aabb-slab')
 const camera = require('ctx-camera')(ctx, window, {})
 
@@ -78,7 +82,21 @@ function normalRotate(n, i, r) {
   n[1] = ny
 }
 
-function createObject(pos, rot, dims, sdfFn) {
+function aabbIntersection(a, b) {
+  const l = [
+    Math.max(a[0][0], b[0][0]),
+    Math.max(a[0][1], b[0][1])
+  ]
+  const u = [
+    Math.min(a[1][0], b[1][0]),
+    Math.min(a[1][1], b[1][1])
+  ]
+
+  return [l, u]
+}
+
+function createObject(pos, rot, dims, cellRadius) {
+  const gridDims = [(dims[0]/cellRadius)|0, (dims[1]/cellRadius)|0]
   const out = {
     rot: rot,
     pos: [pos[0], pos[1]],
@@ -108,7 +126,7 @@ function createObject(pos, rot, dims, sdfFn) {
       vec2.create()
     ],
 
-
+    grid: ndarray(new Float32Array(gridDims[0] * gridDims[1]), gridDims),
 
     aabb() {
       var lx = Infinity
@@ -168,11 +186,50 @@ function createObject(pos, rot, dims, sdfFn) {
       txo(this.points[3], this.model, v2scratch)
     },
 
-    render(ctx, isect) {
+    render(ctx, isect, regionAABB) {
       const hdx = this.dims[0] / 2
       const hdy = this.dims[1] / 2
 
-      ctx.strokeStyle = isect ? "#aaa" : "red"
+
+      // draw grid
+      ctx.strokeStyle = "#666"
+      const sx = this.points[0][0]
+      const sy = this.points[0][1]
+
+      var oxx = this.normals[2][0] * cellRadius
+      var oxy = this.normals[2][1] * cellRadius
+      var oyx = this.normals[3][0] * cellRadius
+      var oyy = this.normals[3][1] * cellRadius
+
+      // for (var x = 0; x < gridDims[0]; x++) {
+      //   for (var y = 0; y < gridDims[1]; y++) {
+      //     ctx.beginPath()
+      //       ctx.moveTo(
+      //         sx + x * oxx,
+      //         sy + x * oxy
+      //       )
+      //       ctx.lineTo(
+      //         sx + x * oxx + oxx,
+      //         sy + x * oxy + oxy
+      //       )
+      //       ctx.lineTo(
+      //         sx + x * oxx + oxx + y * oyx + oyx,
+      //         sy + x * oxy + oxy + y * oyy + oyy
+      //       )
+      //       ctx.lineTo(
+      //         sx + x * oxx + y * oyx + oyx,
+      //         sy + x * oxy + y * oyy + oyy
+      //       )
+      //       ctx.lineTo(
+      //         sx + x * oxx,
+      //         sy + x * oxy
+      //       )
+      //       ctx.stroke();
+      //   }
+      // }
+
+      // ctx.strokeStyle = isect ? "red" : "#aaa"
+      ctx.strokeStyle = "#aaa"
       ctx.beginPath()
         ctx.moveTo(this.points[0][0], this.points[0][1])
         ctx.lineTo(this.points[1][0], this.points[1][1])
@@ -182,21 +239,101 @@ function createObject(pos, rot, dims, sdfFn) {
         ctx.stroke();
 
       // render normals
-      ctx.strokeStyle = "red"
-      this.normals.forEach(n => {
-        ctx.beginPath()
-          ctx.moveTo(this.pos[0], this.pos[1])
-          ctx.lineTo(this.pos[0] + n[0] * 10, this.pos[1] + n[1] * 10)
-          ctx.stroke()
-      })
+      // ctx.strokeStyle = "red"
+      // this.normals.forEach(n => {
+      //   ctx.beginPath()
+      //     ctx.moveTo(this.pos[0], this.pos[1])
+      //     ctx.lineTo(this.pos[0] + n[0] * 10, this.pos[1] + n[1] * 10)
+      //     ctx.stroke()
+      // })
 
       ctx.fillStyle = "white"
       ctx.beginPath()
       this.points.forEach(p => {
         ctx.moveTo(p[0], p[1])
-        ctx.arc(p[0], p[1], 2, 0, Math.PI*2, false)
+        ctx.arc(p[0], p[1], 1, 0, Math.PI*2, false)
         ctx.fill()
       })
+    },
+
+    renderIsect(ctx, regionAABB) {
+
+      const hdx = this.dims[0] / 2
+      const hdy = this.dims[1] / 2
+
+
+      // draw grid
+      ctx.strokeStyle = "#666"
+      const sx = this.points[0][0]
+      const sy = this.points[0][1]
+
+      var oxx = this.normals[2][0] * cellRadius
+      var oxy = this.normals[2][1] * cellRadius
+      var oyx = this.normals[3][0] * cellRadius
+      var oyy = this.normals[3][1] * cellRadius
+
+      const aabb = [
+        regionAABB[0],
+        [regionAABB[1][0], regionAABB[0][1]],
+        regionAABB[1],
+        [regionAABB[0][0], regionAABB[1][1]]
+      ]
+      ctx.strokeStyle = "#f0f"
+      ctx.beginPath()
+        ctx.moveTo(aabb[0][0], aabb[0][1])
+        ctx.lineTo(aabb[1][0], aabb[1][1])
+        ctx.lineTo(aabb[2][0], aabb[2][1])
+        ctx.lineTo(aabb[3][0], aabb[3][1])
+        ctx.lineTo(aabb[0][0], aabb[0][1])
+        ctx.stroke();
+
+      ctx.strokeStyle = "orange"
+      var i = 0
+      for (var x = 0; x < gridDims[0]; x++) {
+        for (var y = 0; y < gridDims[1]; y++) {
+          i++
+          // if (i>3) return
+          ctx.save()
+            ctx.lineWidth = 1.0
+
+            var cx = x * cellRadius
+            var cy = y * cellRadius
+            // var cx = sx + x * oxx + y * oyx
+            // var cy = sy + x * oxy + y * oyy
+
+            // var b = [
+            //   [cx, cy],
+            //   [cx + oxx, cy + oxy],
+            //   [cx + oxx + oyx, cy + oxy + oyy],
+            //   [cx, cy + oxy + oyy],
+            //   // [sx + x * oxx + oxx + y * oyx + oyx, sy + y * oxy + oxy + y * oyy + oyy],
+            //   // [sx + x * oxx + y * oyx + oyx, sy + y * oxy + y * oyy + oyy]
+            // ]
+
+            var b = [
+              txo([0, 0], this.model, [cx - hdx, cy - hdy]),
+              txo([0, 0], this.model, [(cx + cellRadius) - hdx, cy - hdy]),
+              txo([0, 0], this.model, [(cx + cellRadius) - hdx, (cy + cellRadius) - hdy]),
+              txo([0, 0], this.model, [cx - hdx, (cy + cellRadius) - hdy]),
+            ]
+
+            var isect = !SAT(b, aabb)
+            if (isect) {
+              ctx.restore();
+              continue
+            }
+
+            ctx.beginPath()
+              ctx.moveTo(b[0][0], b[0][1])
+              ctx.lineTo(b[1][0], b[1][1])
+              ctx.lineTo(b[2][0], b[2][1])
+              ctx.lineTo(b[3][0], b[3][1])
+              ctx.lineTo(b[0][0], b[0][1])
+              ctx.stroke();
+          ctx.restore()
+
+        }
+      }
     }
   }
 
@@ -205,42 +342,146 @@ function createObject(pos, rot, dims, sdfFn) {
   return out;
 }
 
-
-
 function render() {
-  const now = Date.now() /10
-  vec2.set(eye,
-    Math.sin(now / 1000) * 200,
-    Math.cos(now / 1000) * 200
-  )
-  mat3.identity(model)
-  var scale =  [1 + Math.abs(Math.sin(now / 100)), 1 + Math.abs(Math.cos(now / 1000))]
+  ctx.clear()
+  camera.begin()
+    center(ctx)
+    ctx.scale(2.0, -2.0)
+    ctx.pointToWorld(moveable.pos, camera.mouse.pos)
+    moveable.rot += 0.01
 
-  // render prereqs
-  mat3.invert(invModel, model)
-  var invEye = txo([0, 0], invModel, eye)
-  var txOrigin = txo([0, 0], model, origin)
+    objects.forEach(o => o.tick())
 
-    ctx.clear()
-    camera.begin()
-      center(ctx)
-      ctx.scale(2.0, -2.0)
-      ctx.pointToWorld(moveable.pos, camera.mouse.pos)
-      moveable.rot += 0.01
-      objects[1].rot += 0.01
+    const isect = SAT(
+      objects[1].points,
+      objects[0].points
+    )
 
-      objects.forEach(o => o.tick())
+    objects.forEach((o, i) => {
+      o.render(ctx, false)
 
-      const isect = !SAT(
-        objects[1].points,
-        objects[0].points
+    })
+
+    if (isect) {
+      const regionAABB = [[Infinity, Infinity], [-Infinity, -Infinity]]
+      const aabb = aabbIntersection(objects[0].aabb(), objects[1].aabb())
+      const aabbCenter = [aabb[1][0] - aabb[0][0], aabb[1][1] - aabb[0][1]]
+
+      ctx.strokeStyle = "purple"
+      const lx = Math.floor(aabb[0][0] / CELL_RADIUS) * CELL_RADIUS
+      const ly = Math.floor(aabb[0][1] / CELL_RADIUS) * CELL_RADIUS
+      const ux = Math.ceil(aabb[1][0] / CELL_RADIUS) * CELL_RADIUS
+      const uy = Math.ceil(aabb[1][1] / CELL_RADIUS) * CELL_RADIUS
+
+      const aabbPoints = [
+        [lx, ly],
+        [ux, ly],
+        [ux, uy],
+        [lx, uy]
+      ]
+
+      ctx.strokeRect(
+        lx,
+        ly,
+        ux - lx,
+        uy - ly
       )
 
-      objects.forEach((o) => {
-        o.render(ctx, isect)
-      })
-      //trace()
-    camera.end();
+      ctx.strokeStyle = "white"
+      for (var x=lx; x<ux; x+=CELL_RADIUS) {
+        for (var y=ly; y<uy; y+=CELL_RADIUS) {
+
+          objects.forEach((o, i) => {
+
+            // TODO: this check should only be done on pairs so for now we
+            // reduce the problem set by only dealing with object[0]
+            if (i > 0) return
+
+            const region = []
+
+
+            o.points.forEach((cp, pi) => {
+              const cn = o.points[(pi+1) % o.points.length]
+
+              if (cp[0] >= lx && cp[0] <= ux &&
+                  cp[1] >= ly && cp[1] <= uy)
+              {
+                region.push([cp[0], cp[1]])
+              }
+
+              aabbPoints.forEach((ap, ai) => {
+                const an = aabbPoints[(ai+1) % aabbPoints.length]
+
+                const r = segseg(
+                  cp[0], cp[1], cn[0], cn[1],
+                  ap[0], ap[1], an[0], an[1]
+                )
+
+                if (r && r !== true) {
+                  region.push(r)
+                }
+              })
+            })
+
+            region.forEach(r => {
+              regionAABB[0][0] = Math.min(regionAABB[0][0], r[0])
+              regionAABB[0][1] = Math.min(regionAABB[0][1], r[1])
+              regionAABB[1][0] = Math.max(regionAABB[1][0], r[0])
+              regionAABB[1][1] = Math.max(regionAABB[1][1], r[1])
+            })
+
+            // inflate the regionAABB to cover full grid cells (world space)
+            regionAABB[0][0] = Math.floor(regionAABB[0][0] / CELL_RADIUS) * CELL_RADIUS
+            regionAABB[0][1] = Math.floor(regionAABB[0][1] / CELL_RADIUS) * CELL_RADIUS
+            regionAABB[1][0] = Math.ceil(regionAABB[1][0] / CELL_RADIUS) * CELL_RADIUS
+            regionAABB[1][1] = Math.ceil(regionAABB[1][1] / CELL_RADIUS) * CELL_RADIUS
+
+            // // render the region
+            // ctx.beginPath()
+            //   ctx.strokeStyle = "#f0f"
+            //   ctx.moveTo(region[0][0], region[0][1])
+            //   for (var i=1; i<region.length; i++) {
+            //     ctx.lineTo(region[i][0], region[i][1])
+            //   }
+            //   ctx.lineTo(region[0][0], region[0][1])
+            //   ctx.stroke()
+
+
+            const sx = o.points[0][0]
+            const sy = o.points[0][1]
+
+            var oxx = o.normals[2][0] * CELL_RADIUS
+            var oxy = o.normals[2][1] * CELL_RADIUS
+            var oyx = o.normals[3][0] * CELL_RADIUS
+            var oyy = o.normals[3][1] * CELL_RADIUS
+
+            ctx.strokeStyle = "green"
+            ctx.strokeRect(
+              regionAABB[0][0],
+              regionAABB[0][1],
+              regionAABB[1][0] - regionAABB[0][0],
+              regionAABB[1][1] - regionAABB[0][1]
+            )
+
+          })
+
+          // ctx.strokeRect(
+          //   x + 4,
+          //   y + 4,
+          //   CELL_RADIUS - 8,
+          //   CELL_RADIUS - 8
+          // )
+
+        }
+      }
+
+      // objects.forEach((o) => {
+      //   o.renderIsect(ctx, regionAABB)
+      // })
+      objects[0].renderIsect(ctx, regionAABB)
+    }
+
+  camera.end();
 }
 
 function hsl(p, a) {
