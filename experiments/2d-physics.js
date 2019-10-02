@@ -16,10 +16,13 @@ const mouse = [0, 100];
 const CELL_RADIUS = 10
 const moveable = createObject([0, 0], 0.0, [90, 50], CELL_RADIUS)
 // moveable.rot = Math.PI/4
-objects.push(moveable)
 objects.push(createObject([0, 0], 0.0, [800, 20], CELL_RADIUS))
-objects.push(createObject([0, 90], 0.0, [200, 20], CELL_RADIUS))
+objects[objects.length-1].rot = 0.4
+objects.push(moveable)
+objects.push(createObject([300, 90], 0.0, [200, 70], CELL_RADIUS))
 
+
+objects[objects.length-1].rot = 0.4
 // for (var i=0; i<100; i++) {
 //   var o = createObject([Math.random() * 1000 - 250, Math.random() * 400 + 20], 0.0, [10 + Math.random() * 40, 20 + Math.random() * 40], CELL_RADIUS)
 //   o.rot = Math.random() * Math.PI*2
@@ -46,7 +49,6 @@ const xfBrickAABB = [
   [0, 0],
   [0, 0]
 ]
-
 
 const lineTo = ctx.lineTo.bind(ctx)
 const moveTo = ctx.moveTo.bind(ctx)
@@ -109,8 +111,10 @@ function createObject(pos, rot, dims, cellRadius) {
     velocity: [0, 0],
     angularVelocity: 0,
     mass: 1,
+    invMas: 1,
     dims: dims,
     model: mat3.create(),
+    invModel: mat3.create(),
     /*
       normal/face layout
               3
@@ -158,7 +162,7 @@ function createObject(pos, rot, dims, cellRadius) {
 
     tick(force) {
       var dirty = false
-
+      //
       // this.velocity[1] -= 0.01
       //
       // this.rot += this.angularVelocity;
@@ -175,12 +179,11 @@ function createObject(pos, rot, dims, cellRadius) {
         return
       }
 
-
-
       mat3.identity(this.model)
-
       mat3.translate(this.model, this.model, this.pos)
       mat3.rotate(this.model, this.model, this.rot)
+
+      mat3.invert(this.invModel, this.model)
 
       rot = this.rot
       pos[0] = this.pos[0]
@@ -210,7 +213,6 @@ function createObject(pos, rot, dims, cellRadius) {
     render(ctx, isect, regionAABB) {
       const hdx = this.dims[0] / 2
       const hdy = this.dims[1] / 2
-
 
       // draw grid
       ctx.strokeStyle = "#666"
@@ -250,24 +252,33 @@ function createObject(pos, rot, dims, cellRadius) {
     },
 
     renderIsect(ctx, regionAABB, other) {
-
-      const hdx = this.dims[0] / 2
-      const hdy = this.dims[1] / 2
-      const bhdx = other.dims[0] / 2
-      const bhdy = other.dims[1] / 2
+      // const hdx = this.dims[0] / 2
+      // const hdy = this.dims[1] / 2
+      // const bhdx = other.dims[0] / 2
+      // const bhdy = other.dims[1] / 2
 
       // draw grid
       ctx.strokeStyle = "#666"
       const sx = this.points[0][0]
       const sy = this.points[0][1]
 
-      var oxx = this.normals[2][0] * cellRadius
-      var oxy = this.normals[2][1] * cellRadius
-      var oyx = this.normals[3][0] * cellRadius
-      var oyy = this.normals[3][1] * cellRadius
+      // TODO: maybe this would be faster that transforming every grid cell
+      // var oxx = this.normals[2][0] * cellRadius
+      // var oxy = this.normals[2][1] * cellRadius
+      // var oyx = this.normals[3][0] * cellRadius
+      // var oyy = this.normals[3][1] * cellRadius
 
-      const ainv = mat3.invert(mat3.create(), this.model)
-      const binv = mat3.invert(mat3.create(), other.model)
+      /* Process:
+       - walk over the region aabb
+       - for a and b
+         - convert region cell into local grid space
+         - if grid cell is occupied return both true and world space grid center
+        - if both a and b are occupied
+          - compute impulse between centers
+        - average impulse and apply to a's velocity
+      */
+
+
       // const aabb = [
       //   regionAABB[0],
       //   [regionAABB[1][0], regionAABB[0][1]],
@@ -286,61 +297,110 @@ function createObject(pos, rot, dims, cellRadius) {
 
       ctx.strokeStyle = "orange"
       var impulse = [0, 0]
+      var aworld = [0, 0]
+      var bworld = [0, 0]
+      var halfCellRadius = 0//CELL_RADIUS / 2.0
       for (var x = regionAABB[0][0]; x < regionAABB[1][0]; x+=CELL_RADIUS) {
         for (var y = regionAABB[0][1]; y < regionAABB[1][1]; y+=CELL_RADIUS) {
-          ctx.save()
-            ctx.lineWidth = 1.0
+          if (!testGridCell(aworld, this, x + halfCellRadius, y + halfCellRadius)) {
+            continue
+          }
 
-            var cx = x
-            var cy = y
+          if (!testGridCell(bworld, other, x + halfCellRadius, y + halfCellRadius)) {
+            continue
+          }
 
-            var a = [
-              txo([0, 0], ainv, [cx, cy]),
-              txo([0, 0], ainv, [cx + cellRadius, cy]),
-              txo([0, 0], ainv, [cx + cellRadius, cy + cellRadius]),
-              txo([0, 0], ainv, [cx, cy + cellRadius])
-            ]
+            //
+            // ctx.strokeStyle = "white"
+            // ctx.beginPath()
+            //   ctx.moveTo(x, y)
+            //   ctx.lineTo(x + CELL_RADIUS, y)
+            //   ctx.lineTo(x + CELL_RADIUS, y + CELL_RADIUS)
+            //   ctx.lineTo(x, y + CELL_RADIUS)
+            //   ctx.lineTo(x, y)
+            //   ctx.stroke();
 
-            var b = [
-              txo([0, 0], binv, [cx, cy]),
-              txo([0, 0], binv, [cx + cellRadius, cy]),
-              txo([0, 0], binv, [cx + cellRadius, cy + cellRadius]),
-              txo([0, 0], binv, [cx, cy + cellRadius])
-            ]
+// console.log("aworld", aworld, "bworld", bworld, 'dist', vec2.distance(aworld, bworld))
 
-            ctx.beginPath()
-              ctx.moveTo(x, y)
-              ctx.lineTo(x + CELL_RADIUS, y)
-              ctx.lineTo(x + CELL_RADIUS, y + CELL_RADIUS)
-              ctx.lineTo(x, y + CELL_RADIUS)
-              ctx.lineTo(x, y)
-              ctx.stroke();
 
-            var isect = SAT(a, b)
-            if (isect) {
-              ctx.restore();
-              continue
+            // var isect = SAT(a, b)
+            // if (isect) {
+            //   ctx.restore();
+            //   continue
+            // }
+            //
+            // var r = cellResponse(a, b)
+            // impulse[0] += r[0] / 2.0
+            // impulse[1] += r[1] / 2.0
+
+            var d = vec2.distance(aworld, bworld)
+            if (d > CELL_RADIUS) {
+              continue;
             }
 
-            var r = cellResponse(a, b)
-            impulse[0] += r[0] / 2.0
-            impulse[1] += r[1] / 2.0
+          ctx.save()
+            ctx.lineWidth = 1.0
+            ctx.strokeStyle = "#aaa"
+            ctx.beginPath()
+              ctx.moveTo(aworld[0], aworld[1])
+              ctx.lineTo(bworld[0], bworld[1])
+              ctx.stroke()
+            ctx.fillStyle = "#aaa"
+            ctx.beginPath()
+              ctx.arc(aworld[0], aworld[1], .2, 0, Math.PI*2)
+              ctx.fill()
+
+            var delta = d - CELL_RADIUS * 2;
+            impulse[0] = (impulse[0] + (aworld[0] - bworld[0]) * -delta) / 2.0
+            impulse[1] = (impulse[1] + (aworld[1] - bworld[1]) * -delta) / 2.0
           ctx.restore()
 
         }
       }
 
-      //
-      // this.velocity[0] -= impulse[0] / 1000
-      // this.velocity[1] -= impulse[1] / 1000
-
+      if (impulse[0] || impulse[1]) {
+        this.velocity[0] = this.velocity[0] * 0.55 + impulse[0] / 100.0
+        this.velocity[1] = this.velocity[1] * 0.55 + impulse[1] / 100.0
+      }
+      // TODO: restitution
+      //this.velocity[0] *= -0.1
+      //this.velocity[1] *= -0.1
     }
-
   }
 
   out.tick(true)
 
   return out;
+}
+
+function testGridCell(out, object, x, y) {
+  var hdx = object.dims[0]/2
+  var hdy = object.dims[1]/2
+  // TODO: these coords need to be pushed over by .5 * dims
+  var grid = ([
+    txo([0, 0], object.invModel, [x, y]),
+    txo([0, 0], object.invModel, [x + CELL_RADIUS, y]),
+    txo([0, 0], object.invModel, [x + CELL_RADIUS, y + CELL_RADIUS]),
+    txo([0, 0], object.invModel, [x, y + CELL_RADIUS])
+  ]).map(p => {
+
+    p[0] = Math.floor(p[0] / CELL_RADIUS) * CELL_RADIUS
+    p[1] = Math.floor(p[1] / CELL_RADIUS) * CELL_RADIUS
+    return p
+  })
+  // console.log("grid", grid)
+
+  var center = [
+    (grid[0][0] + grid[2][0]) / 2.0,
+    (grid[0][1] + grid[2][1]) / 2.0
+  ]
+
+  // console.log("center", center)
+
+  txo(out, object.model, center)
+  // console.log("out", out)
+  // TODO: don't return true if the grid cell is not occupied
+  return true
 }
 
 function cellResponse(a, b) {
@@ -382,17 +442,18 @@ function render() {
     center(ctx)
     ctx.scale(2.0, -2.0)
     ctx.pointToWorld(moveable.pos, camera.mouse.pos)
-    // moveable.rot += 0.01
-    // objects[2].rot += Math.sin(Date.now() / 10000) / 100.0
+    moveable.rot += 0.01
+    objects[2].rot += 0.01// Math.sin(Date.now() / 10000) / 1000.0
     objects.forEach((objectA, i) => {
 
         objectA.tick()
-
+        objectA.render(ctx, anyIsect)
         // pairwise test between every object
         // TODO: this problem size can be reduced!!!
         var anyIsect = false
         for (var j = i+1; j<objects.length; j++) {
           var objectB = objects[j]
+
           var isect = SAT(
             objectA.points,
             objectB.points
@@ -402,13 +463,114 @@ function render() {
           if (isect) {
             var aabb = computeIsectAABB(objectA, objectB)
             objectA.renderIsect(ctx, aabb, objectB)
-            // objectB.renderIsect(ctx, aabb, objectA)
+            //objectB.renderIsect(ctx, aabb, objectA)
+
+            //var particlesA = collectParticles(objectA, aabb)
+            var particlesB = collectParticles(objectB, aabb)
           }
         }
-      objectA.render(ctx, anyIsect)
-
     })
   camera.end();
+}
+
+function collectParticles(object, aabb) {
+  const hdx = object.dims[0] / 2.0
+  const hdy = object.dims[1] / 2.0
+
+  const gridAABB = [[0, 0], [0, 0]]
+  txo(gridAABB[0], object.invModel, aabb[0])
+  txo(gridAABB[1], object.invModel, aabb[1])
+  const oaabb = [
+    [ - hdx, - hdy],
+    [ + hdx, + hdy]
+  ]
+
+  aabbRebuild(oaabb)
+  aabbRebuild(gridAABB)
+
+  // TODO: ensure we flip these coords if they get reversed
+  const region = aabbIntersection(gridAABB, oaabb)
+
+  ctx.strokeStyle = "red"
+  aabbToGridRadius(oaabb)
+  ctx.strokeRect(
+    oaabb[0][0],
+    oaabb[0][1],
+    oaabb[1][0] - oaabb[0][0],
+    oaabb[1][1] - oaabb[0][1]
+  )
+
+  ctx.strokeStyle = "orange"
+  aabbToGridRadius(gridAABB)
+  ctx.strokeRect(
+    gridAABB[0][0],
+    gridAABB[0][1],
+    gridAABB[1][0] - gridAABB[0][0],
+    gridAABB[1][1] - gridAABB[0][1]
+  )
+
+
+
+  ctx.strokeStyle = "green"
+  aabbToGridRadius(gridAABB)
+  ctx.strokeRect(
+    oaabb[0][0],
+    oaabb[0][1],
+    oaabb[1][0] - oaabb[0][0],
+    oaabb[1][1] - oaabb[0][1]
+  )
+
+  ctx.strokeStyle = "white"
+
+  ctx.beginPath()
+    square(
+      object.model,
+      region[0][0],
+      region[0][1],
+      region[1][0] - region[0][0],
+      region[1][1] - region[0][1]
+    )
+    ctx.stroke()
+
+  aabbToGridRadius(region)
+  aabbRebuild(region)
+
+  const cc = [0, 0]
+  ctx.strokeStyle = "#fec"
+  ctx.beginPath()
+  for (var x = region[0][0]; x<region[1][0]; x+=CELL_RADIUS) {
+    for (var y = region[0][1]; y<region[1][1]; y+=CELL_RADIUS) {
+      vec2.transformMat3(
+        cc,
+        [x, y],
+        object.model
+      )
+      ctx.moveTo(cc[0] + CELL_RADIUS/2.0 - 1, cc[1])
+      ctx.arc(cc[0], cc[1], CELL_RADIUS/2 - 1, 0, Math.PI*2)
+    }
+  }
+  ctx.stroke()
+}
+
+function aabbToGridRadius(aabb) {
+  aabb[0][0] = Math.floor(aabb[0][0] / CELL_RADIUS) * CELL_RADIUS
+  aabb[0][1] = Math.floor(aabb[0][1] / CELL_RADIUS) * CELL_RADIUS
+  aabb[1][0] = Math.floor(aabb[1][0] / CELL_RADIUS) * CELL_RADIUS
+  aabb[1][1] = Math.floor(aabb[1][1] / CELL_RADIUS) * CELL_RADIUS
+
+}
+
+function aabbRebuild(aabb) {
+  var lx = aabb[0][0]
+  var ly = aabb[0][1]
+  var ux = aabb[1][0]
+  var uy = aabb[1][1]
+
+
+  aabb[0][0] = Math.min(lx, ux)
+  aabb[0][1] = Math.min(ly, uy)
+  aabb[1][0] = Math.max(lx, ux)
+  aabb[1][1] = Math.max(ly, uy)
 }
 
 function growAABBByPoint(aabb, x, y) {
@@ -437,18 +599,19 @@ function computeIsectAABB(a, b) {
 
   const region = []
 
-
   a.points.forEach((cp, pi) => {
     const cn = a.points[(pi+1) % a.points.length]
 
-    if (cp[0] >= lx && cp[0] <= ux &&
-        cp[1] >= ly && cp[1] <= uy)
-    {
+    if (rectContainsPoint(b.points, cp)) {
       growAABBByPoint(regionAABB, cp[0], cp[1])
     }
 
-    aabbPoints.forEach((ap, ai) => {
-      const an = aabbPoints[(ai+1) % aabbPoints.length]
+    b.points.forEach((ap, ai) => {
+      const an = b.points[(ai+1) % b.points.length]
+
+      if (rectContainsPoint(a.points, ap)) {
+        growAABBByPoint(regionAABB, ap[0], ap[1])
+      }
 
       const r = segseg(
         cp[0], cp[1], cn[0], cn[1],
@@ -456,6 +619,9 @@ function computeIsectAABB(a, b) {
       )
 
       if (r && r !== true) {
+        // ctx.beginPath()
+        //   ctx.arc(r[0], r[1], 2, 0, Math.PI*2)
+        //   ctx.fill()
         growAABBByPoint(regionAABB, r[0], r[1])
       }
     })
@@ -465,18 +631,37 @@ function computeIsectAABB(a, b) {
   // inflate the regionAABB to cover full grid cells (world space)
   regionAABB[0][0] = Math.floor(regionAABB[0][0] / CELL_RADIUS) * CELL_RADIUS
   regionAABB[0][1] = Math.floor(regionAABB[0][1] / CELL_RADIUS) * CELL_RADIUS
-  regionAABB[1][0] = Math.round(regionAABB[1][0] / CELL_RADIUS) * CELL_RADIUS
-  regionAABB[1][1] = Math.round(regionAABB[1][1] / CELL_RADIUS) * CELL_RADIUS
+  regionAABB[1][0] = Math.ceil(regionAABB[1][0] / CELL_RADIUS) * CELL_RADIUS
+  regionAABB[1][1] = Math.ceil(regionAABB[1][1] / CELL_RADIUS) * CELL_RADIUS
 
-  ctx.strokeStyle = "green"
-  ctx.strokeRect(
-    regionAABB[0][0],
-    regionAABB[0][1],
-    regionAABB[1][0] - regionAABB[0][0],
-    regionAABB[1][1] - regionAABB[0][1]
-  )
+  // ctx.strokeStyle = "green"
+  // ctx.strokeRect(
+  //   regionAABB[0][0],
+  //   regionAABB[0][1],
+  //   regionAABB[1][0] - regionAABB[0][0],
+  //   regionAABB[1][1] - regionAABB[0][1]
+  // )
 
   return regionAABB
+}
+
+function inAABB(point, aabb) {
+  return aabb[0][0] <= point[0] && aabb[0][1] <= point[1] &&
+         aabb[1][0] >= point[0] && aabb[1][1] >= point[1]
+}
+
+function rectContainsPoint(points, point) {
+  var c = false;
+  var l = points.length
+  for (var i=1; i<=l; i++) {
+    var prev = points[i - 1]
+    var current = points[i%l]
+
+    ;((prev[1] <= point[1] && point[1] < current[1]) || (current[1] <= point[1] && point[1] < prev[1]))
+      && (point[0] < (current[0] - prev[0]) * (point[1] - prev[1]) / (current[1] - prev[1]) + prev[0])
+      && (c = !c)
+  }
+  return c;
 }
 
 function hsl(p, a) {
@@ -496,6 +681,7 @@ function square(mat, x, y, w, h) {
   tx(mat, x + w, y, lineTo)
   tx(mat, x, y, lineTo)
 }
+
 
 function txo(out, mat, vec) {
     vec2.transformMat3(out, vec, mat)
