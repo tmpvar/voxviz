@@ -15,9 +15,9 @@ const objects = []
 const mouse = [0, 100];
 const CELL_RADIUS = 10
 const moveable = createObject([0, 0], 0.0, [90, 50], CELL_RADIUS)
-// moveable.rot = Math.PI/4
+moveable.rot = Math.PI/4
 objects.push(createObject([0, 0], 0.0, [800, 20], CELL_RADIUS))
-objects[objects.length-1].rot = 0.4
+// objects[objects.length-1].rot = 0.4
 objects.push(moveable)
 objects.push(createObject([300, 90], 0.0, [200, 70], CELL_RADIUS))
 
@@ -162,15 +162,15 @@ function createObject(pos, rot, dims, cellRadius) {
 
     tick(force) {
       var dirty = false
-      //
-      // this.velocity[1] -= 0.01
-      //
-      // this.rot += this.angularVelocity;
-      // this.pos[0] += this.velocity[0];
-      // this.pos[1] += this.velocity[1];
-      //
-      // // TODO: don't limit on y
-      // this.pos[1] = Math.max(this.pos[1], 0)
+
+      this.velocity[1] -= 0.01
+
+      this.rot += this.angularVelocity;
+      this.pos[0] += this.velocity[0];
+      this.pos[1] += this.velocity[1];
+
+      // TODO: don't limit on y
+      this.pos[1] = Math.max(this.pos[1], 0)
 
       dirty = dirty || rot !== this.rot
       dirty = dirty || (pos[0] !== this.pos[0] || pos[1] !== this.pos[1])
@@ -347,7 +347,7 @@ function createObject(pos, rot, dims, cellRadius) {
               ctx.stroke()
             ctx.fillStyle = "#aaa"
             ctx.beginPath()
-              ctx.arc(aworld[0], aworld[1], .2, 0, Math.PI*2)
+              ctx.arc(aworld[0], aworld[1], 1.2, 0, Math.PI*2)
               ctx.fill()
 
             var delta = d - CELL_RADIUS * 2;
@@ -489,10 +489,13 @@ function collectParticles(object, aabb) {
   aabbRebuild(gridAABB)
 
   // TODO: ensure we flip these coords if they get reversed
-  const region = aabbIntersection(gridAABB, oaabb)
-
-  ctx.strokeStyle = "red"
   aabbToGridRadius(oaabb)
+  aabbToGridRadius(gridAABB)
+  const region = aabbIntersection(gridAABB, oaabb)
+  // aabbToGridRadius(region)
+  // aabbRebuild(region)
+  ctx.strokeStyle = "red"
+
   ctx.strokeRect(
     oaabb[0][0],
     oaabb[0][1],
@@ -501,18 +504,23 @@ function collectParticles(object, aabb) {
   )
 
   ctx.strokeStyle = "orange"
-  aabbToGridRadius(gridAABB)
+
   ctx.strokeRect(
-    gridAABB[0][0],
-    gridAABB[0][1],
-    gridAABB[1][0] - gridAABB[0][0],
-    gridAABB[1][1] - gridAABB[0][1]
+    -hdx,
+    -hdy,
+    object.dims[0],
+    object.dims[1]
+  )
+  ctx.strokeStyle = "yellow"
+  ctx.strokeRect(
+    region[0][0],
+    region[0][1],
+    region[1][0] - region[0][0],
+    region[1][1] - region[0][1]
   )
 
 
-
   ctx.strokeStyle = "green"
-  aabbToGridRadius(gridAABB)
   ctx.strokeRect(
     oaabb[0][0],
     oaabb[0][1],
@@ -522,6 +530,8 @@ function collectParticles(object, aabb) {
 
   ctx.strokeStyle = "white"
 
+  // aabbToGridRadius(region)
+  // aabbRebuild(region)
   ctx.beginPath()
     square(
       object.model,
@@ -532,8 +542,7 @@ function collectParticles(object, aabb) {
     )
     ctx.stroke()
 
-  aabbToGridRadius(region)
-  aabbRebuild(region)
+
 
   const cc = [0, 0]
   ctx.strokeStyle = "#fec"
@@ -545,7 +554,7 @@ function collectParticles(object, aabb) {
         [x, y],
         object.model
       )
-      ctx.moveTo(cc[0] + CELL_RADIUS/2.0 - 1, cc[1])
+      ctx.moveTo(cc[0], cc[1])
       ctx.arc(cc[0], cc[1], CELL_RADIUS/2 - 1, 0, Math.PI*2)
     }
   }
