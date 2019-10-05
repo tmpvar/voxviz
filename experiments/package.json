@@ -1,6 +1,6 @@
 {
  "dependencies": {
-  "ava": "^2.4.0",
+  "ava": "^1.4.1",
   "ctx-camera": "git+https://github.com/tmpvar/ctx-camera.git",
   "ctx-render-grid-lines": "^1.0.0",
   "ctx-translate-center": "^1.0.0",
