@@ -2,17 +2,18 @@ const ndarray = require('ndarray')
 
 module.exports = createGrid
 function createGrid(dims, cellRadius) {
-  cellRadius = cellRadius || 1
-  
+  cellRadius = 1//cellRadius || 1
+
   const grid = {
     dims: dims,
     data: ndarray([], dims),
+    get cellRadius() { return cellRadius },
     time: 1,
 
     set(pos, bodyId, timeDelta) {
       timeDelta = timeDelta || 1
-      const x = (pos[0] / cellRadius)|0
-      const y = (pos[1] / cellRadius)|0
+      const x = pos[0]|0
+      const y = pos[1]|0
 
       var v = this.data.get(x, y)
       if (v && v.object !== bodyId && this.time - v.time < timeDelta) {
@@ -27,8 +28,8 @@ function createGrid(dims, cellRadius) {
     },
 
     get(pos, objectId) {
-      const x = (pos[0] / cellRadius)|0
-      const y = (pos[1] / cellRadius)|0
+      const x = pos[0]|0
+      const y = pos[1]|0
 
       return this.data.get(x, y)
     },
@@ -64,8 +65,43 @@ function createGrid(dims, cellRadius) {
         }
         process.stdout.write('\n\n')
       }
+    },
+
+    render(ctx, timeDelta) {
+      ctx.save()
+      ctx.lineWidth = 0.1
+      ctx.strokeStyle = "#444"
+      for (var x=0; x<dims[0]; x++) {
+        for (var y=0; y<dims[1]; y++) {
+          ctx.strokeRect(
+            x + .1,
+            y + .1,
+            .98,
+            .98
+          )
+
+          var v = this.data.get(x, y)
+          if (v) {
+            var dt = this.time - v.time
+            if (dt < timeDelta) {
+              ctx.fillStyle = hsl(1.0 - Math.min(1.0, 1.0 - dt/timeDelta) * 0.7)
+              ctx.fillRect(
+                x + .2,
+                y + .2,
+                0.9,
+                0.9
+              )
+            }
+          }
+        }
+      }
+      ctx.restore()
     }
   }
 
   return grid
+}
+
+function hsl(p, a) {
+  return `hsla(${p*360}, 100%, 46%, ${a||1})`
 }

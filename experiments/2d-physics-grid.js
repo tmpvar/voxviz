@@ -95,7 +95,7 @@ function createOccupancyGrid(dims) {
           if (v) {
             var dt = this.time - v.time
 
-            if (dt <= this.timeDelta) {
+            if (dt < this.timeDelta) {
               ctx.fillStyle = hsl(1.0 - Math.min(1.0, 1.0 - dt/this.timeDelta) * 0.7)
               ctx.fillRect(
                 x * this.cellRadius + 3,
