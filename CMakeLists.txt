@@ -17,6 +17,29 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(deps/glfw)
 
+#find_package(bullet REQUIRED)
+set(BUILD_CPU_DEMOS OFF CACHE BOOL "" FORCE)
+set(BUILD_BULLET2_DEMOS OFF CACHE BOOL "" FORCE)
+set(BUILD_OPENGL3_DEMOS OFF CACHE BOOL "" FORCE)
+set(USE_GRAPHICAL_BENCHMARK OFF CACHE BOOL "" FORCE)
+set(BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
+set(USE_MSVC_AVX ON CACHE BOOL "" FORCE)
+set(INSTALL_LIBS OFF CACHE BOOL "" FORCE)
+add_definitions(-DBT_ENABLE_PROFILE=1)
+
+
+add_subdirectory(deps/bullet3)
+set(BULLET_INCLUDE_DIRS "deps/bullet3/src")
+
+list (APPEND BULLET_LIBRARIES LinearMath)
+list (APPEND BULLET_LIBRARIES Bullet3Common)
+list (APPEND BULLET_LIBRARIES BulletInverseDynamics)
+list (APPEND BULLET_LIBRARIES BulletCollision)
+list (APPEND BULLET_LIBRARIES BulletDynamics)
+list (APPEND BULLET_LIBRARIES BulletSoftBody)
+
+
 add_compile_definitions(GLM_ENABLE_EXPERIMENTAL=1 NOMINMAX=1)
 
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
@@ -35,9 +58,8 @@ include_directories(
   deps/imgui
   deps/imgui/examples
   deps/stb
+	${BULLET_INCLUDE_DIRS}
 )
-
-
 
 ENABLE_TESTING()
 ADD_SUBDIRECTORY( test )
@@ -76,6 +98,11 @@ add_executable(
   src/fullscreen-surface.cpp
   include/fullscreen-surface.h
 
+  # physics
+  include/voxviz/physics.h
+  include/voxviz/physics/broadphase-grid.h
+
+
   ${SHADER_FILES}
 
   #imgui
@@ -94,16 +121,17 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT v
 
 source_group("shaders" FILES ${SHADER_FILES})
 
-add_dependencies(voxviz shaders_out)
+add_dependencies(voxviz shaders_out ${BULLET_LIBRARIES})
 add_definitions(-DGPU_HOST=1)
 
-
+message(STATUS "bullet libs ${BULLET_LIBRARIES}")
 target_link_libraries(
   voxviz
   glfw
   uv_a
   ${OPENGL_gl_LIBRARY}
   ${OPENCL_LIBRARIES}
+  ${BULLET_LIBRARIES}
  )
 
 file(COPY img DESTINATION ${CMAKE_BINARY_DIR})

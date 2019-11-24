@@ -33,6 +33,9 @@
 #include <string.h>
 #include <queue>
 #include <map>
+#include <ctime>
+#include <ratio>
+#include <chrono>
 
 
 bool keys[1024];
@@ -253,7 +256,6 @@ int main(void) {
     256 * 32
   );
 
-  vector <Model *>scene;
 
   if (false) {
     float instances = 8.0;
@@ -276,7 +278,7 @@ int main(void) {
             m->dims.z + z*(m->dims.z)
           )
         );
-        scene.push_back(m);
+        physics->addModel(m);
       }
     }
   } else {
@@ -289,7 +291,7 @@ int main(void) {
       m->matrix,
       vec3(50, 0, 0)
     );
-    scene.push_back(m);
+    physics->addModel(m, true);
 
     m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
     if (m == nullptr) {
@@ -300,7 +302,7 @@ int main(void) {
       m->matrix,
       vec3(176, 0, 0)
     );
-    scene.push_back(m);
+    physics->addModel(m, true);
 
 
     m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
@@ -312,7 +314,7 @@ int main(void) {
       m->matrix,
       vec3(302, 0, 0)
     );
-    scene.push_back(m);
+    physics->addModel(m, true);
 
     m = Model::New("E:\\gfx\\voxviz\\img\\models\\track\\straight-horizontal.vox");
     if (m == nullptr) {
@@ -323,8 +325,7 @@ int main(void) {
       m->matrix,
       vec3(428, 0, 0)
     );
-    scene.push_back(m);
-
+    physics->addModel(m, true);
 
     Model *car = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
     if (car == nullptr) {
@@ -333,9 +334,9 @@ int main(void) {
 
     car->matrix = translate(
       car->matrix,
-      vec3(100, 6, 21)
+      vec3(100, 100, 21)
     );
-    scene.push_back(car);
+    physics->addModel(car);
 
     for (float x = 50 + 63; x < 554; x+=126) {
 
@@ -348,7 +349,7 @@ int main(void) {
         light->matrix,
         vec3(x, 4, 15)
       );
-      scene.push_back(light);
+      physics->addModel(light, true);
     }
 
 
@@ -370,6 +371,11 @@ int main(void) {
   glm::vec3 characterPos(20.0);
   int lastCharacterTime = -1;
   glm::vec3 lastCharacterPos(20.0);
+
+
+  std::srand(std::time(nullptr));
+
+
   while (!glfwWindowShouldClose(window)) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -391,6 +397,41 @@ int main(void) {
     double nowTime = glfwGetTime();
     deltaTime = nowTime - lastTime;
     lastTime = nowTime;
+
+    // tick physics
+    {
+      // add more cars
+      {
+        static double lastSpawn = 0;
+        static float offset = 10;
+        if (keys[GLFW_KEY_2] && nowTime - lastSpawn > 0.01) {
+          lastSpawn = nowTime;
+          Model *car = Model::New("E:\\gfx\\voxviz\\img\\models\\car.vox");
+          if (car == nullptr) {
+            return 1;
+          }
+
+          car->matrix = translate(
+            car->matrix,
+            vec3(100.0 + offset, 100, 75)
+          );
+
+          offset = glm::mod(offset + 10.0f, 50.0f);
+          physics->addModel(car);
+        }
+      }
+
+      chrono::high_resolution_clock::time_point t1 = chrono::high_resolution_clock::now();
+      physics->tick(deltaTime * 10.0);
+      chrono::high_resolution_clock::time_point t2 = chrono::high_resolution_clock::now();
+      chrono::duration<double> time_span = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+
+      ImGui::Text("physics: %.3fms", time_span.count() * 1000.0f);
+
+      if (keys[GLFW_KEY_P] && !prevKeys[GLFW_KEY_P]) {
+        physics->debugProfile();
+      }
+    }
 
     // Handle inputs
     {
@@ -548,7 +589,7 @@ int main(void) {
         ->textureImage("worldSpaceVoxelTexture", voxelSpaceTexture)
         ->uniformVec3ui("worldSpaceDims", voxelSpaceSSBO->dims());
 
-      for (auto &m : scene) {
+      for (auto &m : physics->models) {
         if (keys[GLFW_KEY_SPACE]) {
           m->matrix = glm::rotate(m->matrix, 0.005f, vec3(0.0f, 1.0f, 0.0f));
         }
@@ -610,7 +651,7 @@ int main(void) {
           ->uniformVec3("eye", currentEye)
           ->uniformVec2ui("resolution", resolution);
 
-        for (auto &m:scene) {
+        for (auto &m : physics->models) {
           m->render(voxelMeshProgram, VP);
         }
       }

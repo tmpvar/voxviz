@@ -30,6 +30,70 @@ class VOXModel {
       free(this->buffer);
     }
   }
+
+  u32 voxelIndex(uvec3 pos) {
+    // TODO: use morton order
+    return (
+      pos.x +
+      pos.y * this->dims.x +
+      pos.z * this->dims.x * this->dims.y
+    );
+  }
+
+  void setVoxel(uvec3 pos, u8 val) {
+    if (glm::any(glm::greaterThanEqual(pos, this->dims))) {
+      return;
+    }
+    this->buffer[this->voxelIndex(pos)] = val;
+  }
+
+  u8 getVoxel(uvec3 pos) {
+    if (glm::any(glm::greaterThanEqual(pos, this->dims))) {
+      return 0;
+    }
+    return this->buffer[this->voxelIndex(pos)];
+  }
+
+  bool oob(ivec3 pos) {
+    if (glm::any(glm::greaterThanEqual(pos, ivec3(this->dims)))) {
+      return true;
+    }
+
+    if (glm::any(glm::lessThan(pos, ivec3(0)))) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool visible(uvec3 pos) {
+    if (pos.x == 0 || pos.y == 0 || pos.z == 0) {
+      return true;
+    }
+
+    ivec3 p = ivec3(pos);
+    for (int d = 0; d < 3; d++) {
+      ivec3 l(0, 0, 0);
+      ivec3 u(0, 0, 0);
+
+      l[d] = -1;
+      u[d] = 1;
+
+      l += p;
+      u += p;
+
+      if (oob(l) || !this->getVoxel(l)) {
+        return true;
+      }
+
+      if (oob(u) || !this->getVoxel(u)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
 };
 
 class VOXParser {
@@ -130,17 +194,7 @@ public:
           // swap y and z axes
           glm::uvec3 pos = glm::uvec3(val[0], val[2], val[1]);
 
-          if (glm::any(glm::greaterThanEqual(pos, vox->dims))) {
-            continue;
-          }
-          // TODO: use morton order
-          uint64_t idx = (
-            pos.x +
-            pos.y * vox->dims.x +
-            pos.z * vox->dims.x * vox->dims.y
-          );
-
-          vox->buffer[idx] = val[3];
+          vox->setVoxel(pos, val[3]);
         }
       }
       else {

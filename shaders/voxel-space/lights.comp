@@ -286,6 +286,42 @@ uint traceLight2(vec3 pos, vec3 light_pos, vec3 light_col, inout vec3 acc, vec3 
   return 0;
 }
 
+// greyscale coloring
+
+void main1() {
+  ivec2 tx = ivec2(gl_GlobalInvocationID.xy);
+  uint color_idx = (
+    uint(tx.x) +
+    uint(tx.y) * resolution.x
+  );
+
+  colors[color_idx] = vec4(0.0);
+  float depth = texelFetch(gBufferDepth, tx, 0).x;
+  vec3 normal = (texelFetch(gBufferNormal, tx, 0).xyz - 0.5) * 2.0;
+  vec4 color = texelFetch(gBufferColor, tx, 0);
+  vec3 pos = texelFetch(gBufferPosition, tx, 0).xyz * vec3(volumeSlabDims);
+
+  if (oob(pos)) {
+    colors[color_idx] = vec4(0.1, 0.1, 0.1, 0.0);
+    return;
+  }
+
+  if (depth >= 1.0) {
+    return;
+  }
+
+  if (normal.y != 0) {
+    colors[color_idx] = vec4(0.80);// * color;
+  }
+  if (normal.x != 0) {
+    colors[color_idx] = vec4(0.60);// * color;
+  }
+  if (normal.z != 0) {
+    colors[color_idx] = vec4(0.40);// * color;
+  }
+
+}
+
 void main() {
   ivec2 tx = ivec2(gl_GlobalInvocationID.xy);
   uint color_idx = (
@@ -300,6 +336,7 @@ void main() {
   vec3 pos = texelFetch(gBufferPosition, tx, 0).xyz * vec3(volumeSlabDims);
 
   if (oob(pos)) {
+    colors[color_idx] = vec4(0.1, 0.1, 0.1, 0.0);
     return;
   }
 
@@ -353,12 +390,12 @@ void main() {
     //   continue;
     // }
 
-    // contribs += traceLight0(p, light_pos, light_col, acc, normal);
+    contribs += traceLight0(p, light_pos, light_col, acc, normal);
     float intensity = traceMine(p + normal * pp * 2.0, light_pos);
     acc += intensity * light_col;
   }
 
   acc /= float(contribs);
 
-  colors[color_idx] = vec4(acc, 1.0);// * color;
+  colors[color_idx] = vec4(abs(normal), 1.0);//vec4(0.1 + acc, 1.0) * color;
 }

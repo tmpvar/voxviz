@@ -1122,6 +1122,10 @@ public:
     return this;
   }
 
+  Mesh* vert(vec3 v) {
+    return this->vert(v.x, v.y, v.z);
+  }
+
   Mesh* normal(float x, float y, float z) {
     this->normals.push_back(x);
     this->normals.push_back(y);

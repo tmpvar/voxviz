@@ -50,14 +50,36 @@ class Model {
     memcpy(buf, this->vox->buffer, total_bytes);
     this->data->endMap();
 
-
     unsigned int gBuffer;
     glGenFramebuffers(1, &gBuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
     unsigned int gPosition, gNormal, gColorSpec;
+  }
 
+  bool visible(u32 x, u32 y, u32 z) {
 
+    // edge voxels are always visible
+    if (!x || !y || !z) {
+      return true;
+    }
 
+    for (u32 d = 0; d < 2; d++) {
+      uvec3 lowerIndex(x, y, z);
+      lowerIndex[d] -= 1;
+      u8 lowerValue = this->vox->getVoxel(lowerIndex);
+      if (!lowerValue) {
+        return true;
+      }
+
+      uvec3 upperIndex(x, y, z);
+      upperIndex[d] -= 1;
+      u8 upperValue = this->vox->getVoxel(upperIndex);
+      if (!upperValue) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
 public:
@@ -82,6 +104,10 @@ public:
       return nullptr;
     }
     return new Model(vox);
+  }
+
+  vec3 getPosition() {
+    return this->matrix[3];
   }
 
   void render(Program *program, mat4 VP) {
