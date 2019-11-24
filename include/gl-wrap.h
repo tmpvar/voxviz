@@ -17,6 +17,7 @@
 #include <string>
 #include <fstream>
 #include <streambuf>
+#include <sstream>
 #include <imgui.h>
 
 #include <glm/glm.hpp>
@@ -29,9 +30,9 @@
 using namespace std;
 
 #ifndef DISABLE_GL_ERROR
-  #define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); DebugBreak(); exit(1);}
+#define gl_error() if (GL_ERROR()) { printf(" at " __FILE__ ":%d\n",__LINE__); DebugBreak(); exit(1);}
 #else
-  #define gl_error() do {} while(0)
+#define gl_error() do {} while(0)
 #endif
 
 static map<string, string> shaderLogs;
@@ -74,6 +75,13 @@ static const char *shader_type(GLuint type) {
   return "Unknown";
 }
 
+struct ShaderFileLine {
+  string file;
+  size_t line;
+  size_t lineCount;
+  size_t skipLines;
+};
+
 class Shader {
   bool valid = false;
 public:
@@ -97,7 +105,11 @@ public:
 
   bool reload() {
     this->valid = true;
-    std::cout << "reloading shader: " << this->name << std::endl;
+    std::cout << "reloading shader: "
+      << this->name
+      << " (" << this->filename << ")"
+      << std::endl;
+
     std::ifstream t(this->filename);
     std::string str;
 
@@ -123,15 +135,96 @@ public:
 
     GLint isCompiled = 0;
     glGetShaderiv(new_handle, GL_COMPILE_STATUS, &isCompiled);
-    
+
     if (!isCompiled) {
       GLint l, m;
       glGetShaderiv(new_handle, GL_INFO_LOG_LENGTH, &m);
       char *s = (char *)malloc(m * sizeof(char));
       glGetShaderInfoLog(new_handle, m, &l, s);
       cout << this->name << "failed to compile" << endl
-           << s << endl;
-      shaderLogs[this->name] = string(s);
+        << s << endl;
+
+      // compute the line the error occurred on
+      std::stringstream errorLogStream(s);
+      stringstream sourceStream(str);
+      string findFile = "// start: ";
+      string errorLine;
+      stringstream fileLog;
+      while (std::getline(errorLogStream, errorLine, '\n')) {
+        string sourceLine;
+        string currentFile = "";
+        size_t fileStartLine = 0;
+        size_t currentLine = 1;
+        size_t absoluteSourceLine = 1;
+
+        size_t rawErrorLine = 0;
+
+        size_t startingParenLoc = errorLine.find("(");
+        if (startingParenLoc == string::npos) {
+          cout << "could not parse gl error line: " << errorLine << endl;
+          continue;
+        }
+        startingParenLoc += 1;
+
+        // here we assume that errors are of the form 0(<line>) <message>
+        size_t endingParenLoc = errorLine.substr(startingParenLoc).find(")");
+        if (endingParenLoc == string::npos) {
+          cout << "could not parse gl error line: " << errorLine << endl;
+          continue;
+        }
+
+        rawErrorLine = stoul(errorLine.substr(startingParenLoc, endingParenLoc));
+
+        cout << "error line: " << rawErrorLine << endl;
+        sourceStream.seekg(0);
+
+        vector<ShaderFileLine> file_stack;
+
+        while (std::getline(sourceStream, sourceLine, '\n')) {
+          absoluteSourceLine++;
+          size_t fileCommentLoc = sourceLine.find(findFile);
+          if (fileCommentLoc != string::npos) {
+            currentFile = sourceLine.substr(fileCommentLoc + findFile.length());
+            ShaderFileLine l;
+            l.file = currentFile;
+            l.line = absoluteSourceLine;
+            l.lineCount = 0;
+            l.skipLines = 0;
+            file_stack.push_back(l);
+          }
+
+          if (absoluteSourceLine == rawErrorLine) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+            fileLog << "^ " << errorLine.substr(5 + endingParenLoc) << endl;
+          }
+
+          if (absoluteSourceLine == rawErrorLine + 1) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+            break;
+          }
+
+          if (sourceLine.find("// end: " + file_stack.back().file) != string::npos) {
+            size_t skipLines = file_stack.back().lineCount + file_stack.back().skipLines;
+            file_stack.pop_back();
+            if (file_stack.size() == 0) {
+              continue;
+            }
+            file_stack.back().skipLines += skipLines;
+
+            if (absoluteSourceLine == rawErrorLine - 1) {
+              fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines)
+                << " #include \""
+                << file_stack.back().file
+                << "\"" << endl;
+            }
+          }
+          else if (absoluteSourceLine == rawErrorLine - 1) {
+            fileLog << absoluteSourceLine - (file_stack.back().line + file_stack.back().skipLines) << " " << sourceLine << endl;
+          }
+          file_stack.back().lineCount++;
+        }
+      }
+      shaderLogs[this->name] = fileLog.str();
       free(s);
       gl_shader_log(new_handle);
       this->valid = false;
@@ -159,6 +252,9 @@ class SSBO {
   GLsizeiptr total_bytes = 0;
   GLuint handle = 0;
   bool mapped = false;
+  uvec3 _dims = uvec3(0);
+  GLbitfield _flags = GL_STATIC_DRAW;
+  bool _persistent = false;
 public:
 
   const enum MAP_TYPE {
@@ -167,13 +263,41 @@ public:
     MAP_WRITE_ONLY = GL_WRITE_ONLY,
   };
 
-  SSBO(uint64_t bytes) {
+  SSBO(uint64_t bytes, bool persistent = false) {
+    this->_persistent = persistent;
+    if (persistent) {
+      this->_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
+    }
     this->resize(bytes);
   }
 
+  SSBO(uint64_t bytes, uvec3 dims, bool persistent = false) {
+    this->_persistent = persistent;
+    if (persistent) {
+      this->_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT;
+    }
+    this->resize(bytes, dims);
+  }
+
+  SSBO *resize(uint64_t bytes, uvec3 dims) {
+    if (glm::all(glm::equal(dims, this->_dims)) && this->total_bytes == bytes) {
+      return this;
+    }
+
+    this->_dims = dims;
+    this->resize(bytes);
+    return this;
+  }
+
   SSBO *resize(uint64_t bytes) {
-    std::cout << "creating SSBO with " << bytes << " bytes" << endl;
-    
+    // TODO: what do we do if we're mapped?
+    if (this->_dims.x > 0) {
+      std::cout << "creating SSBO with " << bytes << " bytes; dims:" << this->_dims.x << ", " << this->_dims.y << ", " << this->_dims.z << endl;
+    }
+    else {
+      std::cout << "creating SSBO with " << bytes << " bytes" << endl;
+    }
+
     if (this->total_bytes != 0 && bytes != this->total_bytes && this->handle != 0) {
       glDeleteBuffers(1, &this->handle);
     }
@@ -182,11 +306,16 @@ public:
       return this;
     }
 
-    
-
     glGenBuffers(1, &this->handle); gl_error();
     this->bind();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, GL_DYNAMIC_DRAW); gl_error();
+    if (this->_persistent) {
+      glBufferStorage(GL_SHADER_STORAGE_BUFFER, bytes, NULL, this->_flags);
+    }
+    else {
+      glBufferData(GL_SHADER_STORAGE_BUFFER, bytes, NULL, this->_flags);
+    }
+
+    gl_error();
     this->unbind();
 
     this->total_bytes = bytes;
@@ -200,34 +329,65 @@ public:
 
     this->bind();
     void *out = glMapBuffer(GL_SHADER_STORAGE_BUFFER, m); gl_error();
-    this->unbind();
+    //this->unbind();
+    this->mapped = true;
+    return out;
+  }
+
+  void *beginMapPersistent() {
+    if (this->total_bytes == 0) {
+      return nullptr;
+    }
+
+    GLuint access = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+
+    this->bind();
+    void *out = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this->total_bytes, access);
+    gl_error();
+
     this->mapped = true;
     return out;
   }
 
   void endMap() {
-    if (this->total_bytes == 0 || !this->mapped || this->handle == 0) {
+    if (!this->mapped || this->handle == 0) {
       return;
     }
     this->bind();
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER); gl_error();
-    this->unbind();
+    //this->unbind();
     this->mapped = false;
   }
 
-  GLuint bind() {
+  GLuint bind(GLuint type = GL_SHADER_STORAGE_BUFFER) {
     if (this->handle != 0) {
-      glBindBuffer(GL_SHADER_STORAGE_BUFFER, this->handle); gl_error();
+      glBindBuffer(type, this->handle); gl_error();
     }
     return this->handle;
   }
 
-  void unbind() {
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0); gl_error();
+  void unbind(GLuint type = GL_SHADER_STORAGE_BUFFER) {
+    glBindBuffer(type, 0); gl_error();
   }
 
   size_t size() {
     return this->total_bytes;
+  }
+
+  uvec3 dims() {
+    return this->_dims;
+  }
+
+  SSBO *clear(uint8_t val) {
+    this->bind();
+    glClearBufferData(
+      GL_SHADER_STORAGE_BUFFER,
+      GL_R8,
+      GL_RED,
+      GL_UNSIGNED_BYTE,
+      &val
+    );
+    return this;
   }
 };
 
@@ -235,6 +395,76 @@ struct SSBOBinding {
   GLint block_index;
 };
 
+class Timer {
+  GLuint query;
+  double elapsed_time;
+  bool done = false;
+  bool started = 0;
+  string name;
+public:
+
+  Timer() {
+    glGenQueries(1, &this->query);
+  }
+
+  ~Timer() {
+    glDeleteQueries(1, &this->query);
+  }
+
+  Timer *begin(const char *name) {
+    this->done = false;
+    this->name = string(name);
+    glBeginQuery(GL_TIME_ELAPSED, this->query);
+    this->started = true;
+    return this;
+  }
+
+  Timer *end() {
+    glEndQuery(GL_TIME_ELAPSED);
+    return this;
+  }
+
+  bool isComplete() {
+    if (!this->started) {
+      return true;
+    }
+
+    GLint isDone = 0;
+    glGetQueryObjectiv(
+      this->query,
+      GL_QUERY_RESULT_AVAILABLE,
+      &isDone
+    );
+
+    if (isDone == 1) {
+      this->done = true;
+      GLuint64 time;
+      glGetQueryObjectui64v(
+        query,
+        GL_QUERY_RESULT,
+        &time
+      );
+
+      this->elapsed_time = double(time) / 1000000.0;
+    }
+
+    return this->done;
+  }
+
+  Timer *waitUntilComplete() {
+    if (this->started && !this->done) {
+      while (!this->isComplete()) {}
+    }
+    return this;
+  }
+
+  Timer *debug() {
+    if (this->done) {
+      ImGui::Text("%s: %.3f.ms", this->name.c_str(), this->elapsed_time);
+    }
+    return this;
+  }
+};
 
 class Program {
   map<string, GLint> uniforms;
@@ -256,10 +486,18 @@ public:
     this->valid = true;
   }
 
+  static Program *New() {
+    return new Program();
+  }
+
   ~Program() {
     if (glIsProgram(this->handle)) {
       glDeleteProgram(this->handle);
     }
+  }
+
+  bool isValid() {
+    return this->valid;
   }
 
   GLint uniformLocation(string name) {
@@ -294,7 +532,7 @@ public:
         std::cout << "resourceIndex returned invalid enum for: " << name << std::endl;
         return ret;
       }
-      
+
       if (ret == GL_INVALID_INDEX) {
         std::cout << "resourceIndex returned invalid index for: " << name << std::endl;
         return ret;
@@ -311,6 +549,10 @@ public:
   }
 
   Program *add(Shader *shader) {
+    if (shader == nullptr) {
+      this->valid = false;
+      return this;
+    }
     this->shader_versions.insert(std::make_pair(shader, (size_t)shader->version));
     this->compositeName += shader->name + " ";
 
@@ -333,14 +575,16 @@ public:
       return this;
     }
 
-    std::cout << "linking" << this->compositeName << std::endl;
+    std::cout << "linking " << this->compositeName << std::endl;
     glLinkProgram(this->handle);
     gl_program_log(this->handle);
     gl_error();
 
     if (this->isCompute) {
       glGetProgramiv(this->handle, GL_COMPUTE_WORK_GROUP_SIZE, &this->local_layout[0]);
-      gl_error();
+      if (GL_ERROR()) {
+        this->valid = false;
+      }
     }
     return this;
   }
@@ -355,7 +599,7 @@ public:
     this->outputs.clear();
     this->uniforms.clear();
     this->ssbos.clear();
-    
+
     this->handle = glCreateProgram();
     this->compositeName = "";
     this->valid = true;
@@ -380,9 +624,13 @@ public:
   }
 
   Program *use() {
-    #ifdef SHADER_HOTRELOAD
+#ifdef SHADER_HOTRELOAD
     for (auto& it : this->shader_versions) {
       Shader *shader = it.first;
+      if (shader == nullptr) {
+        this->valid = false;
+        return this;
+      }
       size_t version = it.second;
       if (version != shader->version) {
         std::cout << "rebuild program before use: " << this->compositeName << std::endl;
@@ -391,7 +639,7 @@ public:
         break;
       }
     }
-    #endif
+#endif
 
     if (!this->valid) {
       return this;
@@ -594,6 +842,11 @@ public:
       return this;
     }
 
+    if (ssbo == nullptr) {
+      cout << "unable to bind ssbo because it was null. name: " << name << endl;
+      return this;
+    }
+
     GLint ri = this->resourceIndex(name, GL_SHADER_STORAGE_BLOCK);
 
     if (ri == GL_INVALID_ENUM) {
@@ -616,7 +869,7 @@ public:
     else {
       idx = this->ssbos[name];
     }
-  
+
     GLuint ssbo_handle = ssbo->bind();
     if (ssbo_handle != 0) {
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, idx, ssbo_handle); gl_error();
@@ -626,7 +879,7 @@ public:
   }
 
 
-  Program *compute(glm::uvec3 dims) {
+  Program *compute(glm::uvec3 dims, SSBO *indirect = nullptr) {
     this->use();
     if (!this->valid) {
       return this;
@@ -653,33 +906,64 @@ public:
     return this;
   }
 
-  Program *timedCompute(const char *str, glm::uvec3 dims) {
+  Program *timedCompute(const char *str, glm::uvec3 dims, SSBO *indirect = nullptr) {
     if (!this->valid) {
       return this;
     }
 
-    #ifdef DISABLE_DEBUG_GL_TIMED_COMPUTE
-      return this->compute(dims);
-    #else
-      GLuint query;
-      GLuint64 elapsed_time;
-      GLint done = 0;
-      glGenQueries(1, &query);
-      glBeginQuery(GL_TIME_ELAPSED, query);
+#ifdef DISABLE_DEBUG_GL_TIMED_COMPUTE
+    return this->compute(dims);
+#else
+    GLuint query;
+    GLuint64 elapsed_time;
+    GLint done = 0;
+    glGenQueries(1, &query);
+    glBeginQuery(GL_TIME_ELAPSED, query);
 
-      this->compute(dims);
+    this->compute(dims);
 
-      glEndQuery(GL_TIME_ELAPSED);
-      while (!done) {
-        glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
-      }
+    glEndQuery(GL_TIME_ELAPSED);
+    while (!done) {
+      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+    }
 
-      // get the query result
-      glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
-      ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
-      glDeleteQueries(1, &query);
+    // get the query result
+    glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+    ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+    glDeleteQueries(1, &query);
+    return this;
+#endif
+  }
+
+  Program *timedIndirectCompute(const char *str, SSBO *indirect) {
+    if (!this->valid || indirect == nullptr) {
       return this;
-    #endif
+    }
+
+    indirect->bind(GL_DISPATCH_INDIRECT_BUFFER);
+#ifndef DISABLE_DEBUG_GL_TIMED_COMPUTE
+    GLuint query;
+    GLuint64 elapsed_time;
+    GLint done = 0;
+    glGenQueries(1, &query);
+    glBeginQuery(GL_TIME_ELAPSED, query);
+#endif
+
+    glDispatchComputeIndirect(0);
+    gl_error();
+
+#ifndef DISABLE_DEBUG_GL_TIMED_COMPUTE
+    glEndQuery(GL_TIME_ELAPSED);
+    while (!done) {
+      glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &done);
+    }
+
+    // get the query result
+    glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed_time);
+    ImGui::Text("%s: %.3f.ms", str, elapsed_time / 1000000.0);
+    glDeleteQueries(1, &query);
+#endif
+    return this;
   }
 };
 
