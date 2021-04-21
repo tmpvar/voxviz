@@ -1,11 +1,11 @@
 #define GLM_FORCE_EXPLICIT_CTOR
-#include <glm/ext/vector_relational.hpp>
-#include <glm/common.hpp>
 #include <glm/gtc/constants.hpp>
-#include <glm/gtc/vec1.hpp>
 #include <glm/gtc/random.hpp>
-#include <glm/ivec4.hpp>
-#include <glm/dvec4.hpp>
+#include <glm/gtc/vec1.hpp>
+#include <glm/ext/scalar_relational.hpp>
+#include <glm/ext/vector_relational.hpp>
+#include <glm/ext/vector_float1.hpp>
+#include <glm/common.hpp>
 #include <glm/vec4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec2.hpp>
@@ -276,6 +276,8 @@ namespace min_
 		int Error = 0;
 
 		glm::vec1 A0 = glm::min(glm::vec1(1), glm::vec1(1));
+		bool A1 = glm::all(glm::equal(A0, glm::vec1(1), glm::epsilon<float>()));
+		Error += A1 ? 0 : 1;
 
 		glm::vec2 B0 = glm::min(glm::vec2(1), glm::vec2(1));
 		glm::vec2 B1 = glm::min(glm::vec2(1), 1.0f);
@@ -359,6 +361,9 @@ namespace max_
 		int Error = 0;
 
 		glm::vec1 A0 = glm::max(glm::vec1(1), glm::vec1(1));
+		bool A1 = glm::all(glm::equal(A0, glm::vec1(1), glm::epsilon<float>()));
+		Error += A1 ? 0 : 1;
+
 
 		glm::vec2 B0 = glm::max(glm::vec2(1), glm::vec2(1));
 		glm::vec2 B1 = glm::max(glm::vec2(1), 1.0f);
@@ -1298,10 +1303,10 @@ static int test_constexpr()
 {
 #if GLM_HAS_CONSTEXPR
 	static_assert(glm::abs(1.0f) > 0.0f, "GLM: Failed constexpr");
-	static_assert(glm::abs(glm::vec1(1.0f)) != glm::vec1(0.0f), "GLM: Failed constexpr");
-	static_assert(glm::abs(glm::vec2(1.0f)) != glm::vec2(0.0f), "GLM: Failed constexpr");
-	static_assert(glm::abs(glm::vec3(1.0f)) != glm::vec3(0.0f), "GLM: Failed constexpr");
-	static_assert(glm::abs(glm::vec4(1.0f)) != glm::vec4(0.0f), "GLM: Failed constexpr");
+	constexpr glm::vec1 const A = glm::abs(glm::vec1(1.0f));
+	constexpr glm::vec2 const B = glm::abs(glm::vec2(1.0f));
+	constexpr glm::vec3 const C = glm::abs(glm::vec3(1.0f));
+	constexpr glm::vec4 const D = glm::abs(glm::vec4(1.0f));
 #endif // GLM_HAS_CONSTEXPR
 
 	return 0;

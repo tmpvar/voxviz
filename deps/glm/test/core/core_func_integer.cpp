@@ -1,11 +1,15 @@
 #include <glm/integer.hpp>
 #include <glm/vector_relational.hpp>
-#include <glm/ivec2.hpp>
-#include <glm/ivec3.hpp>
-#include <glm/ivec4.hpp>
-#include <glm/uvec2.hpp>
-#include <glm/uvec3.hpp>
-#include <glm/uvec4.hpp>
+#include <glm/ext/vector_int1.hpp>
+#include <glm/ext/vector_int2.hpp>
+#include <glm/ext/vector_int3.hpp>
+#include <glm/ext/vector_int4.hpp>
+#include <glm/ext/vector_uint1.hpp>
+#include <glm/ext/vector_uint2.hpp>
+#include <glm/ext/vector_uint3.hpp>
+#include <glm/ext/vector_uint4.hpp>
+#include <glm/ext/scalar_int_sized.hpp>
+#include <glm/ext/scalar_uint_sized.hpp>
 #include <vector>
 #include <ctime>
 #include <cstdio>
@@ -37,9 +41,9 @@ namespace bitfieldInsert
 		{0x00000000, 0xffffffff,  0, 32, 0xffffffff},
 		{0x00000000, 0xffffffff,  0, 31, 0x7fffffff},
 		{0x00000000, 0xffffffff,  0,  0, 0x00000000},
-		{0xff000000, 0x0000ff00,  8,  8, 0xff00ff00},
-		{0xffff0000, 0x0000ffff, 16, 16, 0x00000000},
-		{0x0000ffff, 0xffff0000, 16, 16, 0xffffffff}
+		{0xff000000, 0x000000ff,  8,  8, 0xff00ff00},
+		{0xffff0000, 0xffff0000, 16, 16, 0x00000000},
+		{0x0000ffff, 0x0000ffff, 16, 16, 0xffffffff}
 	};
 
 	static int test()

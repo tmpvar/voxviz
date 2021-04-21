@@ -38,7 +38,7 @@ public:
     bool out = true;
     out = out && this->toolBrick == next->toolBrick;
     out = out && this->stockBrick == next->stockBrick;
-    out = out && glm::all(glm::equal(this->stockToTool, next->stockToTool));
+    out = out && memcmp(&this->stockToTool, &next->stockToTool, sizeof(glm::mat4)) == 0;
     for (int i = 0; i < 8 && out == true; i++) {
       out = out && glm::all(glm::equal(this->toolVerts[i], next->toolVerts[i]));
     }
@@ -82,11 +82,11 @@ static bool collisionAABBvOBB(const glm::vec3 aabb[8], const glm::vec3 obb[8]) {
       auto aabbProjection = glm::dot(axis, aabb[cornerIdx]);
       auto obbProjection = glm::dot(axis, obb[cornerIdx]);
 
-      resultIntervals[0].x = min(resultIntervals[0].x, aabbProjection);
-      resultIntervals[0].y = max(resultIntervals[0].y, aabbProjection);
+      resultIntervals[0].x = glm::min(resultIntervals[0].x, aabbProjection);
+      resultIntervals[0].y = glm::max(resultIntervals[0].y, aabbProjection);
 
-      resultIntervals[1].x = min(resultIntervals[1].x, obbProjection);
-      resultIntervals[1].y = max(resultIntervals[1].y, obbProjection);
+      resultIntervals[1].x = glm::min(resultIntervals[1].x, obbProjection);
+      resultIntervals[1].y = glm::max(resultIntervals[1].y, obbProjection);
     }
 
     if (
@@ -99,21 +99,21 @@ static bool collisionAABBvOBB(const glm::vec3 aabb[8], const glm::vec3 obb[8]) {
   return true;
 }
 
-static glm::vec3 vmin(glm::vec3 a, glm::vec3 b) {
-  return glm::vec3(
-    min(a.x, b.x),
-    min(a.y, b.y),
-    min(a.z, b.z)
-  );
-}
+// static glm::vec3 vmin(glm::vec3 a, glm::vec3 b) {
+//   return glm::vec3(
+//     min(a.x, b.x),
+//     min(a.y, b.y),
+//     min(a.z, b.z)
+//   );
+// }
 
-static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
-  return glm::vec3(
-    max(a.x, b.x),
-    max(a.y, b.y),
-    max(a.z, b.z)
-  );
-}
+// static glm::vec3 vmax(glm::vec3 a, glm::vec3 b) {
+//   return glm::vec3(
+//     max(a.x, b.x),
+//     max(a.y, b.y),
+//     max(a.z, b.z)
+//   );
+// }
 
 class Volume {
 protected:
@@ -129,7 +129,7 @@ public:
   size_t activeBricks;
 
   Mesh *mesh;
-   
+
   q3Body* physicsBody;
 
 
@@ -303,7 +303,7 @@ public:
   size_t bind() {
     // Mesh data
     size_t brick_len = this->bricks.size();
-    
+
     if (brick_len == 0) {
       this->activeBricks = 0;
       return activeBricks;
@@ -445,12 +445,12 @@ public:
         toolVerts[vertIdx] = txPoint(toolToStock, glm::vec3(toolBrick->index) + offsets[vertIdx]);
 
         // maintain the extents of the transformed verts in volume space
-        lower.x = min(lower.x, toolVerts[vertIdx].x);
-        lower.y = min(lower.y, toolVerts[vertIdx].y);
-        lower.z = min(lower.z, toolVerts[vertIdx].z);
-        upper.x = max(upper.x, toolVerts[vertIdx].x);
-        upper.y = max(upper.y, toolVerts[vertIdx].y);
-        upper.z = max(upper.z, toolVerts[vertIdx].z);
+        lower.x = glm::min(lower.x, toolVerts[vertIdx].x);
+        lower.y = glm::min(lower.y, toolVerts[vertIdx].y);
+        lower.z = glm::min(lower.z, toolVerts[vertIdx].z);
+        upper.x = glm::max(upper.x, toolVerts[vertIdx].x);
+        upper.y = glm::max(upper.y, toolVerts[vertIdx].y);
+        upper.z = glm::max(upper.z, toolVerts[vertIdx].z);
       }
 
 

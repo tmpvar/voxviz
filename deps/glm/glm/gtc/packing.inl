@@ -1,6 +1,6 @@
 /// @ref gtc_packing
-/// @file glm/gtc/packing.inl
 
+#include "../ext/scalar_relational.hpp"
 #include "../ext/vector_relational.hpp"
 #include "../common.hpp"
 #include "../vec2.hpp"
@@ -683,7 +683,7 @@ namespace detail
 		GLM_STATIC_ASSERT(std::numeric_limits<uintType>::is_integer, "uintType must be an integer type");
 		GLM_STATIC_ASSERT(std::numeric_limits<floatType>::is_iec559, "floatType must be a floating point type");
 
-		return vec<L, float, Q>(v) * (static_cast<floatType>(1) / static_cast<floatType>(std::numeric_limits<uintType>::max()));
+		return vec<L, floatType, Q>(v) * (static_cast<floatType>(1) / static_cast<floatType>(std::numeric_limits<uintType>::max()));
 	}
 
 	template<typename intType, length_t L, typename floatType, qualifier Q>

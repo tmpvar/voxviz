@@ -1,14 +1,14 @@
 #include <glm/geometric.hpp>
 #include <glm/trigonometric.hpp>
-#include <glm/vector_relational.hpp>
+#include <glm/ext/scalar_relational.hpp>
 #include <glm/ext/vector_relational.hpp>
-#include <glm/ext/fvec1.hpp>
-#include <glm/fvec2.hpp>
-#include <glm/fvec3.hpp>
-#include <glm/fvec4.hpp>
-#include <glm/dvec2.hpp>
-#include <glm/dvec3.hpp>
-#include <glm/dvec4.hpp>
+#include <glm/ext/vector_float1.hpp>
+#include <glm/ext/vector_float2.hpp>
+#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/vector_float4.hpp>
+#include <glm/ext/vector_double2.hpp>
+#include <glm/ext/vector_double3.hpp>
+#include <glm/ext/vector_double4.hpp>
 #include <limits>
 
 namespace length

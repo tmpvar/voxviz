@@ -82,6 +82,11 @@ add_executable(
   deps/imgui/examples/imgui_impl_opengl3.cpp
 )
 
+target_compile_features(voxviz
+  PRIVATE
+    cxx_std_14
+)
+
 add_compile_definitions(STB_IMAGE_IMPLEMENTATION)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT voxviz)
 

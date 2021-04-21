@@ -3,9 +3,7 @@
 
 #pragma once
 
-#include "../fwd.hpp"
 #include "type_vec2.hpp"
-#include "type_mat.hpp"
 #include <limits>
 #include <cstddef>
 
@@ -34,7 +32,7 @@ namespace glm
 
 		// -- Constructors --
 
-		GLM_FUNC_DECL GLM_CONSTEXPR mat() GLM_DEFAULT;
+		GLM_FUNC_DECL GLM_CONSTEXPR mat() GLM_DEFAULT_CTOR;
 		template<qualifier P>
 		GLM_FUNC_DECL GLM_CONSTEXPR mat(mat<2, 2, T, P> const& m);
 

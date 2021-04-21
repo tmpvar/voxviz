@@ -23,9 +23,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#ifndef max
-#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#ifdef __WIN32
+  #ifndef max
+  #define max(a,b)            (((a) > (b)) ? (a) : (b))
+  #endif
+#else
+void DebugBreak();
 #endif
+
 
 using namespace std;
 
@@ -257,7 +262,7 @@ class SSBO {
   bool _persistent = false;
 public:
 
-  const enum MAP_TYPE {
+  enum MAP_TYPE {
     MAP_READ_ONLY = GL_READ_ONLY,
     MAP_READ_WRITE = GL_READ_WRITE,
     MAP_WRITE_ONLY = GL_WRITE_ONLY,
@@ -891,16 +896,13 @@ public:
       this->local_layout[2]
     );
 
-    glm::uvec3 d(
-      glm::ceil(glm::vec3(dims) / local)
+    glm::uvec3 d = glm::max(
+      glm::uvec3(
+        glm::ceil(glm::vec3(dims) / local)
+      ),
+      glm::uvec3(1)
     );
-
-
-    glDispatchCompute(
-      max(d.x, 1),
-      max(d.y, 1),
-      max(d.z, 1)
-    );
+    glDispatchCompute(d.x, d.y, d.z);
 
     gl_error();
     return this;
@@ -984,7 +986,7 @@ public:
     return this->address;
   }
 
-  const enum MAP_TYPE {
+  enum MAP_TYPE {
     MAP_READ_ONLY = GL_READ_ONLY,
     MAP_READ_WRITE = GL_READ_WRITE,
     MAP_WRITE_ONLY = GL_WRITE_ONLY,

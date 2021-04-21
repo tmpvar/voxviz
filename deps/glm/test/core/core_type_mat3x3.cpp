@@ -1,5 +1,7 @@
 #include <glm/gtc/constants.hpp>
+#include <glm/ext/scalar_relational.hpp>
 #include <glm/ext/vector_relational.hpp>
+#include <glm/ext/matrix_relational.hpp>
 #include <glm/matrix.hpp>
 #include <glm/vector_relational.hpp>
 #include <glm/mat2x2.hpp>
@@ -11,31 +13,18 @@
 #include <glm/mat4x2.hpp>
 #include <glm/mat4x3.hpp>
 #include <glm/mat4x4.hpp>
-#include <cstdio>
 #include <vector>
 
-void print(glm::dmat3 const& Mat0)
-{
-	printf("mat3(\n");
-	printf("\tvec3(%2.3f, %2.3f, %2.3f)\n", Mat0[0][0], Mat0[0][1], Mat0[0][2]);
-	printf("\tvec3(%2.3f, %2.3f, %2.3f)\n", Mat0[1][0], Mat0[1][1], Mat0[1][2]);
-	printf("\tvec3(%2.3f, %2.3f, %2.3f))\n\n", Mat0[2][0], Mat0[2][1], Mat0[2][2]);
-}
-
-int test_mat3x3()
+static int test_mat3x3()
 {
 	glm::dmat3 Mat0(
-		glm::dvec3(0.6f, 0.2f, 0.3f), 
-		glm::dvec3(0.2f, 0.7f, 0.5f), 
+		glm::dvec3(0.6f, 0.2f, 0.3f),
+		glm::dvec3(0.2f, 0.7f, 0.5f),
 		glm::dvec3(0.3f, 0.5f, 0.7f));
 	glm::dmat3 Inv0 = glm::inverse(Mat0);
 	glm::dmat3 Res0 = Mat0 * Inv0;
 
-	print(Mat0);
-	print(Inv0);
-	print(Res0);
-
-	return 0;
+	return glm::all(glm::equal(Res0, glm::dmat3(1.0), 0.01)) ? 0 : 1;
 }
 
 static int test_operators()
@@ -57,7 +46,7 @@ static int test_operators()
 	return (S && !R) ? 0 : 1;
 }
 
-int test_inverse()
+static int test_inverse()
 {
 	int Error(0);
 
@@ -89,7 +78,7 @@ int test_inverse()
 	return Error;
 }
 
-int test_ctr()
+static int test_ctr()
 {
 	int Error(0);
 
@@ -185,9 +174,7 @@ static int test_constexpr()
 #if GLM_HAS_CONSTEXPR
 	static_assert(glm::mat3x3::length() == 3, "GLM: Failed constexpr");
 
-	GLM_CONSTEXPR glm::mat3x3 const Z(0.0f);
-	static_assert(Z[0] == glm::vec3(0.0f), "GLM: Failed constexpr");
-	static_assert(Z == glm::mat3x3(0.0f), "GLM: Failed constexpr");
+	constexpr glm::mat3x3 const Z(0.0f);
 #endif
 
 	return 0;

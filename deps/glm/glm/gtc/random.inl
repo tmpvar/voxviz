@@ -1,10 +1,7 @@
-/// @ref gtc_random
-/// @file glm/gtc/random.inl
-
 #include "../geometric.hpp"
 #include "../exponential.hpp"
 #include "../trigonometric.hpp"
-#include "../ext/vec1.hpp"
+#include "../detail/type_vec1.hpp"
 #include <cstdlib>
 #include <ctime>
 #include <cassert>
@@ -231,7 +228,7 @@ namespace detail
 			w = x1 * x1 + x2 * x2;
 		} while(w > genType(1));
 
-		return x2 * Deviation * Deviation * sqrt((genType(-2) * log(w)) / w) + Mean;
+		return static_cast<genType>(x2 * Deviation * Deviation * sqrt((genType(-2) * log(w)) / w) + Mean);
 	}
 
 	template<length_t L, typename T, qualifier Q>

@@ -15,8 +15,7 @@ void aabb_print(aabb_t *v) {
 }
 
 aabb_t *aabb_create() {
-  aabb_t *out = (aabb_t *)malloc(sizeof(aabb_t));
-  memset(out, 0, sizeof(aabb_t));
+  aabb_t *out = (aabb_t *)calloc(1, sizeof(aabb_t));
   return out;
 }
 
@@ -49,7 +48,7 @@ bool aabb_isect(const aabb_t *a, const aabb_t *b, aabb_t *out) {
   out->lower.x = fmax(a->lower.x, b->lower.x);
   out->lower.y = fmax(a->lower.y, b->lower.y);
   out->lower.z = fmax(a->lower.z, b->lower.z);
-  
+
   return true;
 }
 

@@ -29,36 +29,36 @@ GLint gl_ok(GLint error) {
     printf("error (%i): GL_OUT_OF_MEMORY: There is not enough memory left to execute the command. The state of the GL is undefined, except for the state of the error flags, after this error is recorded.\n", error);
     break;
 
-  case GL_FRAMEBUFFER_UNDEFINED: 
+  case GL_FRAMEBUFFER_UNDEFINED:
     printf("error (%i): GL_FRAMEBUFFER_UNDEFINED is returned if the specified framebuffer is the default read or draw framebuffer, but the default framebuffer does not exist.", error);
     break;
-    
-  case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: 
+
+  case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
     printf("error (%i): GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT is returned if any of the framebuffer attachment points are framebuffer incomplete.", error);
     break;
-    
-  case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: 
+
+  case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
     printf("error (%i): GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT is returned if the framebuffer does not have at least one image attached to it.", error);
     break;
-    
-  case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER: 
+
+  case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
     printf("error (%i): GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER is returned if the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for any color attachment point(s) named by GL_DRAW_BUFFERi.", error);
     break;
-    
-  case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER: 
+
+  case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
     printf("error (%i): GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER is returned if GL_READ_BUFFER is not GL_NONE and the value of GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE is GL_NONE for the color attachment point named by GL_READ_BUFFER.", error);
     break;
-    
-  case GL_FRAMEBUFFER_UNSUPPORTED: 
+
+  case GL_FRAMEBUFFER_UNSUPPORTED:
     printf("error (%i): GL_FRAMEBUFFER_UNSUPPORTED is returned if the combination of internal formats of the attached images violates an implementation - dependent set of restrictions.", error);
     break;
-    
-  case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE: 
+
+  case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
     printf("error (%i): GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE is returned if the value of GL_RENDERBUFFER_SAMPLES is not the same for all attached renderbuffers; if the value of GL_TEXTURE_SAMPLES is the not same for all attached textures; or , if the attached images are a mix of renderbuffers and textures, the value of GL_RENDERBUFFER_SAMPLES does not match the value of GL_TEXTURE_SAMPLES.", error);
     printf("error (%i): GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE is also returned if the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not the same for all attached textures; or , if the attached images are a mix of renderbuffers and textures, the value of GL_TEXTURE_FIXED_SAMPLE_LOCATIONS is not GL_TRUE for all attached textures.", error);
     break;
-    
-  case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS: 
+
+  case GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS:
     printf("error (%i): GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS is returned if any framebuffer attachment is layered, and any populated attachment is not layered, or if all populated color attachments are not from textures of the same target.", error);
     break;
   }
@@ -75,7 +75,7 @@ GLint GL_ERROR() {
     }
 
   } while (err);
- 
+
 
   return ret;
 }
@@ -102,7 +102,7 @@ void gl_program_log(GLuint handle) {
   GLint error = glGetError();
   GLint l, m;
   GLint isLinked = 0;
-  
+
   glGetProgramiv(handle, GL_LINK_STATUS, &isLinked);
   if (isLinked == GL_TRUE) {
     printf("  linked\n");
@@ -168,3 +168,9 @@ void APIENTRY openglCallbackFunction(GLenum source,
   cout << endl;
   cout << "---------------------opengl-callback-end--------------" << endl;
 }
+
+#ifndef __WIN32
+  void DebugBreak() {
+
+  }
+#endif
